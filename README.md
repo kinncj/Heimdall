@@ -119,19 +119,6 @@ make lint             # gofmt + go vet
 make test-acceptance  # behave acceptance suite (drives the real binaries)
 ```
 
-Cut a release by pushing a tag — the [`release` workflow](.github/workflows/release.yml)
-cross-compiles all four binaries and uploads them to the GitHub Release:
-
-```sh
-git tag v0.1.0 && git push origin v0.1.0
-```
-
-## Brand
-
-Steel wordmark, electric-blue signature (`#00d7ff`), near-black surface. Logos and headers live in
-[`assets/`](assets) — PNGs for docs, ASCII-art `.txt` for the terminal splash. See
-[`docs/design/identity/tui-brand.md`](docs/design/identity/tui-brand.md).
-
 ## License
 
 [AGPL-3.0-or-later](LICENSE) © Kinn Coelho Juliao &lt;kinncj@gmail.com&gt;
