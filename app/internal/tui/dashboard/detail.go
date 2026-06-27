@@ -5,6 +5,7 @@ package dashboard
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -180,6 +181,8 @@ func (m Model) DetailView() string {
 		label.Style().Render("disk r ") + m.throughputVal(byName, "disk.read") + "   " +
 		label.Style().Render("disk w ") + m.throughputVal(byName, "disk.write") + "\n")
 
+	b.WriteString(m.nicsSection(byName))
+
 	b.WriteString("\n  " + keys.Style().Render("esc") + muted.Style().Render(" back   ") +
 		keys.Style().Render("↑/↓") + muted.Style().Render(" host   ") +
 		keys.Style().Render("q") + muted.Style().Render(" quit"))
@@ -193,6 +196,54 @@ func (m Model) throughputVal(byName map[string]domain.Metric, key string) string
 	}
 	val, _ := m.mode.Role("value")
 	return val.Style().Render(fmt.Sprintf("%.2f MB/s", mm.Gauge))
+}
+
+// nicsSection lists each non-loopback NIC with its rx/tx throughput and, when
+// known, its gateway latency and IP. NIC names come from the net.rx.<iface>
+// metrics the daemon emits per interface.
+func (m Model) nicsSection(byName map[string]domain.Metric) string {
+	ifaces := make([]string, 0, 4)
+	for name := range byName {
+		if strings.HasPrefix(name, "net.rx.") {
+			ifaces = append(ifaces, strings.TrimPrefix(name, "net.rx."))
+		}
+	}
+	if len(ifaces) == 0 {
+		return ""
+	}
+	sort.Strings(ifaces)
+
+	heading, _ := m.mode.Role("heading")
+	label, _ := m.mode.Role("label")
+	val, _ := m.mode.Role("value")
+
+	var b strings.Builder
+	rows := 0
+	for _, iface := range ifaces {
+		rx := byName["net.rx."+iface]
+		tx := byName["net.tx."+iface]
+		gw, hasGW := byName["net.gateway."+iface]
+		// Skip the OS's many idle virtual interfaces: show a NIC only if it has a
+		// default gateway or is currently moving traffic.
+		if !hasGW && rx.Gauge == 0 && tx.Gauge == 0 {
+			continue
+		}
+		if rows == 0 {
+			b.WriteString("\n  " + heading.Style().Render("NICS") + "\n")
+		}
+		rows++
+		line := "  " + val.Style().Render(fmt.Sprintf("%-12s", clipName(iface, 12))) +
+			label.Style().Render("↓ ") + val.Style().Render(fmt.Sprintf("%6.2f MB/s", rx.Gauge)) +
+			label.Style().Render("  ↑ ") + val.Style().Render(fmt.Sprintf("%6.2f MB/s", tx.Gauge))
+		if hasGW && gw.Status == domain.StatusOK {
+			line += label.Style().Render("   gw ") + val.Style().Render(fmt.Sprintf("%.0f ms", gw.Gauge))
+			if gw.Detail != "" {
+				line += " " + label.Style().Render(gw.Detail)
+			}
+		}
+		b.WriteString(line + "\n")
+	}
+	return b.String()
 }
 
 func (m Model) pingVal(byName map[string]domain.Metric) string {

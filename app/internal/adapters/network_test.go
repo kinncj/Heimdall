@@ -21,7 +21,8 @@ func TestNetworkDelta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("net collect 2: %v", err)
 	}
-	if len(ms) != 2 || ms[0].Name != "net.rx" || ms[1].Name != "net.tx" {
+	// The aggregate comes first, then a per-NIC breakdown.
+	if len(ms) < 2 || ms[0].Name != "net.rx" || ms[1].Name != "net.tx" {
 		t.Fatalf("net metrics = %+v", ms)
 	}
 	for _, m := range ms {
