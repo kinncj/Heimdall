@@ -92,26 +92,33 @@ func (m Model) DetailView() string {
 	muted, _ := m.mode.Role("text_muted")
 	keys, _ := m.mode.Role("keybinding")
 
+	byName := make(map[string]domain.Metric, len(h.LastSnapshot))
+	for _, mm := range h.LastSnapshot {
+		byName[mm.Name] = mm
+	}
+	desc := func(key, fallback string) string {
+		if d := byName[key].Detail; d != "" {
+			return d
+		}
+		return fallback
+	}
+
 	dn := h.Host.DisplayName
 	if dn == "" {
 		dn = string(h.Host.ID)
 	}
 	st, _ := m.mode.State(stateName(h.State))
 	ctx := h.Host.Context
-	osArch := orDash(strings.Trim(ctx.OS+"/"+ctx.Arch, "/"))
+	osArch := orDash(strings.TrimSpace(desc("host.os", ctx.OS) + " " + desc("host.arch", ctx.Arch)))
 
 	var b strings.Builder
 	b.WriteString(header + "\n\n")
 	b.WriteString("  " + heading.Style().Render("HOST DETAIL — "+dn) + "\n")
 	b.WriteString("  " + st.Badge() + "   " +
 		label.Style().Render("os ") + val.Style().Render(osArch) + "   " +
-		label.Style().Render("class ") + val.Style().Render(orDash(ctx.Labels["class"])) + "   " +
+		label.Style().Render("kernel ") + val.Style().Render(orDash(desc("host.kernel", ""))) + "   " +
 		label.Style().Render("seen ") + val.Style().Render(h.LastSeen.Format("15:04:05")) + "\n\n")
 
-	byName := make(map[string]domain.Metric, len(h.LastSnapshot))
-	for _, mm := range h.LastSnapshot {
-		byName[mm.Name] = mm
-	}
 	hist := m.history[h.Host.ID]
 	// Cap the trend to the space between the value column and the right edge so
 	// it scrolls in place instead of growing past the frame as history fills.
@@ -152,6 +159,12 @@ func (m Model) DetailView() string {
 		b.WriteString("  " + render.Sparkline(m.mode, cores.PerCore, w-4) + "  " +
 			muted.Style().Render(fmt.Sprintf("%d cores", len(cores.PerCore))) + "\n")
 	}
+
+	b.WriteString("\n  " + heading.Style().Render("HARDWARE") + "\n")
+	b.WriteString("  " +
+		label.Style().Render("cpu ") + val.Style().Render(orDash(desc("host.cpu", ""))) + "   " +
+		label.Style().Render("gpu ") + val.Style().Render(orDash(desc("host.gpu", ""))) + "   " +
+		label.Style().Render("heimdall ") + val.Style().Render(orDash(desc("host.version", ""))) + "\n")
 
 	b.WriteString("\n  " + heading.Style().Render("NETWORK & SYSTEM") + "\n")
 	b.WriteString("  " +

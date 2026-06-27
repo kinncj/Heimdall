@@ -25,7 +25,7 @@ func first(t *testing.T, a domain.Adapter) domain.Metric {
 }
 
 func TestDefaultAdapters(t *testing.T) {
-	if n := len(Default()); n != 10 {
-		t.Fatalf("Default() = %d adapters, want 10", n)
+	if n := len(Default()); n != 11 {
+		t.Fatalf("Default() = %d adapters, want 11", n)
 	}
 }

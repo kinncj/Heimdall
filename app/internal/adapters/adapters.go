@@ -17,6 +17,9 @@ type Options struct {
 	// PingTarget is the internet host whose round-trip latency the Reachability
 	// adapter measures. Empty means 1.1.1.1.
 	PingTarget string
+	// Version is the Heimdall build version reported by the Inventory adapter.
+	// Empty means "dev".
+	Version string
 }
 
 // Build returns the unprivileged adapters plus the helper bridge, configured by
@@ -24,6 +27,7 @@ type Options struct {
 // adapter here.
 func Build(o Options) []domain.Adapter {
 	return []domain.Adapter{
+		&Inventory{Version: o.Version},
 		CPU{}, Mem{}, Disk{Path: "/"}, &DiskIO{},
 		Temperature{}, &Network{}, Reachability{Target: o.PingTarget}, Uptime{},
 		&Gateway{}, Helper{},

@@ -35,6 +35,10 @@ import (
 
 // logger carries the daemon's structured operational logs. main replaces it
 // once --log-file is parsed; the default keeps early errors on stderr.
+// version is the Heimdall build version, set via -ldflags "-X main.version=…"
+// at release time; "dev" for local builds. Reported by the Inventory adapter.
+var version = "dev"
+
 var logger = slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("component", "heimdall-daemon")
 
 func main() {
@@ -76,7 +80,7 @@ func main() {
 	}
 
 	reg := domain.NewRegistry(*interval)
-	for _, a := range adapters.Build(adapters.Options{PingTarget: *pingTarget}) {
+	for _, a := range adapters.Build(adapters.Options{PingTarget: *pingTarget, Version: version}) {
 		reg.Register(a)
 	}
 
