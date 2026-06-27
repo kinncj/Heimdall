@@ -40,6 +40,7 @@ func hubCatalog() options.Catalog {
 		options.Define("alert-webhook").Help("URL to POST alert events to on fire/clear (Gjallarhorn)"),
 		options.Define("discoverable").Of(options.KindToggle).Default("false").
 			Help("advertise this hub over mDNS so daemons can auto-discover it (Ratatoskr)"),
+		options.Define("tsdb").Help("Prometheus-compatible TSDB base URL (e.g. http://prom:9090) to persist metrics to and restore state from on restart; empty = off (Mímir durable sink)"),
 	)
 }
 

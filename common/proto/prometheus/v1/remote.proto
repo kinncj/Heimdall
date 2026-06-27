@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Kinn Coelho Juliao <kinncj@gmail.com>
+//
+// Minimal Prometheus remote-write 1.0 schema — just the messages Heimdall's
+// durable sink (Mímir, ADR 0016) needs to POST time series. This is the public
+// remote-write wire contract; we vendor only the subset we use rather than
+// depending on the full Prometheus module.
+
+syntax = "proto3";
+
+package prometheus.v1;
+
+option go_package = "heimdall/common/proto/prometheus/v1;prometheusv1";
+
+// WriteRequest is the body of a Prometheus remote-write request (snappy-framed).
+message WriteRequest {
+  repeated TimeSeries timeseries = 1;
+}
+
+message TimeSeries {
+  repeated Label labels = 1;   // includes __name__
+  repeated Sample samples = 2;
+}
+
+message Label {
+  string name = 1;
+  string value = 2;
+}
+
+message Sample {
+  double value = 1;
+  int64 timestamp = 2; // unix milliseconds
+}

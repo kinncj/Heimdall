@@ -28,6 +28,7 @@ import (
 	"heimdall/app/internal/options"
 	"heimdall/app/internal/secure"
 	"heimdall/app/internal/selfupdate"
+	"heimdall/app/internal/store"
 	v1 "heimdall/common/proto/monitoring/v1"
 )
 
@@ -88,6 +89,39 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go h.EvaluateLoop(ctx)
+
+	// Mímir durable sink (ADR 0016): persist to an external TSDB and, on restart,
+	// restore the last-known fleet from it before live traffic arrives. Off unless
+	// --tsdb is set.
+	if tsdb := cfg.Text("tsdb"); tsdb != "" {
+		st := store.NewPrometheus(tsdb)
+		rctx, rcancel := context.WithTimeout(ctx, 10*time.Second)
+		if views, err := st.Restore(rctx); err != nil {
+			fmt.Fprintln(os.Stderr, "heimdall-hub: tsdb restore:", err)
+		} else if len(views) > 0 {
+			for _, hv := range views {
+				h.Registry().Enroll(hv.Host, hv.LastSeen)
+				h.Registry().Observe(hv.Host.ID, hv.LastSnapshot, hv.Host.Context.Labels, hv.LastSeen)
+			}
+			fmt.Fprintf(os.Stderr, "heimdall-hub: restored %d host(s) from %s\n", len(views), tsdb)
+		}
+		rcancel()
+		go func() {
+			t := time.NewTicker(10 * time.Second)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case now := <-t.C:
+					if err := st.Write(ctx, h.Registry().Hosts(), now); err != nil {
+						fmt.Fprintln(os.Stderr, "heimdall-hub: tsdb write:", err)
+					}
+				}
+			}
+		}()
+		fmt.Fprintf(os.Stderr, "heimdall-hub: persisting to %s (Mímir durable sink)\n", tsdb)
+	}
 
 	if upstream := cfg.Text("upstream"); upstream != "" {
 		dialOpts, err := upstreamDialOptions(cfg.Secret("upstream-token").Reveal(), secure.ClientConfig{

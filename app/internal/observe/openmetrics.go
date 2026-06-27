@@ -22,35 +22,9 @@ import (
 // one series per core. Non-OK and info metrics are not emitted as numeric series.
 func RenderOpenMetrics(views []domain.HostView) string {
 	families := map[string][]string{}
-	add := func(family string, labels map[string]string, value float64) {
-		name := "heimdall_" + family
-		families[name] = append(families[name],
-			name+formatLabels(labels)+" "+strconv.FormatFloat(value, 'g', -1, 64))
-	}
-	for _, v := range views {
-		base := map[string]string{"host": string(v.Host.ID)}
-		for k, val := range v.Host.Context.Labels {
-			base[k] = val
-		}
-		up := withLabel(base, "state", v.State.String())
-		add("host_up", up, 1)
-
-		for _, m := range v.LastSnapshot {
-			if m.Status != domain.StatusOK {
-				continue
-			}
-			family := sanitize(m.Name)
-			if m.Kind == domain.KindPerCore {
-				for i, c := range m.PerCore {
-					add(family, withLabel(base, "core", strconv.Itoa(i)), c)
-				}
-				continue
-			}
-			if m.Unit == "info" {
-				continue
-			}
-			add(family, base, m.Gauge)
-		}
+	for _, s := range SeriesOf(views) {
+		families[s.Name] = append(families[s.Name],
+			s.Name+formatLabels(s.Labels)+" "+strconv.FormatFloat(s.Value, 'g', -1, 64))
 	}
 
 	names := make([]string, 0, len(families))
@@ -70,6 +44,45 @@ func RenderOpenMetrics(views []domain.HostView) string {
 		}
 	}
 	return b.String()
+}
+
+// Series is one Prometheus sample: a metric name, its label set, and a value.
+type Series struct {
+	Name   string
+	Labels map[string]string
+	Value  float64
+}
+
+// SeriesOf flattens host views into Prometheus series — a heimdall_host_up
+// liveness series per host plus one series per OK scalar metric (per-core metrics
+// fan out to one series per core). Non-OK and info metrics are skipped. Both the
+// OpenMetrics text export and the durable sink (Mímir) build on this.
+func SeriesOf(views []domain.HostView) []Series {
+	var out []Series
+	for _, v := range views {
+		base := map[string]string{"host": string(v.Host.ID)}
+		for k, val := range v.Host.Context.Labels {
+			base[k] = val
+		}
+		out = append(out, Series{"heimdall_host_up", withLabel(base, "state", v.State.String()), 1})
+		for _, m := range v.LastSnapshot {
+			if m.Status != domain.StatusOK {
+				continue
+			}
+			name := "heimdall_" + sanitize(m.Name)
+			if m.Kind == domain.KindPerCore {
+				for i, c := range m.PerCore {
+					out = append(out, Series{name, withLabel(base, "core", strconv.Itoa(i)), c})
+				}
+				continue
+			}
+			if m.Unit == "info" {
+				continue
+			}
+			out = append(out, Series{name, base, m.Gauge})
+		}
+	}
+	return out
 }
 
 // sanitize maps a metric name to a valid Prometheus identifier (cpu.util ->

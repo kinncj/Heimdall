@@ -6,6 +6,7 @@ require (
 	github.com/BourgeoisBear/rasterm v1.1.2
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/golang/snappy v1.0.0
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/shirou/gopsutil/v4 v4.26.5
 	golang.org/x/image v0.43.0
