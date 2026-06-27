@@ -351,12 +351,13 @@ func emit(w io.Writer, host string, ms []domain.Metric, asJSON bool) {
 			Status string    `json:"status"`
 			Value  float64   `json:"value"`
 			Unit   string    `json:"unit"`
+			Detail string    `json:"detail,omitempty"`
 			Cores  []float64 `json:"cores,omitempty"`
 		}
 		enc := json.NewEncoder(w)
 		now := time.Now().Unix()
 		for _, m := range ms {
-			_ = enc.Encode(row{host, now, m.Name, m.Status.String(), m.Gauge, m.Unit, m.PerCore})
+			_ = enc.Encode(row{host, now, m.Name, m.Status.String(), m.Gauge, m.Unit, m.Detail, m.PerCore})
 		}
 		return
 	}
@@ -384,6 +385,8 @@ func formatMetric(m domain.Metric) string {
 		return fmt.Sprintf("%s=%dc(avg%.0f%%,max%.0f%%)", m.Name, len(m.PerCore), sum/float64(len(m.PerCore)), max)
 	}
 	switch m.Unit {
+	case "info":
+		return fmt.Sprintf("%s=%s", m.Name, m.Detail)
 	case "percent":
 		return fmt.Sprintf("%s=%.0f%%", m.Name, m.Gauge)
 	case "watts":

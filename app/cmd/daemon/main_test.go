@@ -32,6 +32,26 @@ func TestResolveOutputFalseDiscardsEverything(t *testing.T) {
 	}
 }
 
+func TestFormatMetricInfoUsesDetail(t *testing.T) {
+	// Info metrics (host.os, host.cpu, …) carry their value as a Detail string
+	// with no gauge. They must render the string, not the zero gauge.
+	m := domain.Metric{Name: "host.os", Unit: "info", Status: domain.StatusOK, Detail: "macOS 15.0"}
+	got := formatMetric(m)
+	want := "host.os=macOS 15.0"
+	if got != want {
+		t.Fatalf("formatMetric(info) = %q, want %q", got, want)
+	}
+}
+
+func TestEmitJSONInfoCarriesDetail(t *testing.T) {
+	var b strings.Builder
+	emit(&b, "host-a", []domain.Metric{{Name: "host.os", Unit: "info", Status: domain.StatusOK, Detail: "macOS 15.0"}}, true)
+	out := b.String()
+	if !strings.Contains(out, `"detail":"macOS 15.0"`) {
+		t.Fatalf("emit JSON info dropped the detail string: %s", out)
+	}
+}
+
 func TestResolveOutputFileWritesJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "d.log")
 	lg, mw, mjson, closeFn, err := resolveOutput(path, false)
