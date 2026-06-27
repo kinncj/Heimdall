@@ -11,7 +11,7 @@ jobs:
     name: Story frontmatter
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate story frontmatter
         run: |
           STORIES=$(find docs/stories -name "*.md" ! -name "_template.md" 2>/dev/null || true)
@@ -22,7 +22,7 @@ jobs:
     name: Gherkin story validation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Gherkin scenarios in story files
         run: bash scripts/sdlc/spec-kit-gate.sh
 
@@ -30,7 +30,7 @@ jobs:
     name: Design approval (ui:true stories)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check wireframe + mockup approval status
         run: |
           STORIES=$(find docs/stories -name "*.md" ! -name "_template.md" 2>/dev/null || true)
@@ -41,7 +41,7 @@ jobs:
     name: A11y audit gate (ui:true stories)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check a11y audit reports
         run: |
           STORIES=$(find docs/stories -name "*.md" ! -name "_template.md" 2>/dev/null || true)
@@ -52,7 +52,7 @@ jobs:
     name: ADR required gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check ADR files exist when adr_required is true
         run: bash scripts/sdlc/adr-required-gate.sh
 
@@ -61,8 +61,8 @@ jobs:
     runs-on: ubuntu-latest
     if: vars.ENABLE_SHIP_SAFE == 'true'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
       - name: Run ship-safe audit
