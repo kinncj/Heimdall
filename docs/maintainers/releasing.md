@@ -22,11 +22,19 @@ binary and attaches them to that release. Re-running is therefore idempotent.
 gh release create v1.2.0 --target main --title v1.2.0 --generate-notes
 ```
 
-The workflow then:
+The workflow then, in parallel:
 
-1. runs `scripts/release.sh` (the single build source, also used by `make release`),
-   producing `dist/heimdall-<binary>_<os>_<arch>` plus a `SHA256SUMS` manifest;
-2. uploads those assets to the `v1.2.0` release with `softprops/action-gh-release`.
+1. **macOS** (`macos-14`, **CGO enabled**) builds `darwin/arm64` and `darwin/amd64`
+   so the Apple Silicon IOReport path — no-sudo GPU utilisation and power — is
+   compiled in. CGO-free cross-compiles cannot link IOReport, so these must be
+   built on a macOS runner.
+2. **Linux + Windows** (`ubuntu-latest`, CGO-free) cross-compiles `linux/{amd64,arm64}`
+   and `windows/{amd64,arm64}` via `scripts/release.sh`.
+3. a **publish** job downloads both, writes `SHA256SUMS`, and attaches everything
+   to the release with `softprops/action-gh-release`.
+
+> `make release` locally produces CGO-free binaries for every platform (a portable
+> convenience build); the official macOS binaries with IOReport come from CI.
 
 To rebuild assets for an existing release, re-publish it (or re-run the workflow) — the
 upload overwrites in place.
