@@ -530,6 +530,7 @@ type Snapshot struct {
 	Keyframe      bool                   `protobuf:"varint,5,opt,name=keyframe,proto3" json:"keyframe,omitempty"` // true = full set (resync point)
 	Samples       []*MetricSample        `protobuf:"bytes,6,rep,name=samples,proto3" json:"samples,omitempty"`
 	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // effective host tags (host wins over hub); inherited across Bifröst relay
+	Alerts        []string               `protobuf:"bytes,8,rep,name=alerts,proto3" json:"alerts,omitempty"`                                                                           // names of rules currently firing for this host (Gjallarhorn)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -609,6 +610,13 @@ func (x *Snapshot) GetSamples() []*MetricSample {
 func (x *Snapshot) GetLabels() map[string]string {
 	if x != nil {
 		return x.Labels
+	}
+	return nil
+}
+
+func (x *Snapshot) GetAlerts() []string {
+	if x != nil {
+		return x.Alerts
 	}
 	return nil
 }
@@ -1528,7 +1536,7 @@ const file_common_proto_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x05gauge\x18\x05 \x01(\x01H\x00R\x05gauge\x123\n" +
 	"\bper_core\x18\x06 \x01(\v2\x16.monitoring.v1.PerCoreH\x00R\aperCore\x122\n" +
 	"\acounter\x18\a \x01(\v2\x16.monitoring.v1.CounterH\x00R\acounterB\a\n" +
-	"\x05value\"\xbc\x02\n" +
+	"\x05value\"\xd4\x02\n" +
 	"\bSnapshot\x12\x17\n" +
 	"\ahost_id\x18\x01 \x01(\tR\x06hostId\x12$\n" +
 	"\x0ets_unix_millis\x18\x02 \x01(\x03R\ftsUnixMillis\x12\x10\n" +
@@ -1536,7 +1544,8 @@ const file_common_proto_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x05delta\x18\x04 \x01(\bR\x05delta\x12\x1a\n" +
 	"\bkeyframe\x18\x05 \x01(\bR\bkeyframe\x125\n" +
 	"\asamples\x18\x06 \x03(\v2\x1b.monitoring.v1.MetricSampleR\asamples\x12;\n" +
-	"\x06labels\x18\a \x03(\v2#.monitoring.v1.Snapshot.LabelsEntryR\x06labels\x1a9\n" +
+	"\x06labels\x18\a \x03(\v2#.monitoring.v1.Snapshot.LabelsEntryR\x06labels\x12\x16\n" +
+	"\x06alerts\x18\b \x03(\tR\x06alerts\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"|\n" +

@@ -134,10 +134,26 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 			return err
 		}
 		hostID, ms, labels := transport.FromSnapshot(snap)
-		h.reg.Observe(domain.HostID(hostID), ms, withOrigin(labels, h.idOrDefault()), time.Now())
-		h.recordOrigin(domain.HostID(hostID), h.idOrDefault(), nil)
-		h.publish(snap)
+		id := domain.HostID(hostID)
+		h.reg.Observe(id, ms, withOrigin(labels, h.idOrDefault()), time.Now())
+		h.recordOrigin(id, h.idOrDefault(), nil)
+		h.publish(h.enrich(id, snap))
 	}
+}
+
+// enrich rebuilds a snapshot from the registry view so live updates carry the
+// same merged labels (origin hub, inherited tags) and alert state as the initial
+// subscribe state — without this, the live path would forward the raw daemon
+// snapshot and the dashboard would lose the hub label and alerts between frames.
+// Falls back to the raw snapshot if the host is unknown.
+func (h *Hub) enrich(id domain.HostID, raw *v1.Snapshot) *v1.Snapshot {
+	hv, ok := h.reg.Host(id)
+	if !ok {
+		return raw
+	}
+	out := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, raw.GetSeq(), time.Now())
+	out.Alerts = hv.Alerts
+	return out
 }
 
 // Subscribe streams the current state then live snapshots to a dashboard.
@@ -147,7 +163,9 @@ func (h *Hub) Subscribe(_ *v1.SubscribeRequest, stream v1.FederationService_Subs
 	defer h.removeSub(ch)
 
 	for _, hv := range h.reg.Hosts() {
-		if err := stream.Send(transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, hv.LastSeen)); err != nil {
+		snap := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, hv.LastSeen)
+		snap.Alerts = hv.Alerts
+		if err := stream.Send(snap); err != nil {
 			return err
 		}
 	}

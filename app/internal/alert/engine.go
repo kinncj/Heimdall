@@ -8,6 +8,7 @@
 package alert
 
 import (
+	"strings"
 	"time"
 
 	"heimdall/app/internal/domain"
@@ -95,6 +96,23 @@ func (e *Engine) Evaluate(views []domain.HostView, now time.Time) []Event {
 		}
 	}
 	return events
+}
+
+// FiringByHost returns the names of currently-firing rules grouped by host id,
+// so the hub can stamp them onto each host's view for the dashboard.
+func (e *Engine) FiringByHost() map[string][]string {
+	out := map[string][]string{}
+	for key, on := range e.firing {
+		if !on {
+			continue
+		}
+		rule, host, ok := strings.Cut(key, "\x00")
+		if !ok {
+			continue
+		}
+		out[host] = append(out[host], rule)
+	}
+	return out
 }
 
 // Active returns the number of currently firing alerts.

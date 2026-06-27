@@ -29,6 +29,7 @@ type hostEntry struct {
 	observed bool
 	snapshot []Metric
 	labels   map[string]string
+	alerts   []string
 }
 
 // NewHostRegistry returns a registry with the given liveness thresholds.
@@ -68,6 +69,16 @@ func (r *HostRegistry) SetHubLabels(labels map[string]string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.hubLabels = labels
+}
+
+// SetAlerts records the names of rules currently firing for a host (Gjallarhorn),
+// so they ride into HostView and out to dashboards. An unknown host is ignored.
+func (r *HostRegistry) SetAlerts(id HostID, alerts []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if e, ok := r.hosts[id]; ok {
+		e.alerts = alerts
+	}
 }
 
 // Observe records a fresh metric snapshot, marking the host Online and storing
@@ -156,7 +167,11 @@ func (e *hostEntry) view(hubLabels map[string]string) HostView {
 	// Precedence: hub tags < enrolled tags < live (observed) tags. The host's own
 	// tags win over the hub's; the latest from the wire wins over enrollment.
 	host.Context.Labels = mergeLabels(hubLabels, mergeLabels(e.host.Context.Labels, e.labels))
-	return HostView{Host: host, State: e.state, LastSeen: e.lastSeen, LastSnapshot: snap}
+	var alerts []string
+	if e.alerts != nil {
+		alerts = append([]string(nil), e.alerts...)
+	}
+	return HostView{Host: host, State: e.state, LastSeen: e.lastSeen, LastSnapshot: snap, Alerts: alerts}
 }
 
 // mergeLabels combines hub-level tags with a host's own tags; the host's value

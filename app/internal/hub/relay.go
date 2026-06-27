@@ -45,6 +45,7 @@ func (h *Hub) Relay(stream v1.FederationService_RelayServer) error {
 		}
 		h.reg.Enroll(domain.Host{ID: id, Hostname: hostID, DisplayName: hostID}, time.Now())
 		h.reg.Observe(id, ms, withOrigin(labels, origin), time.Now())
+		h.reg.SetAlerts(id, snap.GetAlerts())
 		h.recordOrigin(id, origin, env.GetPath())
 		h.publish(snap)
 		_ = stream.Send(&v1.RelayControl{AckedSeq: snap.GetSeq()})
@@ -67,10 +68,12 @@ func (h *Hub) RelayEnvelopes() []*v1.RelayEnvelope {
 			origin = self
 		}
 		path := append(append([]string{}, meta.path...), self)
+		snap := transport.ToSnapshot(string(v.Host.ID), v.LastSnapshot, v.Host.Context.Labels, 0, v.LastSeen)
+		snap.Alerts = v.Alerts
 		out = append(out, &v1.RelayEnvelope{
 			OriginHubId: origin,
 			Path:        path,
-			Snapshot:    transport.ToSnapshot(string(v.Host.ID), v.LastSnapshot, v.Host.Context.Labels, 0, v.LastSeen),
+			Snapshot:    snap,
 		})
 	}
 	return out

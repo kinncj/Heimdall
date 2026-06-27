@@ -169,6 +169,12 @@ func main() {
 							notifier.Notify(ctx, ev)
 						}
 					}
+					// Stamp firing state onto each host so it rides the enriched
+					// snapshot to dashboards (Gjallarhorn badge).
+					firing := engine.FiringByHost()
+					for _, hv := range h.Registry().Hosts() {
+						h.Registry().SetAlerts(hv.Host.ID, firing[string(hv.Host.ID)])
+					}
 				}
 			}
 		}()

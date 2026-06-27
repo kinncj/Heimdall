@@ -66,4 +66,5 @@ type HostView struct {
 	State        HostState
 	LastSeen     time.Time
 	LastSnapshot []Metric
+	Alerts       []string // names of rules currently firing for this host (Gjallarhorn)
 }

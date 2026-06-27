@@ -115,6 +115,7 @@ message Snapshot {
   bool   keyframe = 5;                // true = full set (resync point)
   repeated MetricSample samples = 6;
   map<string, string> labels = 7;     // effective host tags (host wins over hub); inherited across Bifröst relay
+  repeated string alerts = 8;         // names of rules currently firing for this host (Gjallarhorn)
 }
 
 // ---------------------------------------------------------------------------
