@@ -5,6 +5,24 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-06-27
+
+### Fixed
+- Add the missing `scripts/gen-dev-certs.sh` that `make dev-certs` and the TLS
+  acceptance test call. It writes a self-signed `hub.crt`/`hub.key` (SANs for
+  `localhost` and `127.0.0.1`) usable as both the hub server cert and the client
+  CA bundle.
+- Make the acceptance suite hermetic: each scenario gets its own
+  `HEIMDALL_CONFIG_DIR` and each simulated host its own config dir. Scenarios
+  were leaking saved daemon settings (a stale `control-listen`) into each other,
+  so co-located daemons collided on a port and only one host came online.
+
+### Changed
+- Replace the `switch m.Unit` in the daemon print formatter with a per-unit
+  strategy table (no behaviour change).
+- Bump GitHub Actions off the deprecated Node 20 runtime: checkout v7, setup-go
+  v6, setup-node v6, upload-artifact v7, download-artifact v8, gh-release v3.
+
 ## [1.1.0] - 2026-06-27
 
 First release with a consolidated changelog. Rolls up the v1.0.x line and fixes
@@ -105,6 +123,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.1.1]: https://github.com/kinncj/Heimdall/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/kinncj/Heimdall/compare/v1.0.7...v1.1.0
 [1.0.7]: https://github.com/kinncj/Heimdall/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/kinncj/Heimdall/compare/v1.0.5...v1.0.6
