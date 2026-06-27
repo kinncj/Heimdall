@@ -333,4 +333,5 @@ func foldSnapshot(reg *domain.HostRegistry, snap *v1.Snapshot) {
 	}
 	reg.Enroll(domain.Host{ID: hid, Hostname: id, DisplayName: id}, seen)
 	reg.Observe(hid, ms, labels, seen)
+	reg.SetAlerts(hid, snap.GetAlerts())
 }

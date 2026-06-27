@@ -32,6 +32,9 @@ type Model struct {
 	history       map[domain.HostID]map[string][]float64
 	source        string
 	live          func() bool
+	groupBy       int    // 0 = no grouping; 1..N index dimensions()+1 (Yggdrasil)
+	filter        string // active filter query
+	filtering     bool   // true while the filter input is open
 }
 
 type tickMsg time.Time
@@ -69,6 +72,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
+		if m.filtering {
+			return m.updateFilter(msg)
+		}
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -84,12 +90,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.detail = false
 				return m, nil
 			}
+			if m.filter != "" {
+				m.filter = ""
+				m.cursor = 0
+				return m, nil
+			}
 			return m, tea.Quit
 		case "r":
 			m.refresh()
 			return m, nil
+		case "g":
+			// cycle the grouping dimension: none -> hub -> os -> tag keys -> none
+			m.groupBy = (m.groupBy + 1) % (len(m.dimensions(m.reg.Hosts())) + 1)
+			m.cursor = 0
+			return m, nil
+		case "/":
+			m.filtering = true
+			return m, nil
 		case "enter":
-			if !m.detail && m.reg.Count() > 0 {
+			if !m.detail && len(m.orderedList()) > 0 {
 				m.detail = true
 			}
 		case "up", "k":
@@ -97,7 +116,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor--
 			}
 		case "down", "j":
-			if m.cursor < m.reg.Count()-1 {
+			if m.cursor < len(m.orderedList())-1 {
 				m.cursor++
 			}
 		}
@@ -110,6 +129,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.recordHistory()
 		return m, tick()
 	}
+	return m, nil
+}
+
+// updateFilter handles keystrokes while the filter input is open: type to
+// narrow, backspace to edit, enter to keep, esc to clear.
+func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "enter":
+		m.filtering = false
+	case "esc":
+		m.filtering = false
+		m.filter = ""
+	case "backspace":
+		if r := []rune(m.filter); len(r) > 0 {
+			m.filter = string(r[:len(r)-1])
+		}
+	default:
+		if len(msg.Runes) > 0 {
+			m.filter += string(msg.Runes)
+		}
+	}
+	m.cursor = 0
 	return m, nil
 }
 
@@ -126,9 +167,9 @@ func (m Model) View() string {
 
 // GridView renders the dashboard grid frame.
 func (m Model) GridView() string {
-	hosts := m.reg.Hosts()
+	all := m.reg.Hosts()
 	online := 0
-	for _, h := range hosts {
+	for _, h := range all {
 		if h.State == domain.StateOnline {
 			online++
 		}
@@ -139,14 +180,28 @@ func (m Model) GridView() string {
 	}
 	clock := m.now.Format("15:04:05")
 
-	header := brand.SkinnyHeader(m.mode, w, online, len(hosts), clock)
+	header := brand.SkinnyHeader(m.mode, w, online, len(all), clock)
 	legend, _ := m.mode.Role("label")
 	cols := legend.Style().Render(fmt.Sprintf("  %-16s %-13s %-14s %-14s %-14s %-7s %-6s %-6s",
 		"HOST", "STATE", "CPU", "MEM", "DISK", "TEMP", "GPU", "PWR"))
 
-	rows := make([]string, 0, len(hosts))
+	hosts, groups := m.orderedHosts()
+	rows := make([]string, 0, len(hosts)+4)
+	lastGroup := "\x00"
 	for i, h := range hosts {
+		if groups != nil && groups[i] != lastGroup {
+			lastGroup = groups[i]
+			rows = append(rows, m.sectionHeader(groups[i], countGroup(groups, groups[i])))
+		}
 		rows = append(rows, m.row(h, i == m.cursor))
+	}
+	if len(hosts) == 0 {
+		muted, _ := m.mode.Role("text_muted")
+		msg := "no hosts yet"
+		if m.filter != "" {
+			msg = fmt.Sprintf("no hosts match %q", m.filter)
+		}
+		rows = append(rows, muted.Style().Render("  "+msg))
 	}
 
 	status := brand.StatusBar(m.mode, w, m.live != nil && m.live(), m.source, clock)
@@ -154,11 +209,57 @@ func (m Model) GridView() string {
 	keys, _ := m.mode.Role("keybinding")
 	footer := foot.Style().Render("  ") + keys.Style().Render("↑/↓") + foot.Style().Render(" nav  ") +
 		keys.Style().Render("⏎") + foot.Style().Render(" detail  ") +
+		keys.Style().Render("g") + foot.Style().Render(" group  ") +
+		keys.Style().Render("/") + foot.Style().Render(" filter  ") +
 		keys.Style().Render("r") + foot.Style().Render(" refresh  ") +
 		keys.Style().Render("q") + foot.Style().Render(" quit  ") +
 		keys.Style().Render("?") + foot.Style().Render(" help")
 
-	return strings.Join([]string{header, "", cols, strings.Join(rows, "\n"), "", status, footer}, "\n")
+	return strings.Join([]string{header, m.metaLine(all), cols, strings.Join(rows, "\n"), "", status, footer}, "\n")
+}
+
+// metaLine shows the active grouping dimension, the filter query (with a cursor
+// while editing), and a fleet alert count when any host is firing.
+func (m Model) metaLine(all []domain.HostView) string {
+	muted, _ := m.mode.Role("text_muted")
+	val, _ := m.mode.Role("value")
+	groupName := "off"
+	if dim, ok := m.activeDim(all); ok {
+		groupName = dim.name
+	}
+	parts := []string{muted.Style().Render("  group: ") + val.Style().Render(groupName)}
+	if m.filtering || m.filter != "" {
+		q := m.filter
+		if m.filtering {
+			q += "▏"
+		}
+		parts = append(parts, muted.Style().Render("filter: ")+val.Style().Render(q))
+	}
+	if n := alertCount(all); n > 0 {
+		al, _ := m.mode.State("error")
+		suffix := "s"
+		if n == 1 {
+			suffix = ""
+		}
+		parts = append(parts, al.Style().Render(fmt.Sprintf("⚠ %d alert%s", n, suffix)))
+	}
+	return strings.Join(parts, muted.Style().Render("    "))
+}
+
+// sectionHeader renders a group divider like "── home (3) ──".
+func (m Model) sectionHeader(name string, n int) string {
+	lbl, _ := m.mode.Role("label")
+	return lbl.Style().Render(fmt.Sprintf("  ── %s (%d) ──", name, n))
+}
+
+func countGroup(groups []string, name string) int {
+	n := 0
+	for _, g := range groups {
+		if g == name {
+			n++
+		}
+	}
+	return n
 }
 
 func clipName(s string, n int) string {
@@ -188,21 +289,30 @@ func (m Model) row(h domain.HostView, selected bool) string {
 		byName[mm.Name] = mm
 	}
 
+	alerting := len(h.Alerts) > 0
 	marker := "  "
 	if selected {
 		f, _ := m.mode.Role("focus")
 		marker = f.Style().Render("▸ ")
+	} else if alerting {
+		al, _ := m.mode.State("error")
+		marker = al.Style().Render("⚠ ")
 	}
 
 	st, _ := m.mode.State(stateName(h.State))
 	badge := lipgloss.NewStyle().Width(13).Render(st.Badge())
 
 	name, _ := m.mode.Role("value")
+	nameStyle := name.Style()
+	if alerting {
+		al, _ := m.mode.State("error")
+		nameStyle = al.Style()
+	}
 	dn := h.Host.DisplayName
 	if dn == "" {
 		dn = string(h.Host.ID)
 	}
-	nameCell := name.Style().Render(fmt.Sprintf("%-16s", clipName(dn, 16)))
+	nameCell := nameStyle.Render(fmt.Sprintf("%-16s", clipName(dn, 16)))
 
 	line := marker + nameCell + " " + badge +
 		" " + m.pct(byName["cpu.util"]) +

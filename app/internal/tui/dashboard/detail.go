@@ -80,7 +80,7 @@ func pickMetric(byName map[string]domain.Metric, keys ...string) domain.Metric {
 // DetailView renders the per-host drilldown: identity, context, and each metric
 // as a wide gauge + value + trend sparkline.
 func (m Model) DetailView() string {
-	hosts := m.reg.Hosts()
+	hosts := m.orderedList()
 	if len(hosts) == 0 {
 		return m.GridView()
 	}
