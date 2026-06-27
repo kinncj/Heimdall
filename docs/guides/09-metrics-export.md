@@ -68,6 +68,30 @@ The history is **bounded and in-memory**: it is lost on hub restart, by design.
 Live values rebuild within seconds from the next keyframe, so a restart costs you
 recent trend depth, not current state.
 
+## Durable storage & hub recovery (`--tsdb`)
+
+Heimdall never embeds a database, but it can persist to — and recover from — a
+TSDB you already run. Point the hub at any Prometheus-compatible backend
+(Prometheus, Thanos, Mimir, VictoriaMetrics):
+
+```sh
+heimdall-hub --listen :9090 --tsdb http://prom:9090
+```
+
+With `--tsdb` set the hub does two things:
+
+- **Persists** the fleet continuously via Prometheus **remote-write**
+  (`/api/v1/write`).
+- **Restores** on restart: before any daemon reconnects, the hub queries the TSDB
+  (`/api/v1/query`) and re-seeds the registry, so the dashboard repaints the whole
+  fleet immediately — **including hosts that are still offline**, with their real
+  last-seen age, instead of starting blank.
+
+Restore is **best-effort**: scalar values, labels (host, origin `hub`, tags), and
+last-seen come back; info strings (`host.os`) and alert state are not stored in the
+TSDB and reappear within one sample interval once live data resumes. With no
+`--tsdb`, the hub stays fully in-memory (the default).
+
 ## Federation
 
 A parent hub's `/metrics` includes the hosts relayed up to it from child hubs.

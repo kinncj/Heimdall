@@ -50,5 +50,6 @@ docs/architecture/NNNN-short-decision-title.md
 | [0013](0013-yggdrasil-interactive-grouping-and-enriched-snapshots.md) | Yggdrasil: interactive dashboard grouping + enriched snapshots | accepted | 2026-06-27 |
 | [0014](0014-gjallarhorn-alert-state-on-the-wire-and-dashboard-surfacing.md) | Gjallarhorn: alert state on the wire + dashboard surfacing | accepted | 2026-06-27 |
 | [0015](0015-windows-privileged-metrics.md) | Windows privileged metrics | accepted | 2026-06-27 |
+| [0016](0016-mimir-durable-sink-and-hub-restore.md) | Mímir: pluggable durable sink and hub state restore | accepted | 2026-06-27 |
 
 <!-- Add a row for each ADR as you create them -->

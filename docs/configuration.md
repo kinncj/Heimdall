@@ -49,6 +49,7 @@ dashboards. Optionally relays upstream to a parent hub (federation).
 | `--discoverable` | `false` | advertise this hub over mDNS so daemons can auto-discover it (Ratatoskr) |
 | `--alert-rules` | — | path to a JSON alert-rules file; empty = alerting off (Gjallarhorn) |
 | `--alert-webhook` | — | URL to POST alert events to on fire/clear (Gjallarhorn) |
+| `--tsdb` | — | Prometheus-compatible TSDB base URL (e.g. `http://prom:9090`) to persist metrics to and restore the fleet from on restart; empty = off (Mímir durable sink) |
 
 ---
 

@@ -5,6 +5,21 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-27
+
+### Added
+- **Mímir durable sink + hub state recovery.** Point the hub at any
+  Prometheus-compatible TSDB with `--tsdb <url>`: it persists the fleet via
+  Prometheus remote-write *and* restores its last-known state from the TSDB on
+  restart — repainting the dashboard (including offline hosts, with their real
+  last-seen age) before daemons reconnect, instead of starting blank. Restore is
+  best-effort (scalar values + labels + last-seen; info strings and alert state
+  reconverge live). Heimdall still embeds no database; the sink is off by default.
+
+### Changed
+- Factored the metric→series mapping into `observe.SeriesOf`, shared by the
+  OpenMetrics export and the durable sink.
+
 ## [1.3.1] - 2026-06-27
 
 ### Fixed
@@ -219,6 +234,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.4.0]: https://github.com/kinncj/Heimdall/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/kinncj/Heimdall/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/kinncj/Heimdall/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/kinncj/Heimdall/compare/v1.2.1...v1.2.2
