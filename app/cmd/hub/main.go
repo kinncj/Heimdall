@@ -20,6 +20,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"heimdall/app/internal/alert"
 	"heimdall/app/internal/hub"
 	"heimdall/app/internal/observe"
 	"heimdall/app/internal/options"
@@ -122,6 +123,40 @@ func main() {
 		}()
 		go func() { <-ctx.Done(); _ = ms.Close() }()
 		fmt.Fprintf(os.Stderr, "heimdall-hub: serving Prometheus metrics on %s (Mímir)\n", mAddr)
+	}
+
+	// Gjallarhorn: evaluate threshold rules and notify on fire/clear.
+	if rulesPath := cfg.Text("alert-rules"); rulesPath != "" {
+		rules, err := alert.LoadRules(rulesPath)
+		if err != nil {
+			fail(err)
+		}
+		engine := alert.NewEngine(rules)
+		var notifier alert.Notifier
+		if url := cfg.Text("alert-webhook"); url != "" {
+			notifier = alert.Webhook{URL: url, OnError: func(e error) {
+				fmt.Fprintln(os.Stderr, "heimdall-hub: alert webhook:", e)
+			}}
+		}
+		go func() {
+			t := time.NewTicker(10 * time.Second)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case now := <-t.C:
+					for _, ev := range engine.Evaluate(h.Registry().Hosts(), now) {
+						fmt.Fprintf(os.Stderr, "heimdall-hub: alert %s host=%s rule=%s %s=%.1f\n",
+							ev.State, ev.Host, ev.Rule, ev.Metric, ev.Value)
+						if notifier != nil {
+							notifier.Notify(ctx, ev)
+						}
+					}
+				}
+			}
+		}()
+		fmt.Fprintf(os.Stderr, "heimdall-hub: alerting on %d rule(s) (Gjallarhorn)\n", len(rules))
 	}
 
 	go func() {

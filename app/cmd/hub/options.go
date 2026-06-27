@@ -36,6 +36,8 @@ func hubCatalog() options.Catalog {
 		options.Define("relay-interval").Of(options.KindSpan).Default("2s").Help("how often to relay hosts upstream"),
 		options.Define("metrics-listen").Help("serve Prometheus/OpenMetrics on this address (e.g. :9091); empty disables (Mímir)").
 			Ask("Prometheus metrics address (blank = off, e.g. :9091)"),
+		options.Define("alert-rules").Help("path to a JSON alert-rules file; empty disables alerting (Gjallarhorn)"),
+		options.Define("alert-webhook").Help("URL to POST alert events to on fire/clear (Gjallarhorn)"),
 	)
 }
 
