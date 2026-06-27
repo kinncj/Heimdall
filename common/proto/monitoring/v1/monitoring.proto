@@ -1,0 +1,267 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Kinn Coelho Juliao <kinncj@gmail.com>
+//
+// Heimdall monitoring contract — version 1.
+//
+// Single source of truth for the wire protocol shared by ALL binaries
+// (heimdall-daemon, heimdall-helper, heimdall-hub, heimdall-dashboard).
+// Every binary imports the generated types from this file; none defines a
+// private copy. Versioning policy: see README.md in this directory.
+//
+// Design constraints reflected here:
+//   - Low bandwidth: compact scalar timestamps (int64 unix-millis, no
+//     well-known-type sub-message per sample), packed per-core arrays,
+//     delta/keyframe snapshots, monotonic per-host sequence for resume.
+//   - Failure isolation: every MetricSample carries its own MetricStatus, so
+//     one failing metric is reported without dropping the host or siblings.
+//   - Clean boundary: this file is a transport CONTRACT only. It contains no
+//     business logic and no Go code. Domain types map to these messages at the
+//     transport layer, never the reverse.
+syntax = "proto3";
+
+package monitoring.v1;
+
+option go_package = "heimdall/common/proto/monitoring/v1;monitoringv1";
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+// MetricStatus — adapter self-reported health for a single metric reading.
+//
+// METRIC_STATUS_UNSPECIFIED (0) is a safety guard: proto3 decodes an absent or
+// truncated enum as 0, and a monitoring system must never read "missing" as
+// "healthy". Consumers treat UNSPECIFIED as a non-OK, do-not-trust value.
+enum MetricStatus {
+  METRIC_STATUS_UNSPECIFIED = 0;
+  METRIC_STATUS_OK = 1;                     // value present and trustworthy
+  METRIC_STATUS_UNAVAILABLE = 2;            // adapter not applicable on this host
+  METRIC_STATUS_INSUFFICIENT_PERMISSION = 3;// needs privileged helper / denied
+  METRIC_STATUS_ERROR = 4;                  // adapter errored, timed out, panicked
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+// Host — stable identity of a monitored machine.
+// host_id is content-derived and stable across restarts and reconnects so a
+// returning daemon re-registers as the SAME host (no duplicate registration).
+message Host {
+  string host_id = 1;        // stable, opaque (e.g. hash of machine-id + pubkey)
+  string hostname = 2;       // OS hostname (may change; not used for identity)
+  string display_name = 3;   // operator-friendly label
+  HostContext context = 4;   // slow-changing descriptive attributes
+}
+
+// HostContext — locale / uptime / OS / host descriptors.
+// Slow-changing; sent on enroll and refreshed on change, not every sample.
+message HostContext {
+  string os = 1;                  // "linux" | "darwin" | "windows"
+  string os_version = 2;
+  string arch = 3;                // "amd64" | "arm64"
+  string kernel = 4;
+  string locale = 5;              // e.g. "en_US.UTF-8"
+  string timezone = 6;            // IANA tz, e.g. "America/New_York"
+  int64  boot_time_unix_s = 7;    // uptime is derived as now - boot_time
+  string agent_version = 8;       // daemon build version
+  map<string, string> labels = 9; // device class: {"class":"dgx-spark"} etc.
+}
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+// PerCore — packed per-core readings (e.g. per-core CPU utilisation).
+message PerCore {
+  repeated double values = 1 [packed = true];
+}
+
+// Counter — a monotonic counter plus its derived per-second rate.
+// Used for disk IO and network throughput where deltas are cheaper to ship
+// than recomputed gauges.
+message Counter {
+  uint64 total = 1;   // monotonic total since boot
+  double rate = 2;    // derived units/second over the sample interval
+}
+
+// MetricSample — one metric reading from one adapter.
+// The value lives in exactly one arm of the oneof. status is ALWAYS set so a
+// non-OK metric (UNAVAILABLE / INSUFFICIENT_PERMISSION / ERROR) can be reported
+// with no value arm at all — this is the failure-isolation guarantee on the wire.
+message MetricSample {
+  string metric = 1;        // canonical key, e.g. "cpu.core.util", "mem.used"
+  MetricStatus status = 2;  // adapter self-report; never left at UNSPECIFIED by a healthy adapter
+  string unit = 3;          // "percent" | "bytes" | "celsius" | "bytes_per_sec" | "ms"
+  string detail = 4;        // human-readable note, esp. for non-OK status
+
+  oneof value {
+    double gauge = 5;       // single instantaneous value
+    PerCore per_core = 6;   // repeated per-core values
+    Counter counter = 7;    // monotonic counter + rate
+  }
+}
+
+// Snapshot — the metric set for one host at one instant (the streamed unit).
+// Delta encoding: when delta=true, samples[] carries only metrics whose value
+// or status changed since the last keyframe. keyframe=true marks a full set and
+// is the resync point after reconnect. seq is monotonic per host for resume and
+// duplicate suppression.
+message Snapshot {
+  string host_id = 1;
+  int64  ts_unix_millis = 2;
+  uint64 seq = 3;                     // monotonic per-host sequence
+  bool   delta = 4;                   // true = changed samples only
+  bool   keyframe = 5;                // true = full set (resync point)
+  repeated MetricSample samples = 6;
+}
+
+// ---------------------------------------------------------------------------
+// Enrollment
+// ---------------------------------------------------------------------------
+
+// EnrollRequest — a daemon presents its enrollment token and self-declared
+// identity. Optionally includes a CSR so the hub can issue a client cert for
+// subsequent mTLS on the metric stream.
+message EnrollRequest {
+  string enrollment_token = 1;  // bootstrap bearer secret (one-time / scoped)
+  Host   host = 2;              // self-declared identity (host_id + context)
+  string csr_pem = 3;          // optional PEM CSR for issued client certificate
+}
+
+// EnrollResponse — the hub confirms identity and returns stream policy.
+message EnrollResponse {
+  string host_id = 1;            // canonical id confirmed/assigned by the hub
+  bool   accepted = 2;
+  string reason = 3;             // populated when accepted=false (token rejected, etc.)
+  int32  sample_interval_ms = 4; // hub-directed sampling cadence
+  int32  stale_after_s = 5;      // liveness: online -> stale threshold
+  int32  offline_after_s = 6;    // liveness: stale  -> offline threshold
+  string client_cert_pem = 7;    // optional issued cert when csr_pem was provided
+}
+
+// ---------------------------------------------------------------------------
+// Stream control (hub -> daemon, downstream side of the bidi metric stream)
+// ---------------------------------------------------------------------------
+
+message AckResume      { uint64 acked_seq = 1; }          // hub has durably seen up to acked_seq
+message CadenceUpdate  { int32 sample_interval_ms = 1; }  // hub re-tunes cadence at runtime
+message KeyframeRequest{ string reason = 1; }             // hub asks daemon for a full keyframe
+
+// StreamControl — multiplexed control frames sent from hub to daemon.
+message StreamControl {
+  oneof control {
+    AckResume       ack = 1;
+    CadenceUpdate   cadence = 2;
+    KeyframeRequest keyframe = 3;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Federation (epic 4)
+// ---------------------------------------------------------------------------
+
+// RelayEnvelope — a child hub relays a snapshot upstream to a parent hub.
+// origin_hub_id and path[] provide loop and duplication prevention: a hub drops
+// any envelope whose path already contains its own hub id.
+message RelayEnvelope {
+  string origin_hub_id = 1;    // first hub that ingested the snapshot
+  repeated string path = 2;    // ordered hub ids traversed so far
+  Snapshot snapshot = 3;
+}
+
+message RelayControl { uint64 acked_seq = 1; }
+
+// SubscribeRequest — a dashboard or peer hub subscribes to a hub's MetricBus.
+message SubscribeRequest {
+  string subscriber_id = 1;
+  repeated string host_ids = 2; // empty = all hosts
+  bool   deltas_only = 3;       // true = skip keyframes after initial sync
+}
+
+// FederationService — cross-hub relay and fan-out. Cross-hub mTLS + token.
+service FederationService {
+  // Child -> parent: relay merged snapshots upstream as a bus subscriber.
+  rpc Relay(stream RelayEnvelope) returns (stream RelayControl);
+  // Subscribe to a hub's bus (used by dashboards and peer/parent hubs).
+  rpc Subscribe(SubscribeRequest) returns (stream Snapshot);
+}
+
+// ---------------------------------------------------------------------------
+// Control plane (epic 5) — allow-listed, READ-ONLY, unprivileged
+// ---------------------------------------------------------------------------
+
+// ControlRequest — dashboard -> daemon. allowlisted_cmd is a LOGICAL command
+// key validated against a static allow-list; it is never a shell string. args
+// are typed/validated tokens, never concatenated into a shell. Commands run as
+// the unprivileged daemon user. No sudo. No arbitrary execution.
+message ControlRequest {
+  string request_id = 1;
+  string host_id = 2;
+  string allowlisted_cmd = 3;   // logical key, e.g. "process.list" | "disk.df"
+  repeated string args = 4;     // validated argument tokens
+  string actor = 5;             // authenticated dashboard principal (for audit)
+}
+
+// ControlResponse — bounded result. status=INSUFFICIENT_PERMISSION when the
+// allow-list or arg validation rejects the request. truncated=true when stdout
+// hit the output cap.
+message ControlResponse {
+  string request_id = 1;
+  int32  exit_code = 2;
+  string stdout = 3;
+  string stderr = 4;
+  bool   truncated = 5;
+  MetricStatus status = 6;      // OK | INSUFFICIENT_PERMISSION | ERROR
+}
+
+// ControlPlaneService — single authenticated, audit-logged control channel.
+service ControlPlaneService {
+  rpc Execute(stream ControlRequest) returns (stream ControlResponse);
+}
+
+// ---------------------------------------------------------------------------
+// Logs (epic 6) — opt-in, rate-limited, separate stream from metrics
+// ---------------------------------------------------------------------------
+
+// LogTailRequest — opt-in per-source tail. sources are explicit opt-in keys
+// (a journald unit alias or a registered file alias), never arbitrary paths.
+message LogTailRequest {
+  string host_id = 1;
+  repeated string sources = 2;  // opt-in source keys
+  int32  max_lines_per_sec = 3; // client-requested cap; hub/daemon may lower it
+  string filter = 4;            // server-side substring / severity filter
+}
+
+// LogLine — one tailed line. rate_limited=true means lines were dropped before
+// this one to honour the rate cap.
+message LogLine {
+  string host_id = 1;
+  string source = 2;
+  int64  ts_unix_millis = 3;
+  string line = 4;
+  string level = 5;             // optional parsed severity
+  bool   rate_limited = 6;
+}
+
+// LogStreamService — opt-in log tailing on its own stream so log volume can
+// never back-pressure or starve the metric stream.
+service LogStreamService {
+  rpc Tail(LogTailRequest) returns (stream LogLine);
+}
+
+// ---------------------------------------------------------------------------
+// Enrollment + primary metric stream
+// ---------------------------------------------------------------------------
+
+// EnrollmentService — bootstrap a daemon's identity and obtain stream policy.
+service EnrollmentService {
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+}
+
+// MetricStreamService — primary bidirectional metric channel.
+// Upstream: daemon streams Snapshots. Downstream: hub streams StreamControl
+// (resume acks, cadence retune, keyframe requests).
+service MetricStreamService {
+  rpc Stream(stream Snapshot) returns (stream StreamControl);
+}

@@ -1,0 +1,74 @@
+{
+  "_meta": {
+    "name": "Heimdall",
+    "target": "tui",
+    "status": "approved",
+    "approved_by": null,
+    "approved_at": null,
+    "medium": "terminal",
+    "note": "TUI 'typography' = a monospace cell grid + SGR terminal attributes. There are no font families, point sizes, or line-heights. Emphasis is expressed with bold / faint / italic / underline / reverse. Colour role names reference docs/design/identity/palette.json (the colour source of record); this file owns only the attribute layer."
+  },
+
+  "family": {
+    "mono": "terminal default monospace (inherited from the user's terminal; not specified by the app)",
+    "rationale": "A TUI must render in the user's chosen terminal font. Heimdall assumes a fixed-width cell grid and selects no web/desktop font. All glyphs used (box-drawing, block elements, braille, the listed status symbols) are standard Unicode and degrade to an ASCII set under TERM=dumb."
+  },
+
+  "principles": [
+    "No web fonts, point sizes, rems, or line-heights — those concepts do not exist in a cell grid.",
+    "Emphasis is an SGR attribute, never a size change.",
+    "Attributes reinforce meaning but never carry it alone: every state is glyph + text (see palette.state_glyph_legend).",
+    "The SGR 'faint/dim' attribute is decorative only. Muted/stale legibility comes from a solid AA-passing colour, so meaning survives even where a terminal renders faint weakly or not at all.",
+    "Italic is optional: terminals that lack it fall back to the listed fallback attribute with no loss of meaning."
+  ],
+
+  "attributes": {
+    "_doc": "The terminal attribute vocabulary (SGR codes) available to roles below.",
+    "bold":      { "sgr": 1, "support": "universal", "use": "titles, headings, metric values, error/refused labels" },
+    "faint":     { "sgr": 2, "support": "wide",      "use": "muted text, stale rows, dimmed overlay backdrop", "fallback": "use the muted colour role", "decorative_only": true },
+    "italic":    { "sgr": 3, "support": "partial",   "use": "captions / annotations", "fallback": "faint" },
+    "underline": { "sgr": 4, "support": "wide",      "use": "active filter input, keybinding letters" },
+    "reverse":   { "sgr": 7, "support": "universal", "use": "focused / selected row; focus indicator that works even under NO_COLOR" }
+  },
+
+  "roles": {
+    "_doc": "Named type roles. color = palette colour role (resolved per active theme); attributes = SGR list; glyph = leading marker where the role owns one.",
+    "title":        { "color": "brand.gold",   "attributes": ["bold"],            "glyph": "\u2b22", "use": "app title bar — '\u2b22 Heimdall'" },
+    "heading":      { "color": "text.primary", "attributes": ["bold"],            "use": "panel / section headers (HOST DETAIL, FEDERATION, HELP)" },
+    "subheading":   { "color": "text.secondary","attributes": ["bold"],           "use": "sub-section headers inside a panel" },
+    "label":        { "color": "text.muted",   "attributes": ["faint"],           "use": "column headers and field labels (HOST, CPU%, ORIGIN, target)" },
+    "body":         { "color": "text.primary", "attributes": [],                  "use": "default body text" },
+    "value":        { "color": "text.primary", "attributes": ["bold"],            "use": "metric values / numbers (72%, 74\u00b0C, 142W) — bold so data leads" },
+    "unit":         { "color": "text.muted",   "attributes": [],                  "use": "units / suffixes next to a value (%, \u00b0C, W, ms, GB)" },
+    "muted":        { "color": "text.muted",   "attributes": [],                  "use": "de-emphasised text; AA via colour, not the dim attribute" },
+    "caption":      { "color": "text.muted",   "attributes": ["italic"],          "italicFallback": "faint", "use": "footnotes / annotations under a panel" },
+    "keybinding":   { "color": "text.primary", "attributes": ["underline", "bold"],"use": "key letters in the footer (q, r, L, v, \u23ce)" },
+    "input_active": { "color": "text.primary", "attributes": ["underline"],       "glyph": "\u258f", "use": "active filter text field; \u258f marks the cursor (focus-visible)" },
+    "focus":        { "color": "brand.gold",   "attributes": ["reverse"],         "glyph": "\u25b8", "use": "focused / selected row — reverse video + leading \u25b8, never colour alone" },
+    "overlay_backdrop": { "color": "text.muted","attributes": ["faint"],          "use": "grid dimmed behind a modal overlay (help / detail)" }
+  },
+
+  "state_emphasis": {
+    "_doc": "Extra attribute layered on a status badge, by state. Colour + glyph come from palette.state_glyph_legend; this only adds emphasis. [] = no extra attribute.",
+    "online":       [],
+    "degraded":     [],
+    "offline":      [],
+    "stale":        ["faint"],
+    "error":        ["bold"],
+    "needs_helper": [],
+    "unavailable":  ["faint"],
+    "installed":    [],
+    "absent":       ["faint"],
+    "relaying":     [],
+    "reconnecting": [],
+    "rate_limited": [],
+    "refused":      ["bold"],
+    "focus":        ["reverse"]
+  },
+
+  "fidelity": {
+    "_doc": "Render-mode hooks (wireframe 0004). Attributes that switch off as fidelity degrades.",
+    "high":     { "animation": true,  "spinner": "braille", "attributes": "all (bold/faint/italic/underline/reverse)" },
+    "degraded": { "animation": false, "spinner": "static 'busy'", "attributes": "bold/underline/reverse only; faint and italic dropped; colours dropped under NO_COLOR" }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "name": "heimdall-component-inventory",
+  "target": "tui",
+  "components": {
+    "header": [
+      "title",
+      "heading",
+      "accent",
+      "states.online"
+    ],
+    "footer": [
+      "keybinding",
+      "text_muted",
+      "label"
+    ],
+    "host_card": [
+      "panel",
+      "border",
+      "heading",
+      "value",
+      "unit",
+      "states.*",
+      "severity.*"
+    ],
+    "metric_gauge": [
+      "severity.nominal",
+      "severity.moderate",
+      "severity.elevated",
+      "severity.high",
+      "severity.critical",
+      "decoration.gauge_blocks"
+    ],
+    "status_badge": [
+      "states.online",
+      "states.degraded",
+      "states.offline",
+      "states.stale",
+      "states.error",
+      "states.needs_helper",
+      "states.unavailable"
+    ],
+    "host_detail": [
+      "panel",
+      "heading",
+      "subheading",
+      "label",
+      "value",
+      "unit",
+      "caption",
+      "decoration.sparkline",
+      "decoration.trend"
+    ],
+    "logs_pane": [
+      "panel",
+      "border",
+      "body",
+      "text_muted",
+      "states.rate_limited",
+      "label"
+    ],
+    "control_overlay": [
+      "panel",
+      "border_focus",
+      "input_active",
+      "keybinding",
+      "states.refused",
+      "overlay_backdrop"
+    ],
+    "federation_strip": [
+      "label",
+      "states.relaying",
+      "states.reconnecting",
+      "accent"
+    ],
+    "filter_bar": [
+      "input_active",
+      "label",
+      "focus"
+    ],
+    "help_overlay": [
+      "overlay_backdrop",
+      "panel",
+      "heading",
+      "keybinding"
+    ]
+  }
+}

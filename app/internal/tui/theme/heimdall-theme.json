@@ -1,0 +1,675 @@
+{
+  "name": "heimdall",
+  "target": "tui",
+  "default_mode": "dark",
+  "source": "docs/design/identity/tokens.json",
+  "mono_fallback": "Under NO_COLOR/TERM=dumb/monochrome, colours collapse to terminal default fg/bg. Meaning survives via glyph, status word, numeric value, gauge block density (░▒▓█) and reverse video for focus.",
+  "decoration": {
+    "brand_mark": "⬢",
+    "spinner_braille": [
+      "⠹",
+      "⠸",
+      "⠼"
+    ],
+    "gauge_blocks": [
+      "█",
+      "▓",
+      "▒",
+      "░"
+    ],
+    "sparkline": [
+      "▁",
+      "▂",
+      "▃",
+      "▄",
+      "▅",
+      "▆",
+      "▇",
+      "█"
+    ],
+    "trend": {
+      "rising": "↑",
+      "steady": "→",
+      "falling": "↓"
+    },
+    "ascii_fallback": {
+      "gauge_fill": "#",
+      "gauge_track": " ",
+      "trend_up": "^",
+      "trend_steady": "="
+    }
+  },
+  "borders": {
+    "app": {
+      "lipgloss": "DoubleBorder",
+      "glyphs": {
+        "topLeft": "╔",
+        "top": "═",
+        "topRight": "╗",
+        "left": "║",
+        "right": "║",
+        "bottomLeft": "╚",
+        "bottom": "═",
+        "bottomRight": "╝"
+      }
+    },
+    "panel": {
+      "lipgloss": "NormalBorder",
+      "glyphs": {
+        "topLeft": "┌",
+        "top": "─",
+        "topRight": "┐",
+        "left": "│",
+        "right": "│",
+        "bottomLeft": "└",
+        "bottom": "─",
+        "bottomRight": "┘"
+      }
+    },
+    "panelRounded": {
+      "lipgloss": "RoundedBorder",
+      "glyphs": {
+        "topLeft": "╭",
+        "top": "─",
+        "topRight": "╮",
+        "left": "│",
+        "right": "│",
+        "bottomLeft": "╰",
+        "bottom": "─",
+        "bottomRight": "╯"
+      }
+    },
+    "depth": {
+      "lipgloss": "ThickBorder",
+      "note": "high-fidelity depth panel only",
+      "glyphs": {
+        "topLeft": "┏",
+        "top": "━",
+        "topRight": "┓",
+        "left": "┃",
+        "right": "┃",
+        "bottomLeft": "┗",
+        "bottom": "━",
+        "bottomRight": "┛"
+      }
+    },
+    "ascii": {
+      "lipgloss": "Border",
+      "note": "degraded / dumb-terminal fallback",
+      "glyphs": {
+        "topLeft": "+",
+        "top": "-",
+        "topRight": "+",
+        "left": "|",
+        "right": "|",
+        "bottomLeft": "+",
+        "bottom": "-",
+        "bottomRight": "+"
+      }
+    }
+  },
+  "spacing": {
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3,
+    "4": 4,
+    "6": 6,
+    "8": 8
+  },
+  "modes": {
+    "dark": {
+      "structure": {
+        "background": {
+          "bg": "#121212",
+          "ansi256": 233
+        },
+        "panel": {
+          "bg": "#1c1c1c",
+          "ansi256": 234
+        },
+        "selection": {
+          "bg": "#303030",
+          "ansi256": 236
+        },
+        "shadow": {
+          "bg": "#080808",
+          "ansi256": 232
+        },
+        "border": {
+          "fg": "#767676",
+          "ansi256": 243,
+          "attrs": []
+        },
+        "border_focus": {
+          "fg": "#00d7ff",
+          "ansi256": 45,
+          "attrs": []
+        },
+        "title": {
+          "fg": "#d0d0d0",
+          "ansi256": 252,
+          "attrs": [
+            "bold"
+          ],
+          "glyph": "⬢"
+        },
+        "heading": {
+          "fg": "#eeeeee",
+          "ansi256": 255,
+          "attrs": [
+            "bold"
+          ]
+        },
+        "subheading": {
+          "fg": "#c6c6c6",
+          "ansi256": 251,
+          "attrs": [
+            "bold"
+          ]
+        },
+        "label": {
+          "fg": "#949494",
+          "ansi256": 246,
+          "attrs": [
+            "faint"
+          ]
+        },
+        "body": {
+          "fg": "#eeeeee",
+          "ansi256": 255,
+          "attrs": []
+        },
+        "text_secondary": {
+          "fg": "#c6c6c6",
+          "ansi256": 251,
+          "attrs": []
+        },
+        "text_muted": {
+          "fg": "#949494",
+          "ansi256": 246,
+          "attrs": []
+        },
+        "value": {
+          "fg": "#eeeeee",
+          "ansi256": 255,
+          "attrs": [
+            "bold"
+          ]
+        },
+        "unit": {
+          "fg": "#949494",
+          "ansi256": 246,
+          "attrs": []
+        },
+        "caption": {
+          "fg": "#949494",
+          "ansi256": 246,
+          "attrs": [
+            "italic"
+          ],
+          "italic_fallback": "faint"
+        },
+        "accent": {
+          "fg": "#00d7ff",
+          "ansi256": 45,
+          "attrs": []
+        },
+        "keybinding": {
+          "fg": "#eeeeee",
+          "ansi256": 255,
+          "attrs": [
+            "underline",
+            "bold"
+          ]
+        },
+        "input_active": {
+          "fg": "#eeeeee",
+          "ansi256": 255,
+          "attrs": [
+            "underline"
+          ],
+          "glyph": "▏"
+        },
+        "focus": {
+          "fg": "#00d7ff",
+          "ansi256": 45,
+          "attrs": [
+            "reverse"
+          ],
+          "glyph": "▸"
+        },
+        "overlay_backdrop": {
+          "fg": "#949494",
+          "ansi256": 246,
+          "attrs": [
+            "faint"
+          ]
+        }
+      },
+      "states": {
+        "online": {
+          "fg": "#5fd75f",
+          "ansi256": 77,
+          "glyph": "●",
+          "label": "ONLINE",
+          "attrs": []
+        },
+        "degraded": {
+          "fg": "#ffaf00",
+          "ansi256": 214,
+          "glyph": "◐",
+          "label": "DEGRADED",
+          "attrs": []
+        },
+        "enrolling": {
+          "fg": "#ffaf00",
+          "ansi256": 214,
+          "glyph": "◐",
+          "label": "ENROLLING…",
+          "attrs": []
+        },
+        "offline": {
+          "fg": "#a8a8a8",
+          "ansi256": 248,
+          "glyph": "○",
+          "label": "OFFLINE",
+          "attrs": []
+        },
+        "stale": {
+          "fg": "#d7af87",
+          "ansi256": 180,
+          "glyph": "⏱",
+          "label": "STALE",
+          "attrs": [
+            "faint"
+          ]
+        },
+        "error": {
+          "fg": "#ff5f5f",
+          "ansi256": 203,
+          "glyph": "⚠",
+          "label": "ERROR",
+          "attrs": [
+            "bold"
+          ]
+        },
+        "needs_helper": {
+          "fg": "#5fd7ff",
+          "ansi256": 81,
+          "glyph": "⚿",
+          "label": "needs helper",
+          "attrs": []
+        },
+        "unavailable": {
+          "fg": "#a8a8a8",
+          "ansi256": 248,
+          "glyph": "—",
+          "label": "unavailable",
+          "attrs": [
+            "faint"
+          ]
+        },
+        "installed": {
+          "fg": "#5fd75f",
+          "ansi256": 77,
+          "glyph": "✓",
+          "label": "installed",
+          "attrs": []
+        },
+        "absent": {
+          "fg": "#a8a8a8",
+          "ansi256": 248,
+          "glyph": "–",
+          "label": "absent",
+          "attrs": [
+            "faint"
+          ]
+        },
+        "relaying": {
+          "fg": "#5fd7ff",
+          "ansi256": 81,
+          "glyph": "↑",
+          "label": "relaying",
+          "attrs": []
+        },
+        "reconnecting": {
+          "fg": "#ffaf00",
+          "ansi256": 214,
+          "glyph": "↯",
+          "label": "reconnecting",
+          "attrs": []
+        },
+        "rate_limited": {
+          "fg": "#ffaf00",
+          "ansi256": 214,
+          "glyph": "⚡",
+          "label": "rate-limited",
+          "attrs": []
+        },
+        "refused": {
+          "fg": "#ff5f5f",
+          "ansi256": 203,
+          "glyph": "✋",
+          "label": "refused",
+          "attrs": [
+            "bold"
+          ]
+        },
+        "focus": {
+          "fg": "#00d7ff",
+          "ansi256": 45,
+          "glyph": "▸",
+          "label": "focus",
+          "attrs": [
+            "reverse"
+          ]
+        }
+      },
+      "severity": {
+        "nominal": {
+          "fg": "#5fd7af",
+          "ansi256": 79,
+          "band": "0-39%"
+        },
+        "moderate": {
+          "fg": "#87d75f",
+          "ansi256": 113,
+          "band": "40-59%"
+        },
+        "elevated": {
+          "fg": "#ffd75f",
+          "ansi256": 221,
+          "band": "60-74%"
+        },
+        "high": {
+          "fg": "#ff875f",
+          "ansi256": 209,
+          "band": "75-89%"
+        },
+        "critical": {
+          "fg": "#ff5f5f",
+          "ansi256": 203,
+          "band": "90-100%"
+        }
+      }
+    },
+    "light": {
+      "structure": {
+        "background": {
+          "bg": "#ffffff",
+          "ansi256": 231
+        },
+        "panel": {
+          "bg": "#eeeeee",
+          "ansi256": 255
+        },
+        "selection": {
+          "bg": "#d0d0d0",
+          "ansi256": 252
+        },
+        "shadow": {
+          "bg": "#bcbcbc",
+          "ansi256": 250
+        },
+        "border": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "attrs": []
+        },
+        "border_focus": {
+          "fg": "#005f87",
+          "ansi256": 24,
+          "attrs": []
+        },
+        "title": {
+          "fg": "#1c1c1c",
+          "ansi256": 234,
+          "attrs": [
+            "bold"
+          ],
+          "glyph": "⬢"
+        },
+        "heading": {
+          "fg": "#1c1c1c",
+          "ansi256": 234,
+          "attrs": [
+            "bold"
+          ]
+        },
+        "subheading": {
+          "fg": "#3a3a3a",
+          "ansi256": 237,
+          "attrs": [
+            "bold"
+          ]
+        },
+        "label": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "attrs": [
+            "faint"
+          ]
+        },
+        "body": {
+          "fg": "#1c1c1c",
+          "ansi256": 234,
+          "attrs": []
+        },
+        "text_secondary": {
+          "fg": "#3a3a3a",
+          "ansi256": 237,
+          "attrs": []
+        },
+        "text_muted": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "attrs": []
+        },
+        "value": {
+          "fg": "#1c1c1c",
+          "ansi256": 234,
+          "attrs": [
+            "bold"
+          ]
+        },
+        "unit": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "attrs": []
+        },
+        "caption": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "attrs": [
+            "italic"
+          ],
+          "italic_fallback": "faint"
+        },
+        "accent": {
+          "fg": "#005f87",
+          "ansi256": 24,
+          "attrs": []
+        },
+        "keybinding": {
+          "fg": "#1c1c1c",
+          "ansi256": 234,
+          "attrs": [
+            "underline",
+            "bold"
+          ]
+        },
+        "input_active": {
+          "fg": "#1c1c1c",
+          "ansi256": 234,
+          "attrs": [
+            "underline"
+          ],
+          "glyph": "▏"
+        },
+        "focus": {
+          "fg": "#005f87",
+          "ansi256": 24,
+          "attrs": [
+            "reverse"
+          ],
+          "glyph": "▸"
+        },
+        "overlay_backdrop": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "attrs": [
+            "faint"
+          ]
+        }
+      },
+      "states": {
+        "online": {
+          "fg": "#006d00",
+          "ansi256": 22,
+          "glyph": "●",
+          "label": "ONLINE",
+          "attrs": []
+        },
+        "degraded": {
+          "fg": "#9c5400",
+          "ansi256": 130,
+          "glyph": "◐",
+          "label": "DEGRADED",
+          "attrs": []
+        },
+        "enrolling": {
+          "fg": "#9c5400",
+          "ansi256": 130,
+          "glyph": "◐",
+          "label": "ENROLLING…",
+          "attrs": []
+        },
+        "offline": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "glyph": "○",
+          "label": "OFFLINE",
+          "attrs": []
+        },
+        "stale": {
+          "fg": "#6b5526",
+          "ansi256": 58,
+          "glyph": "⏱",
+          "label": "STALE",
+          "attrs": [
+            "faint"
+          ]
+        },
+        "error": {
+          "fg": "#c81414",
+          "ansi256": 160,
+          "glyph": "⚠",
+          "label": "ERROR",
+          "attrs": [
+            "bold"
+          ]
+        },
+        "needs_helper": {
+          "fg": "#005f87",
+          "ansi256": 24,
+          "glyph": "⚿",
+          "label": "needs helper",
+          "attrs": []
+        },
+        "unavailable": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "glyph": "—",
+          "label": "unavailable",
+          "attrs": [
+            "faint"
+          ]
+        },
+        "installed": {
+          "fg": "#006d00",
+          "ansi256": 22,
+          "glyph": "✓",
+          "label": "installed",
+          "attrs": []
+        },
+        "absent": {
+          "fg": "#626262",
+          "ansi256": 241,
+          "glyph": "–",
+          "label": "absent",
+          "attrs": [
+            "faint"
+          ]
+        },
+        "relaying": {
+          "fg": "#005f87",
+          "ansi256": 24,
+          "glyph": "↑",
+          "label": "relaying",
+          "attrs": []
+        },
+        "reconnecting": {
+          "fg": "#9c5400",
+          "ansi256": 130,
+          "glyph": "↯",
+          "label": "reconnecting",
+          "attrs": []
+        },
+        "rate_limited": {
+          "fg": "#9c5400",
+          "ansi256": 130,
+          "glyph": "⚡",
+          "label": "rate-limited",
+          "attrs": []
+        },
+        "refused": {
+          "fg": "#c81414",
+          "ansi256": 160,
+          "glyph": "✋",
+          "label": "refused",
+          "attrs": [
+            "bold"
+          ]
+        },
+        "focus": {
+          "fg": "#005f87",
+          "ansi256": 24,
+          "glyph": "▸",
+          "label": "focus",
+          "attrs": [
+            "reverse"
+          ]
+        }
+      },
+      "severity": {
+        "nominal": {
+          "fg": "#006d00",
+          "ansi256": 22,
+          "band": "0-39%"
+        },
+        "moderate": {
+          "fg": "#5a7400",
+          "ansi256": 64,
+          "band": "40-59%"
+        },
+        "elevated": {
+          "fg": "#806600",
+          "ansi256": 94,
+          "band": "60-74%"
+        },
+        "high": {
+          "fg": "#9c5400",
+          "ansi256": 130,
+          "band": "75-89%"
+        },
+        "critical": {
+          "fg": "#c81414",
+          "ansi256": 160,
+          "band": "90-100%"
+        }
+      }
+    }
+  },
+  "tagline": "watch over all realms"
+}

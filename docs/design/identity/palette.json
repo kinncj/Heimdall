@@ -1,0 +1,679 @@
+{
+  "_meta": {
+    "name": "Heimdall",
+    "tagline": "watch over all realms",
+    "target": "tui",
+    "status": "approved",
+    "approved_by": null,
+    "approved_at": null,
+    "default_theme": "dark",
+    "color_model": "truecolor (24-bit) hex, primary; nearest ANSI-256 index recorded per color as the 256-colour fallback",
+    "wcag": "2.2 AA — every text pair >= 4.5:1, every large/UI pair (gauge blocks, focus, borders) >= 3:1. All pairs verified; see README contrast table.",
+    "concept": "Heimdall watches over all realms. The wordmark is steel/silver; the single signature accent is the electric blue of Heimdall's all-seeing eye (also the Bifrost glow), used for title rule, focus and brand marks. The rainbow bridge is expressed functionally as the severity ramp (cool -> warm). Backgrounds sit near-black so monitoring data carries the contrast.",
+    "color_only_signaling": "Colour never carries meaning alone. Every state is glyph + text (+ numeric value / timestamp where relevant); see state_glyph_legend. Focus additionally uses reverse video and a leading marker.",
+    "no_color_behavior": "Under NO_COLOR / TERM=dumb / monochrome the palette collapses to the terminal's default fg/bg. Meaning survives via: (1) status glyph, (2) status word, (3) numeric value, (4) gauge block density (░▒▓█), (5) reverse video for focus. No information is lost — this is the accessible baseline render described in wireframe 0004."
+  },
+  "themes": {
+    "dark": {
+      "_doc": "Primary theme. Assume a near-black terminal background.",
+      "surface": {
+        "background": {
+          "hex": "#121212",
+          "ansi256": 233,
+          "role": "app background — near-black night-watch field"
+        },
+        "panel": {
+          "hex": "#1c1c1c",
+          "ansi256": 234,
+          "role": "elevated panel / card / table surface"
+        },
+        "selection": {
+          "hex": "#303030",
+          "ansi256": 236,
+          "role": "active / hovered row background (high-fidelity mode)"
+        },
+        "shadow": {
+          "hex": "#080808",
+          "ansi256": 232,
+          "role": "depth-panel drop shadow (high-fidelity mode only)"
+        }
+      },
+      "structure": {
+        "_doc": "Panel / chrome borders. UI elements held to the 3:1 large/UI bar — never used for text. Pair every border with box-drawing glyphs so structure survives NO_COLOR.",
+        "border": {
+          "hex": "#767676",
+          "ansi256": 243,
+          "role": "panel + chrome border, unfocused (neutral.4)",
+          "aa": "large",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "border_focus": {
+          "hex": "#00d7ff",
+          "ansi256": 45,
+          "role": "focused panel border — electric-blue signature",
+          "aa": "large",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "text": {
+        "primary": {
+          "hex": "#eeeeee",
+          "ansi256": 255,
+          "role": "primary text + metric values",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel",
+            "selection"
+          ]
+        },
+        "secondary": {
+          "hex": "#c6c6c6",
+          "ansi256": 251,
+          "role": "secondary text, sublabels",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "muted": {
+          "hex": "#949494",
+          "ansi256": 246,
+          "role": "muted text, captions, de-emphasised labels (solid colour — meets AA without relying on the SGR dim attribute)",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "brand": {
+        "signature": {
+          "hex": "#00d7ff",
+          "ansi256": 45,
+          "role": "electric-blue signature — Heimdall's eye, focus accent, tagline rule",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "steel": {
+          "hex": "#d0d0d0",
+          "ansi256": 252,
+          "role": "steel/silver wordmark (HEIMDALL)",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "secondary": null,
+      "accent": null,
+      "neutral": {
+        "_doc": "10-step neutral ramp (near-white -> near-black), aligned to ANSI-256 greys for clean 256-colour fallback. Used for text, borders, surfaces.",
+        "0": {
+          "hex": "#eeeeee",
+          "ansi256": 255
+        },
+        "1": {
+          "hex": "#d0d0d0",
+          "ansi256": 252
+        },
+        "2": {
+          "hex": "#a8a8a8",
+          "ansi256": 248
+        },
+        "3": {
+          "hex": "#949494",
+          "ansi256": 246
+        },
+        "4": {
+          "hex": "#767676",
+          "ansi256": 243
+        },
+        "5": {
+          "hex": "#585858",
+          "ansi256": 240
+        },
+        "6": {
+          "hex": "#444444",
+          "ansi256": 238
+        },
+        "7": {
+          "hex": "#303030",
+          "ansi256": 236
+        },
+        "8": {
+          "hex": "#1c1c1c",
+          "ansi256": 234
+        },
+        "9": {
+          "hex": "#121212",
+          "ansi256": 233
+        }
+      },
+      "semantic": {
+        "online": {
+          "hex": "#5fd75f",
+          "ansi256": 77,
+          "glyph": "●",
+          "label": "ONLINE",
+          "family": "success",
+          "role": "ok / online / installed / healthy",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "degraded": {
+          "hex": "#ffaf00",
+          "ansi256": 214,
+          "glyph": "◐",
+          "label": "DEGRADED",
+          "family": "caution",
+          "role": "degraded / enrolling / reconnecting / rate-limited (transitional attention, not failure)",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "stale": {
+          "hex": "#d7af87",
+          "ansi256": 180,
+          "glyph": "⏱",
+          "label": "STALE",
+          "family": "caution",
+          "role": "stale data — last-known values retained with age; rendered faded (faint) but the solid colour still meets AA",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "offline": {
+          "hex": "#a8a8a8",
+          "ansi256": 248,
+          "glyph": "○",
+          "label": "OFFLINE",
+          "family": "absence",
+          "role": "offline / no-internet / unavailable / absent / n-a (absence of data, not an error)",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "error": {
+          "hex": "#ff5f5f",
+          "ansi256": 203,
+          "glyph": "⚠",
+          "label": "ERROR",
+          "family": "critical",
+          "role": "error / probe-failed / refused (fault or hard refusal)",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "info": {
+          "hex": "#5fd7ff",
+          "ansi256": 81,
+          "glyph": "⚿",
+          "label": "INFO",
+          "family": "info",
+          "role": "needs-helper affordance / relaying / network — informational, never alarming",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "severity": {
+        "_doc": "Sequential low->high gauge-fill ramp (cool -> warm) for utilisation / temperature. A full gauge reads hot/busy. Applied to the filled blocks of █▓▒░ gauges and sparklines. Distinct in ANSI-256; monochrome fallback = block density + printed numeric value.",
+        "thresholds": {
+          "nominal": "0-39%",
+          "moderate": "40-59%",
+          "elevated": "60-74%",
+          "high": "75-89%",
+          "critical": "90-100%",
+          "temp_note": "temperature uses analogous °C bands defined per adapter"
+        },
+        "ramp": [
+          {
+            "stop": 1,
+            "name": "nominal",
+            "hex": "#5fd7af",
+            "ansi256": 79,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 2,
+            "name": "moderate",
+            "hex": "#87d75f",
+            "ansi256": 113,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 3,
+            "name": "elevated",
+            "hex": "#ffd75f",
+            "ansi256": 221,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 4,
+            "name": "high",
+            "hex": "#ff875f",
+            "ansi256": 209,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 5,
+            "name": "critical",
+            "hex": "#ff5f5f",
+            "ansi256": 203,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          }
+        ]
+      }
+    },
+    "light": {
+      "_doc": "Secondary theme for light terminals. Same roles, darkened so every pair clears AA on a white / near-white background. Colours never carry meaning alone — every state is also a glyph and a word.",
+      "surface": {
+        "background": {
+          "hex": "#ffffff",
+          "ansi256": 231,
+          "role": "app background (light terminal)"
+        },
+        "panel": {
+          "hex": "#eeeeee",
+          "ansi256": 255,
+          "role": "elevated panel / card / table surface"
+        },
+        "selection": {
+          "hex": "#d0d0d0",
+          "ansi256": 252,
+          "role": "active / selected row background"
+        },
+        "shadow": {
+          "hex": "#bcbcbc",
+          "ansi256": 250,
+          "role": "depth-panel drop shadow (high-fidelity mode only)"
+        }
+      },
+      "structure": {
+        "_doc": "Panel / chrome borders (light terminal). UI elements held to the 3:1 large/UI bar.",
+        "border": {
+          "hex": "#626262",
+          "ansi256": 241,
+          "role": "panel + chrome border, unfocused (light)",
+          "aa": "large",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "border_focus": {
+          "hex": "#005f87",
+          "ansi256": 24,
+          "role": "focused panel border — signature (light)",
+          "aa": "large",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "text": {
+        "primary": {
+          "hex": "#1c1c1c",
+          "ansi256": 234,
+          "role": "primary text + metric values",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "secondary": {
+          "hex": "#3a3a3a",
+          "ansi256": 237,
+          "role": "secondary text, sublabels",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "muted": {
+          "hex": "#626262",
+          "ansi256": 241,
+          "role": "muted text, captions",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "brand": {
+        "signature": {
+          "hex": "#005f87",
+          "ansi256": 24,
+          "role": "electric-blue signature (darkened for light terminals)",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "steel": {
+          "hex": "#1c1c1c",
+          "ansi256": 234,
+          "role": "steel wordmark (dark on light)",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "secondary": null,
+      "accent": null,
+      "semantic": {
+        "online": {
+          "hex": "#006d00",
+          "ansi256": 22,
+          "glyph": "●",
+          "label": "ONLINE",
+          "family": "success",
+          "role": "ok / online / installed / healthy",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "degraded": {
+          "hex": "#9c5400",
+          "ansi256": 130,
+          "glyph": "◐",
+          "label": "DEGRADED",
+          "family": "caution",
+          "role": "degraded / enrolling / reconnecting / rate-limited",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "stale": {
+          "hex": "#6b5526",
+          "ansi256": 58,
+          "glyph": "⏱",
+          "label": "STALE",
+          "family": "caution",
+          "role": "stale data, faded",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "offline": {
+          "hex": "#626262",
+          "ansi256": 241,
+          "glyph": "○",
+          "label": "OFFLINE",
+          "family": "absence",
+          "role": "offline / no-internet / unavailable / absent / n-a",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "error": {
+          "hex": "#c81414",
+          "ansi256": 160,
+          "glyph": "⚠",
+          "label": "ERROR",
+          "family": "critical",
+          "role": "error / probe-failed / refused",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        },
+        "info": {
+          "hex": "#005f87",
+          "ansi256": 24,
+          "glyph": "⚿",
+          "label": "INFO",
+          "family": "info",
+          "role": "needs-helper / relaying / network",
+          "aa": "text",
+          "on": [
+            "background",
+            "panel"
+          ]
+        }
+      },
+      "severity": {
+        "_doc": "Darkened cool->warm ramp for light terminals.",
+        "thresholds": {
+          "nominal": "0-39%",
+          "moderate": "40-59%",
+          "elevated": "60-74%",
+          "high": "75-89%",
+          "critical": "90-100%"
+        },
+        "ramp": [
+          {
+            "stop": 1,
+            "name": "nominal",
+            "hex": "#006d00",
+            "ansi256": 22,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 2,
+            "name": "moderate",
+            "hex": "#5a7400",
+            "ansi256": 64,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 3,
+            "name": "elevated",
+            "hex": "#806600",
+            "ansi256": 94,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 4,
+            "name": "high",
+            "hex": "#9c5400",
+            "ansi256": 130,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          },
+          {
+            "stop": 5,
+            "name": "critical",
+            "hex": "#c81414",
+            "ansi256": 160,
+            "aa": "large",
+            "on": [
+              "background"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "state_glyph_legend": {
+    "_doc": "Canonical map of the wireframe legend (stories 0001-0011). glyph + label are the meaning carriers; colorRole points at themes.<theme>.semantic.<role>; emphasis names an extra SGR attribute applied by typography.json.",
+    "online": {
+      "glyph": "●",
+      "label": "online / ok",
+      "colorRole": "online",
+      "emphasis": null
+    },
+    "degraded": {
+      "glyph": "◐",
+      "label": "degraded / enrolling",
+      "colorRole": "degraded",
+      "emphasis": null
+    },
+    "offline": {
+      "glyph": "○",
+      "label": "offline / no-internet",
+      "colorRole": "offline",
+      "emphasis": null
+    },
+    "stale": {
+      "glyph": "⏱",
+      "label": "stale",
+      "colorRole": "stale",
+      "emphasis": "faint"
+    },
+    "error": {
+      "glyph": "⚠",
+      "label": "error",
+      "colorRole": "error",
+      "emphasis": "bold"
+    },
+    "needs_helper": {
+      "glyph": "⚿",
+      "label": "needs helper (insufficient permission)",
+      "colorRole": "info",
+      "emphasis": null
+    },
+    "unavailable": {
+      "glyph": "—",
+      "label": "unavailable (vendor / path)",
+      "colorRole": "offline",
+      "emphasis": "faint"
+    },
+    "installed": {
+      "glyph": "✓",
+      "label": "installed",
+      "colorRole": "online",
+      "emphasis": null
+    },
+    "absent": {
+      "glyph": "–",
+      "label": "absent",
+      "colorRole": "offline",
+      "emphasis": "faint"
+    },
+    "relaying": {
+      "glyph": "↑",
+      "label": "relaying",
+      "colorRole": "info",
+      "emphasis": null
+    },
+    "reconnecting": {
+      "glyph": "↯",
+      "label": "reconnecting",
+      "altGlyph": "◑",
+      "colorRole": "degraded",
+      "emphasis": null
+    },
+    "rate_limited": {
+      "glyph": "⚡",
+      "label": "rate-limited",
+      "colorRole": "degraded",
+      "emphasis": null
+    },
+    "refused": {
+      "glyph": "✋",
+      "label": "refused",
+      "colorRole": "error",
+      "emphasis": "bold"
+    },
+    "focus": {
+      "glyph": "▸",
+      "label": "focus / selected",
+      "colorRole": "signature",
+      "emphasis": "reverse"
+    }
+  },
+  "decoration_glyphs": {
+    "_doc": "Non-state glyphs used by the render. Not colour-coded by state.",
+    "brand_mark": "⬢",
+    "spinner_braille": [
+      "⠹",
+      "⠸",
+      "⠼"
+    ],
+    "gauge_blocks": [
+      "█",
+      "▓",
+      "▒",
+      "░"
+    ],
+    "sparkline": [
+      "▁",
+      "▂",
+      "▃",
+      "▄",
+      "▅",
+      "▆",
+      "▇",
+      "█"
+    ],
+    "trend": {
+      "rising": "↑",
+      "steady": "→",
+      "falling": "↓"
+    },
+    "ascii_fallback": {
+      "gauge_fill": "#",
+      "gauge_track": " ",
+      "trend_up": "^",
+      "trend_steady": "="
+    }
+  }
+}

@@ -1,0 +1,116 @@
+---
+id: cross-platform-metrics-daemon-enrollment-0001
+story: docs/stories/cross-platform-metrics-daemon-enrollment-20260626121705-0001/Story.md
+target: tui
+status: approved
+created_at: 2026-06-26
+---
+
+# Wireframe — cross-platform-metrics-daemon-enrollment-0001
+
+Target: **tui**. Enrollment view shares the global shell; focus is the CONNECTION lifecycle:
+◐ ENROLLING… → ● ONLINE → ○ OFFLINE → ◑ RECONNECTING… → ● ONLINE. Stable HOST-ID re-binds rows.
+Transport is gRPC over mutual-TLS with a bearer token (shown in PROTO / status).
+
+Legend (every state = symbol + text, never colour alone):
+  ● online/ok   ◐ degraded/enrolling   ○ offline/no-internet   ⏱ stale   ⚠ error
+  ⚿ needs helper (insufficient permission)   — unavailable (vendor/path)   ✓ installed   – absent
+  ↑ relaying   ↯ reconnecting   ⚡ rate-limited   ✋ refused   ▸ focus (also inverse)
+Min width ≈ 80 cols: optional columns (TREND/GPU/PWR/NET) collapse first; core metrics never drop.
+
+## Enrollment list — mixed OS + first-time join (mTLS + token)
+
+```text
+╔════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ ⬢ Heimdall · Enrollment             ● 5/6 · ◐ 1 enrolling                ⏱ 2026-06-26 14:02:12 ║
+╠════════════════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                                ║
+║   ┌───────────────┬─────┬──────────┬──────────────┬──────────┬──────────────────────┐          ║
+║   │ HOST          │ OS  │ HOST-ID  │ ADDRESS      │ PROTO    │ CONNECTION           │          ║
+║   ├───────────────┼─────┼──────────┼──────────────┼──────────┼──────────────────────┤          ║
+║   │ ▸ workstation │ win │ h-7a1c   │ 10.0.1.21    │ gRPC+TLS │ ● ONLINE   14:02:10  │          ║
+║   │   dgx-spark   │ lin │ h-3f9a   │ 10.0.1.32    │ gRPC+TLS │ ● ONLINE   14:02:08  │          ║
+║   │   strix-halo  │ lin │ h-9b2d   │ 10.0.1.33    │ gRPC+TLS │ ● ONLINE   14:02:11  │          ║
+║   │   mac-mini    │ mac │ h-1c4e   │ 10.0.1.44    │ gRPC+TLS │ ● ONLINE   14:02:05  │          ║
+║   │   rpi-5       │ lin │ h-5d80   │ 10.0.1.55    │ gRPC+TLS │ ● ONLINE   14:02:09  │          ║
+║   │   alienware   │ win │ h-2e66   │ 10.0.1.66    │ gRPC+TLS │ ◐ ENROLLING…  (new)  │          ║
+║   └───────────────┴─────┴──────────┴──────────────┴──────────┴──────────────────────┘          ║
+║                                                                                                ║
+║   Mixed OS (Windows / macOS / Linux). A first-time host appears as ONE new row when its        ║
+║   daemon completes handshake — alienware just joined: ◐ ENROLLING… → ● ONLINE next tick.       ║
+║   Enrollment is mutual-TLS + bearer-token authenticated — no metrics flow until the TLS        ║
+║   handshake and token check pass (PROTO shows gRPC+TLS).                                       ║
+╠════════════════════════════════════════════════════════════════════════════════════════════════╣
+║ STATUS ● 5 online · ◐ 1 enrolling · gRPC low-bandwidth · mTLS+token                            ║
+║ q quit · ↑/↓ nav · ⏎ detail · r refresh · ? help                                               ║
+╚════════════════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+**Annotations**
+
+- Hosts span Windows / macOS / Linux over a low-bandwidth gRPC stream secured by mutual-TLS + token.
+- First-time join: alienware appears as a SINGLE new row in ◐ ENROLLING… then flips to ● ONLINE.
+- Connection state is glyph + word so it is legible without colour; ▸ + inverse marks focus.
+- Keyboard: ↑/↓ nav, ⏎ detail, r refresh, q quit — no mouse-only path.
+- Security note: no metric data flows before the TLS handshake and token check succeed.
+
+## Connection lost — marked offline (outage)
+
+```text
+╔════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ ⬢ Heimdall · Enrollment              ● 5/6 · ○ 1 offline                 ⏱ 2026-06-26 14:03:41 ║
+╠════════════════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                                ║
+║   ┌───────────────┬─────┬──────────┬──────────────┬──────────┬──────────────────────┐          ║
+║   │ HOST          │ OS  │ HOST-ID  │ ADDRESS      │ PROTO    │ CONNECTION           │          ║
+║   ├───────────────┼─────┼──────────┼──────────────┼──────────┼──────────────────────┤          ║
+║   │   workstation │ win │ h-7a1c   │ 10.0.1.21    │ gRPC+TLS │ ● ONLINE   14:03:38  │          ║
+║   │ ▸ dgx-spark   │ lin │ h-3f9a   │ 10.0.1.32    │ gRPC ✗   │ ○ OFFLINE  14:03:40  │          ║
+║   │   strix-halo  │ lin │ h-9b2d   │ 10.0.1.33    │ gRPC+TLS │ ● ONLINE   14:03:39  │          ║
+║   │   mac-mini    │ mac │ h-1c4e   │ 10.0.1.44    │ gRPC+TLS │ ● ONLINE   14:03:37  │          ║
+║   │   rpi-5       │ lin │ h-5d80   │ 10.0.1.55    │ gRPC+TLS │ ● ONLINE   14:03:39  │          ║
+║   │   alienware   │ win │ h-2e66   │ 10.0.1.66    │ gRPC+TLS │ ● ONLINE   14:02:40  │          ║
+║   └───────────────┴─────┴──────────┴──────────────┴──────────┴──────────────────────┘          ║
+║                                                                                                ║
+║   Network dropped for dgx-spark (host-id h-3f9a). It is marked ○ OFFLINE in place — the        ║
+║   row is KEPT, last-seen time freezes. The row is never removed during an outage.              ║
+╠════════════════════════════════════════════════════════════════════════════════════════════════╣
+║ STATUS ○ 1 offline (dgx-spark) · last seen 14:03:18                                            ║
+║ q quit · ↑/↓ nav · ⏎ detail · r refresh · ? help                                               ║
+╚════════════════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+**Annotations**
+
+- dgx-spark's socket drops: PROTO shows gRPC ✗ and CONNECTION becomes ○ OFFLINE with a frozen time.
+- Offline is signalled by ○ + word + frozen timestamp — never by colour or by removing the row.
+- The host-id is retained so the row holds its place (no layout jump).
+
+## Automatic reconnect — no duplicate row
+
+```text
+╔════════════════════════════════════════════════════════════════════════════════════════════════╗
+║ ⬢ Heimdall · Enrollment              ● 6/6 online · 0 offline            ⏱ 2026-06-26 14:04:12 ║
+╠════════════════════════════════════════════════════════════════════════════════════════════════╣
+║                                                                                                ║
+║   ┌ RECONNECT — same row, no duplicate ──────────────────────────────────────────────────────┐ ║
+║   │ before  ▸ dgx-spark  h-3f9a  10.0.1.32   ○ OFFLINE       14:03:40                        │ ║
+║   │   …     ▸ dgx-spark  h-3f9a  10.0.1.32   ◑ RECONNECTING… 14:04:05                        │ ║
+║   │ after   ▸ dgx-spark  h-3f9a  10.0.1.32   ● ONLINE        14:04:12  ▸ resumed (re-auth ok)│ ║
+║   │                                                                                          │ ║
+║   │ Host-id h-3f9a is unchanged across all three ticks → the daemon re-attaches (and         │ ║
+║   │ re-authenticates mTLS+token) to the same row. No second row is appended; count stays 6.  │ ║
+║   └──────────────────────────────────────────────────────────────────────────────────────────┘ ║
+║                                                                                                ║
+╠════════════════════════════════════════════════════════════════════════════════════════════════╣
+║ STATUS ● 6 online · dgx-spark reconnected (no duplicate)                                       ║
+║ q quit · ↑/↓ nav · ⏎ detail · r refresh · ? help                                               ║
+╚════════════════════════════════════════════════════════════════════════════════════════════════╝
+```
+
+**Annotations**
+
+- Across OFFLINE → ◑ RECONNECTING… → ● ONLINE the HOST-ID is constant, so the daemon re-binds the SAME row.
+- Reconnect re-runs mTLS + token auth before data resumes; no second row is appended; count holds.
+- ◑ RECONNECTING… is a distinct glyph from ● and ○ (shape, not colour).
+
