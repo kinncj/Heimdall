@@ -39,12 +39,12 @@ func (h *Hub) Relay(stream v1.FederationService_RelayServer) error {
 		}
 		hostID, ms, labels := transport.FromSnapshot(snap)
 		id := domain.HostID(hostID)
-		h.reg.Enroll(domain.Host{ID: id, Hostname: hostID, DisplayName: hostID}, time.Now())
-		h.reg.Observe(id, ms, labels, time.Now())
 		origin := env.GetOriginHubId()
 		if origin == "" {
 			origin = self
 		}
+		h.reg.Enroll(domain.Host{ID: id, Hostname: hostID, DisplayName: hostID}, time.Now())
+		h.reg.Observe(id, ms, withOrigin(labels, origin), time.Now())
 		h.recordOrigin(id, origin, env.GetPath())
 		h.publish(snap)
 		_ = stream.Send(&v1.RelayControl{AckedSeq: snap.GetSeq()})

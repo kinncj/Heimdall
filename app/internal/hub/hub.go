@@ -83,6 +83,18 @@ func (h *Hub) recordOrigin(id domain.HostID, origin string, path []string) {
 // Registry exposes the host registry (e.g. for an embedded dashboard).
 func (h *Hub) Registry() *domain.HostRegistry { return h.reg }
 
+// withOrigin returns a copy of labels with the reserved "hub" tag set to the
+// host's origin hub — the Yggdrasil grouping axis. The origin is authoritative
+// and overrides any incoming "hub" value.
+func withOrigin(labels map[string]string, origin string) map[string]string {
+	out := make(map[string]string, len(labels)+1)
+	for k, v := range labels {
+		out[k] = v
+	}
+	out["hub"] = origin
+	return out
+}
+
 // Enroll registers a daemon's host identity and returns stream policy.
 func (h *Hub) Enroll(_ context.Context, req *v1.EnrollRequest) (*v1.EnrollResponse, error) {
 	host := req.GetHost()
@@ -94,7 +106,14 @@ func (h *Hub) Enroll(_ context.Context, req *v1.EnrollRequest) (*v1.EnrollRespon
 	if name == "" {
 		name = id
 	}
-	h.reg.Enroll(domain.Host{ID: domain.HostID(id), Hostname: host.GetHostname(), DisplayName: name}, time.Now())
+	h.reg.Enroll(domain.Host{
+		ID: domain.HostID(id), Hostname: host.GetHostname(), DisplayName: name,
+		Context: domain.HostContext{
+			OS:     host.GetContext().GetOs(),
+			Arch:   host.GetContext().GetArch(),
+			Labels: host.GetContext().GetLabels(),
+		},
+	}, time.Now())
 	return &v1.EnrollResponse{
 		HostId:           id,
 		Accepted:         true,
@@ -115,7 +134,7 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 			return err
 		}
 		hostID, ms, labels := transport.FromSnapshot(snap)
-		h.reg.Observe(domain.HostID(hostID), ms, labels, time.Now())
+		h.reg.Observe(domain.HostID(hostID), ms, withOrigin(labels, h.idOrDefault()), time.Now())
 		h.recordOrigin(domain.HostID(hostID), h.idOrDefault(), nil)
 		h.publish(snap)
 	}
