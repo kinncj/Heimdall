@@ -133,11 +133,14 @@ func (m Model) DetailView() string {
 
 	b.WriteString("\n  " + heading.Style().Render("NETWORK & SYSTEM") + "\n")
 	b.WriteString("  " +
-		label.Style().Render("net ↓ ") + m.netVal(byName, "net.rx") + "   " +
-		label.Style().Render("net ↑ ") + m.netVal(byName, "net.tx") + "   " +
+		label.Style().Render("net ↓ ") + m.throughputVal(byName, "net.rx") + "   " +
+		label.Style().Render("net ↑ ") + m.throughputVal(byName, "net.tx") + "   " +
 		label.Style().Render("ping ") + m.pingVal(byName) + "   " +
 		label.Style().Render("gw ") + m.gatewayVal(byName) + "   " +
 		label.Style().Render("uptime ") + m.uptimeVal(byName) + "\n")
+	b.WriteString("  " +
+		label.Style().Render("disk r ") + m.throughputVal(byName, "disk.read") + "   " +
+		label.Style().Render("disk w ") + m.throughputVal(byName, "disk.write") + "\n")
 
 	b.WriteString("\n  " + keys.Style().Render("esc") + muted.Style().Render(" back   ") +
 		keys.Style().Render("↑/↓") + muted.Style().Render(" host   ") +
@@ -145,7 +148,7 @@ func (m Model) DetailView() string {
 	return b.String()
 }
 
-func (m Model) netVal(byName map[string]domain.Metric, key string) string {
+func (m Model) throughputVal(byName map[string]domain.Metric, key string) string {
 	mm, ok := byName[key]
 	if !ok || mm.Status != domain.StatusOK {
 		return m.nonOK(mm)

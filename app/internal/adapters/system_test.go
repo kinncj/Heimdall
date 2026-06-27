@@ -54,8 +54,28 @@ func TestDiskReportsRealUsed(t *testing.T) {
 }
 
 func TestDefaultAdapters(t *testing.T) {
-	if n := len(Default()); n != 9 {
-		t.Fatalf("Default() = %d adapters, want 9", n)
+	if n := len(Default()); n != 10 {
+		t.Fatalf("Default() = %d adapters, want 10", n)
+	}
+}
+
+func TestDiskIODelta(t *testing.T) {
+	d := &DiskIO{}
+	if _, err := d.Collect(context.Background()); err != nil {
+		t.Fatalf("diskio collect 1: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	ms, err := d.Collect(context.Background())
+	if err != nil {
+		t.Fatalf("diskio collect 2: %v", err)
+	}
+	if len(ms) != 2 || ms[0].Name != "disk.read" || ms[1].Name != "disk.write" {
+		t.Fatalf("diskio metrics = %+v", ms)
+	}
+	for _, m := range ms {
+		if m.Status == domain.StatusOK && m.Gauge < 0 {
+			t.Errorf("%s rate negative: %v", m.Name, m.Gauge)
+		}
 	}
 }
 

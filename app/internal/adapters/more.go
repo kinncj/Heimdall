@@ -24,6 +24,16 @@ type Network struct {
 	last   time.Time
 }
 
+// deltaRateMB converts the growth of a monotonic byte counter over dt seconds
+// into MB/s. A non-positive interval or a counter reset (cur < prev) yields 0,
+// so a wrapped or restarted counter never produces a bogus spike.
+func deltaRateMB(prev, cur uint64, dt float64) float64 {
+	if dt <= 0 || cur < prev {
+		return 0
+	}
+	return float64(cur-prev) / dt / 1e6
+}
+
 func (n *Network) Describe() domain.AdapterInfo {
 	return domain.AdapterInfo{ID: "net", Metrics: []string{"net.rx", "net.tx"}}
 }
@@ -45,10 +55,9 @@ func (n *Network) Collect(ctx context.Context) ([]domain.Metric, error) {
 	defer n.mu.Unlock()
 	var rxRate, txRate float64
 	if !n.last.IsZero() {
-		if dt := now.Sub(n.last).Seconds(); dt > 0 {
-			rxRate = float64(rx-n.lastRx) / dt / 1e6
-			txRate = float64(tx-n.lastTx) / dt / 1e6
-		}
+		dt := now.Sub(n.last).Seconds()
+		rxRate = deltaRateMB(n.lastRx, rx, dt)
+		txRate = deltaRateMB(n.lastTx, tx, dt)
 	}
 	n.lastRx, n.lastTx, n.last = rx, tx, now
 	return []domain.Metric{
