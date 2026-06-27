@@ -112,6 +112,7 @@ func main() {
 	}
 
 	if *snapshot {
+		reg.Evaluate(time.Now())
 		if *detailFlag {
 			fmt.Println(model.DetailView())
 		} else {
@@ -271,12 +272,25 @@ func subscribeHub(addr string, reg *domain.HostRegistry, dialOpts []grpc.DialOpt
 			if err != nil {
 				break
 			}
-			id, ms := transport.FromSnapshot(snap)
-			hid := domain.HostID(id)
-			reg.Enroll(domain.Host{ID: hid, Hostname: id, DisplayName: id}, time.Now())
-			reg.Observe(hid, ms, time.Now())
+			foldSnapshot(reg, snap)
 		}
 		_ = conn.Close()
 		time.Sleep(time.Second)
 	}
+}
+
+// foldSnapshot folds a hub snapshot into the registry, observing the host at the
+// snapshot's own timestamp (the hub's last-seen time for that host) rather than
+// wall-clock now. This is what lets a host go OFFLINE: a retained snapshot for a
+// dead daemon — replayed on connect or reconnect — ages from its real timestamp
+// instead of looking freshly seen. A missing timestamp falls back to now.
+func foldSnapshot(reg *domain.HostRegistry, snap *v1.Snapshot) {
+	id, ms := transport.FromSnapshot(snap)
+	hid := domain.HostID(id)
+	seen := time.Now()
+	if t := snap.GetTsUnixMillis(); t > 0 {
+		seen = time.UnixMilli(t)
+	}
+	reg.Enroll(domain.Host{ID: hid, Hostname: id, DisplayName: id}, seen)
+	reg.Observe(hid, ms, seen)
 }
