@@ -17,6 +17,7 @@ type HostRegistry struct {
 	mu           sync.RWMutex
 	staleAfter   time.Duration
 	offlineAfter time.Duration
+	purgeAfter   time.Duration
 	hosts        map[HostID]*hostEntry
 }
 
@@ -35,6 +36,15 @@ func NewHostRegistry(staleAfter, offlineAfter time.Duration) *HostRegistry {
 		offlineAfter: offlineAfter,
 		hosts:        make(map[HostID]*hostEntry),
 	}
+}
+
+// SetPurgeAfter drops a host from the registry once it has been unseen for this
+// long, bounding memory under host churn. Purging happens during Evaluate. Zero
+// (the default) disables purging — offline hosts are retained indefinitely.
+func (r *HostRegistry) SetPurgeAfter(d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.purgeAfter = d
 }
 
 // Enroll registers or updates a host's identity. A returning host (same ID) is
@@ -66,16 +76,23 @@ func (r *HostRegistry) Observe(id HostID, snapshot []Metric, now time.Time) {
 	e.state = StateOnline
 }
 
-// Evaluate recomputes liveness for every observed host against now. Enrolling
-// hosts (never observed) are left untouched. Last-known values are preserved.
+// Evaluate recomputes liveness for every observed host against now, and purges
+// hosts unseen past the purge horizon (see SetPurgeAfter). Enrolling hosts
+// (never observed) are left untouched. Last-known values are preserved until a
+// host is purged.
 func (r *HostRegistry) Evaluate(now time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, e := range r.hosts {
+	for id, e := range r.hosts {
 		if !e.observed {
 			continue
 		}
-		switch age := now.Sub(e.lastSeen); {
+		age := now.Sub(e.lastSeen)
+		if r.purgeAfter > 0 && age > r.purgeAfter {
+			delete(r.hosts, id)
+			continue
+		}
+		switch {
 		case age > r.offlineAfter:
 			e.state = StateOffline
 		case age > r.staleAfter:

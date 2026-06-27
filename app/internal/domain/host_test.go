@@ -95,6 +95,26 @@ func TestReconnectResumesSameHostNoDuplicate(t *testing.T) {
 	}
 }
 
+// A host unseen past the purge horizon is removed entirely, so the registry —
+// and the trend buffers keyed off it — never grow without bound under churn
+// (architecture.md risk: in-memory ring buffers grow with fleet size).
+func TestPurgesLongOfflineHost(t *testing.T) {
+	t0 := time.Unix(5_000, 0)
+	r := NewHostRegistry(10*time.Second, 30*time.Second)
+	r.SetPurgeAfter(5 * time.Minute)
+	r.Enroll(sampleHost("ephemeral"), t0)
+	r.Observe("ephemeral", snapshot(), t0)
+
+	r.Evaluate(t0.Add(45 * time.Second)) // offline, still retained for visibility
+	if r.Count() != 1 {
+		t.Fatalf("offline host should be retained, count=%d", r.Count())
+	}
+	r.Evaluate(t0.Add(6 * time.Minute)) // past the purge horizon
+	if r.Count() != 0 {
+		t.Fatalf("long-offline host should be purged, count=%d", r.Count())
+	}
+}
+
 // Enrolling the same id twice updates identity in place — never two entries.
 func TestEnrollSameIDDeduplicates(t *testing.T) {
 	t0 := time.Unix(5_000, 0)

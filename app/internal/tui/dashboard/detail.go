@@ -25,10 +25,14 @@ func onlineCount(hosts []domain.HostView) int {
 }
 
 // recordHistory appends each host's OK metric values into a capped in-memory
-// ring buffer for the detail-view sparklines (no TSDB; bounded RAM).
+// ring buffer for the detail-view sparklines (no TSDB; bounded RAM), and drops
+// history for hosts the registry has purged so the trend store never outgrows
+// the live fleet.
 func (m Model) recordHistory() {
 	const capN = 60
+	live := make(map[domain.HostID]struct{})
 	for _, h := range m.reg.Hosts() {
+		live[h.Host.ID] = struct{}{}
 		hm := m.history[h.Host.ID]
 		if hm == nil {
 			hm = make(map[string][]float64)
@@ -43,6 +47,11 @@ func (m Model) recordHistory() {
 				s = s[len(s)-capN:]
 			}
 			hm[mm.Name] = s
+		}
+	}
+	for id := range m.history {
+		if _, ok := live[id]; !ok {
+			delete(m.history, id)
 		}
 	}
 }

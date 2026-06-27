@@ -37,6 +37,7 @@ func main() {
 	listen := flag.String("listen", ":9090", "gRPC listen address")
 	staleAfter := flag.Duration("stale-after", 10*time.Second, "mark a host stale after no updates for this long")
 	offlineAfter := flag.Duration("offline-after", 30*time.Second, "mark a host offline after no updates for this long")
+	purgeAfter := flag.Duration("purge-after", 15*time.Minute, "drop a host from the registry after it has been unseen this long (0 disables)")
 	token := flag.String("token", os.Getenv("HEIMDALL_TOKEN"), "required enrollment token (env HEIMDALL_TOKEN); empty disables auth")
 	tlsCert := flag.String("tls-cert", "", "PEM server certificate; enables TLS with --tls-key")
 	tlsKey := flag.String("tls-key", "", "PEM server private key; enables TLS with --tls-cert")
@@ -58,6 +59,7 @@ func main() {
 	h := hub.New(*staleAfter, *offlineAfter)
 	h.SetToken(*token)
 	h.SetID(*id)
+	h.Registry().SetPurgeAfter(*purgeAfter)
 
 	lis, err := net.Listen("tcp", *listen)
 	if err != nil {

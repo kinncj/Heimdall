@@ -47,6 +47,7 @@ func main() {
 	splashFlag := flag.Bool("splash", false, "render the splash frame to stdout and exit")
 	demoMode := flag.Bool("demo", false, "render a simulated multi-host fleet (no hub needed; for trying the UI)")
 	hubAddr := flag.String("hub", "localhost:9090", "hub address to subscribe to for live host metrics")
+	purgeAfter := flag.Duration("purge-after", 15*time.Minute, "drop a host from the view after it has been unseen this long (0 disables)")
 	detailFlag := flag.Bool("detail", false, "render the host-detail frame (with --snapshot)")
 	mode := flag.String("mode", "dark", "theme mode: dark|light")
 	token := flag.String("token", os.Getenv("HEIMDALL_TOKEN"), "enrollment token presented to the hub (env HEIMDALL_TOKEN)")
@@ -115,6 +116,7 @@ func main() {
 		live = func() bool { return true }
 	default:
 		reg = domain.NewHostRegistry(10*time.Second, 30*time.Second)
+		reg.SetPurgeAfter(*purgeAfter)
 		dialOpts, err := clientDialOptions(*token, secure.ClientConfig{
 			Enabled: *useTLS, CAFile: *tlsCA, ServerName: *tlsServerName, SkipVerify: *tlsInsecure,
 		})
