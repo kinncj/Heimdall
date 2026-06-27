@@ -18,10 +18,18 @@ import (
 	"heimdall/app/internal/helper"
 )
 
+// version is the Heimdall build version, set via -ldflags "-X main.version=…".
+var version = "dev"
+
 func main() {
 	sock := flag.String("socket", helper.DefaultSocketPath(), "unix socket to listen on")
 	demo := flag.Bool("demo", false, "serve canned sample metrics (no root needed; for trying the needs-helper UI)")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("heimdall-helper", version)
+		return
+	}
 
 	collect := helper.PrivilegedMetrics
 	if *demo {

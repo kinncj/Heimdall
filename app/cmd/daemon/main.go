@@ -59,8 +59,13 @@ func main() {
 	logSource := flag.String("log-source", "", "opt-in log sources alias=path,alias2=path2 (served on --control-listen; empty = logs off)")
 	logFile := flag.String("log-file", "", "operational log destination: unset = stderr (TTY); 'false' = disabled; a path = JSON logs appended to that file")
 	pingTarget := flag.String("ping-target", "1.1.1.1", "internet host pinged for reachability/latency (net.latency)")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Usage = usage
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("heimdall-daemon", version)
+		return
+	}
 
 	lg, metricsW, metricsJSON, closeLog, err := resolveOutput(*logFile, *asJSON)
 	if err != nil {

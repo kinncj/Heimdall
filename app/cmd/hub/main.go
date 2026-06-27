@@ -22,6 +22,9 @@ import (
 	v1 "heimdall/common/proto/monitoring/v1"
 )
 
+// version is the Heimdall build version, set via -ldflags "-X main.version=…".
+var version = "dev"
+
 func main() {
 	listen := flag.String("listen", ":9090", "gRPC listen address")
 	staleAfter := flag.Duration("stale-after", 10*time.Second, "mark a host stale after no updates for this long")
@@ -37,7 +40,12 @@ func main() {
 	upstreamServerName := flag.String("upstream-tls-server-name", "", "override the server name verified in the upstream certificate")
 	upstreamInsecure := flag.Bool("upstream-tls-insecure", false, "skip upstream certificate verification (dev only)")
 	relayInterval := flag.Duration("relay-interval", 2*time.Second, "how often to relay hosts upstream")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("heimdall-hub", version)
+		return
+	}
 
 	h := hub.New(*staleAfter, *offlineAfter)
 	h.SetToken(*token)

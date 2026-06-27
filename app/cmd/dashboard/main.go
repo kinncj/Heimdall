@@ -30,6 +30,9 @@ import (
 	v1 "heimdall/common/proto/monitoring/v1"
 )
 
+// version is the Heimdall build version, set via -ldflags "-X main.version=…".
+var version = "dev"
+
 func main() {
 	snapshot := flag.Bool("snapshot", false, "render one grid frame to stdout and exit")
 	splashFlag := flag.Bool("splash", false, "render the splash frame to stdout and exit")
@@ -45,8 +48,13 @@ func main() {
 	controlAddr := flag.String("control", "", "daemon control-plane address for --run")
 	controlRun := flag.String("run", "", "allow-listed control command to run against --control, e.g. \"process.list\" or \"dir.list /var/log\"")
 	tailAlias := flag.String("tail", "", "tail an opt-in log source alias from --control (e.g. app); streams until ctrl-c")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Usage = usage
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("heimdall-dashboard", version)
+		return
+	}
 
 	if *controlRun != "" || *tailAlias != "" {
 		if *controlAddr == "" {
