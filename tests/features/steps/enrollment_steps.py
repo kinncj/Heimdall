@@ -63,7 +63,12 @@ def _start_daemon(context, name, token=None):
     if context.hub_tls_dir:
         args += ["--tls", "--tls-ca", os.path.join(context.hub_tls_dir, "hub.crt")]
     log = open(tempfile.mktemp(prefix=f"heimdall-daemon-{name}-", suffix=".log"), "w+")
-    proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT, cwd=str(context.root))
+    # Each named host is a distinct machine: give it its own config dir so the
+    # daemons don't race on a single shared config file when started together.
+    env = dict(os.environ)
+    env["HEIMDALL_CONFIG_DIR"] = os.path.join(context.config_dir, f"daemon-{name}")
+    proc = subprocess.Popen(args, stdout=log, stderr=subprocess.STDOUT,
+                            cwd=str(context.root), env=env)
     context.procs.append(proc)
     return proc, log.name
 
