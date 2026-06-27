@@ -3,13 +3,7 @@
 
 package main
 
-import (
-	"flag"
-	"fmt"
-	"os"
-
-	"heimdall/app/internal/options"
-)
+import "heimdall/app/internal/options"
 
 // daemonCatalog declares every persistent daemon setting once. Each option drives
 // a flag, a JSON config field, an optional env var, and (where it has a question)
@@ -48,35 +42,10 @@ func daemonCatalog() options.Catalog {
 }
 
 // resolveDaemon folds defaults, the saved config, the environment, and flags into
-// the effective settings; on a fresh terminal with no config and no flags it runs
-// the first-run wizard. It persists when the wizard ran or a setting flag was
-// given.
+// the effective settings, running the first-run wizard on a fresh terminal.
 func resolveDaemon(cat options.Catalog) options.Resolved {
-	path, _ := options.Locate("daemon")
-	fileSrc, found, _ := options.FromFile(path)
-
-	resolver := options.NewResolver(cat).
-		With(options.Builtins(cat)).
-		With(fileSrc).
-		With(options.FromEnvironment(cat)).
-		With(options.FromFlags(cat, flag.CommandLine))
-	resolved := resolver.Resolve()
-
-	wizardRan := false
-	if !found && !options.AnyProvided(flag.CommandLine) && options.Interactive() {
-		p := options.NewPrompter(os.Stdin, os.Stderr)
-		p.Intro("heimdall-daemon — first-run setup",
-			"This host samples its own metrics and streams them to a hub.",
-			"Press Enter to accept each [default]; edit the saved file anytime.")
-		resolved = resolver.With(options.RunWizard(cat, resolved, p)).Resolve()
-		p.Note("Advanced options (control plane, log streaming, TLS) live in the saved file.")
-		wizardRan = true
-	}
-
-	if path != "" && (wizardRan || options.Provided(cat, flag.CommandLine)) {
-		if err := (options.Sink{Path: path}).Write(cat, resolved); err == nil {
-			fmt.Fprintf(os.Stderr, "heimdall-daemon: saved config to %s\n", path)
-		}
-	}
-	return resolved
+	return options.Resolve("daemon", cat,
+		"heimdall-daemon — first-run setup",
+		"This host samples its own metrics and streams them to a hub.",
+		"Press Enter to accept each [default]; advanced options live in the saved file.")
 }

@@ -12,12 +12,15 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/hub"
+	"heimdall/app/internal/options"
 	"heimdall/app/internal/secure"
 	"heimdall/app/internal/selfupdate"
 	v1 "heimdall/common/proto/monitoring/v1"
@@ -34,39 +37,26 @@ func main() {
 		}
 		return
 	}
-	listen := flag.String("listen", ":9090", "gRPC listen address")
-	staleAfter := flag.Duration("stale-after", 10*time.Second, "mark a host stale after no updates for this long")
-	offlineAfter := flag.Duration("offline-after", 30*time.Second, "mark a host offline after no updates for this long")
-	purgeAfter := flag.Duration("purge-after", 15*time.Minute, "drop a host from the registry after it has been unseen this long (0 disables)")
-	token := flag.String("token", os.Getenv("HEIMDALL_TOKEN"), "required enrollment token (env HEIMDALL_TOKEN); empty disables auth")
-	tlsCert := flag.String("tls-cert", "", "PEM server certificate; enables TLS with --tls-key")
-	tlsKey := flag.String("tls-key", "", "PEM server private key; enables TLS with --tls-cert")
-	id := flag.String("id", defaultHubID(), "this hub's federation id (origin of local hosts, appended to relay paths)")
-	upstream := flag.String("upstream", "", "parent hub address to relay this hub's hosts to (federation)")
-	upstreamToken := flag.String("upstream-token", os.Getenv("HEIMDALL_UPSTREAM_TOKEN"), "enrollment token for the upstream hub (env HEIMDALL_UPSTREAM_TOKEN)")
-	upstreamTLS := flag.Bool("upstream-tls", false, "relay to the upstream hub over TLS")
-	upstreamCA := flag.String("upstream-tls-ca", "", "PEM CA bundle to trust for the upstream hub")
-	upstreamServerName := flag.String("upstream-tls-server-name", "", "override the server name verified in the upstream certificate")
-	upstreamInsecure := flag.Bool("upstream-tls-insecure", false, "skip upstream certificate verification (dev only)")
-	relayInterval := flag.Duration("relay-interval", 2*time.Second, "how often to relay hosts upstream")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	cat := hubCatalog()
+	cat.Register(flag.CommandLine)
+	flag.Usage = usage
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("heimdall-hub", version)
 		return
 	}
 
-	h := hub.New(*staleAfter, *offlineAfter)
-	h.SetToken(*token)
-	h.SetID(*id)
-	h.Registry().SetPurgeAfter(*purgeAfter)
+	cfg := options.Resolve("hub", cat,
+		"heimdall-hub — first-run setup",
+		"The hub ingests metrics from daemons and fans them out to dashboards.")
 
-	lis, err := net.Listen("tcp", *listen)
-	if err != nil {
-		fail(err)
-	}
+	h := hub.New(cfg.Span("stale-after", 10*time.Second), cfg.Span("offline-after", 30*time.Second))
+	h.SetToken(cfg.Secret("token").Reveal())
+	h.SetID(cfg.Text("id"))
+	h.Registry().SetPurgeAfter(cfg.Span("purge-after", 15*time.Minute))
 
-	creds, err := secure.ServerOption(*tlsCert, *tlsKey)
+	creds, err := secure.ServerOption(cfg.Text("tls-cert"), cfg.Text("tls-key"))
 	if err != nil {
 		fail(err)
 	}
@@ -79,19 +69,31 @@ func main() {
 	v1.RegisterMetricStreamServiceServer(srv, h)
 	v1.RegisterFederationServiceServer(srv, h)
 
+	addrs := listenAddrs(cfg.Text("listen"))
+	listeners := make([]net.Listener, 0, len(addrs))
+	for _, addr := range addrs {
+		lis, err := net.Listen("tcp", addr)
+		if err != nil {
+			fail(err)
+		}
+		listeners = append(listeners, lis)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go h.EvaluateLoop(ctx)
 
-	if *upstream != "" {
-		dialOpts, err := upstreamDialOptions(*upstreamToken, secure.ClientConfig{
-			Enabled: *upstreamTLS, CAFile: *upstreamCA, ServerName: *upstreamServerName, SkipVerify: *upstreamInsecure,
+	if upstream := cfg.Text("upstream"); upstream != "" {
+		dialOpts, err := upstreamDialOptions(cfg.Secret("upstream-token").Reveal(), secure.ClientConfig{
+			Enabled: cfg.Toggle("upstream-tls"), CAFile: cfg.Text("upstream-tls-ca"),
+			ServerName: cfg.Text("upstream-tls-server-name"), SkipVerify: cfg.Toggle("upstream-tls-insecure"),
 		})
 		if err != nil {
 			fail(err)
 		}
-		go hub.RunRelay(ctx, h, *upstream, dialOpts, *relayInterval)
-		fmt.Fprintf(os.Stderr, "heimdall-hub: relaying upstream to %s every %s\n", *upstream, *relayInterval)
+		interval := cfg.Span("relay-interval", 2*time.Second)
+		go hub.RunRelay(ctx, h, upstream, dialOpts, interval)
+		fmt.Fprintf(os.Stderr, "heimdall-hub: relaying upstream to %s every %s\n", upstream, interval)
 	}
 
 	go func() {
@@ -102,11 +104,20 @@ func main() {
 		srv.GracefulStop()
 	}()
 
-	fmt.Fprintf(os.Stderr, "heimdall-hub: id=%s listening on %s (stale %s, offline %s, tls=%t, auth=%t)\n",
-		*id, *listen, *staleAfter, *offlineAfter, *tlsCert != "", *token != "")
-	if err := srv.Serve(lis); err != nil {
-		fail(err)
+	fmt.Fprintf(os.Stderr, "heimdall-hub: id=%s listening on %s (tls=%t, auth=%t)\n",
+		cfg.Text("id"), strings.Join(addrs, ","), cfg.Text("tls-cert") != "", !cfg.Secret("token").IsEmpty())
+
+	var wg sync.WaitGroup
+	for _, lis := range listeners {
+		wg.Add(1)
+		go func(l net.Listener) {
+			defer wg.Done()
+			if err := srv.Serve(l); err != nil {
+				fmt.Fprintln(os.Stderr, "heimdall-hub:", err)
+			}
+		}(lis)
 	}
+	wg.Wait()
 }
 
 // defaultHubID derives a stable-ish federation id from the hostname.

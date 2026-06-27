@@ -129,3 +129,19 @@ func TestLocateHonorsConfigDirOverride(t *testing.T) {
 		t.Fatalf("Locate = %q", p)
 	}
 }
+
+func TestProvidedIgnoresUnknownFlags(t *testing.T) {
+	cat := sampleCatalog()
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	cat.Register(fs)
+	fs.Bool("once", false, "action flag not in catalog")
+	_ = fs.Parse([]string{"--once"})
+
+	if Provided(cat, fs) {
+		t.Fatal("an action flag must not count as a setting")
+	}
+	_ = fs.Parse([]string{"--hub", "x:1"})
+	if !Provided(cat, fs) {
+		t.Fatal("a catalog flag must count as provided")
+	}
+}

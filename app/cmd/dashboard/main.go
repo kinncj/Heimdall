@@ -46,19 +46,13 @@ func main() {
 	snapshot := flag.Bool("snapshot", false, "render one grid frame to stdout and exit")
 	splashFlag := flag.Bool("splash", false, "render the splash frame to stdout and exit")
 	demoMode := flag.Bool("demo", false, "render a simulated multi-host fleet (no hub needed; for trying the UI)")
-	hubAddr := flag.String("hub", "localhost:9090", "hub address to subscribe to for live host metrics")
-	purgeAfter := flag.Duration("purge-after", 15*time.Minute, "drop a host from the view after it has been unseen this long (0 disables)")
 	detailFlag := flag.Bool("detail", false, "render the host-detail frame (with --snapshot)")
-	mode := flag.String("mode", "dark", "theme mode: dark|light")
-	token := flag.String("token", os.Getenv("HEIMDALL_TOKEN"), "enrollment token presented to the hub (env HEIMDALL_TOKEN)")
-	useTLS := flag.Bool("tls", false, "connect to the hub over TLS")
-	tlsCA := flag.String("tls-ca", "", "PEM CA bundle to trust (default: system roots)")
-	tlsServerName := flag.String("tls-server-name", "", "override the server name verified in the hub certificate")
-	tlsInsecure := flag.Bool("tls-insecure", false, "skip hub certificate verification (dev only)")
 	controlAddr := flag.String("control", "", "daemon control-plane address for --run")
 	controlRun := flag.String("run", "", "allow-listed control command to run against --control, e.g. \"process.list\" or \"dir.list /var/log\"")
 	tailAlias := flag.String("tail", "", "tail an opt-in log source alias from --control (e.g. app); streams until ctrl-c")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	cat := dashboardCatalog()
+	cat.Register(flag.CommandLine)
 	flag.Usage = usage
 	flag.Parse()
 	if *showVersion {
@@ -66,13 +60,19 @@ func main() {
 		return
 	}
 
+	cfg := resolveDashboard(cat)
+	token := cfg.Secret("token").Reveal()
+	tlsCfg := secure.ClientConfig{
+		Enabled: cfg.Toggle("tls"), CAFile: cfg.Text("tls-ca"),
+		ServerName: cfg.Text("tls-server-name"), SkipVerify: cfg.Toggle("tls-insecure"),
+	}
+	hubAddr := cfg.Address("hub").String()
+
 	if *controlRun != "" || *tailAlias != "" {
 		if *controlAddr == "" {
 			fail(fmt.Errorf("--run/--tail require --control <addr>"))
 		}
-		dialOpts, err := clientDialOptions(*token, secure.ClientConfig{
-			Enabled: *useTLS, CAFile: *tlsCA, ServerName: *tlsServerName, SkipVerify: *tlsInsecure,
-		})
+		dialOpts, err := clientDialOptions(token, tlsCfg)
 		if err != nil {
 			fail(err)
 		}
@@ -88,9 +88,9 @@ func main() {
 	if err != nil {
 		fail(err)
 	}
-	md, ok := th.Mode(*mode)
+	md, ok := th.Mode(cfg.Text("mode"))
 	if !ok {
-		fail(fmt.Errorf("unknown theme mode %q", *mode))
+		fail(fmt.Errorf("unknown theme mode %q", cfg.Text("mode")))
 	}
 
 	now := time.Now()
@@ -116,16 +116,14 @@ func main() {
 		live = func() bool { return true }
 	default:
 		reg = domain.NewHostRegistry(10*time.Second, 30*time.Second)
-		reg.SetPurgeAfter(*purgeAfter)
-		dialOpts, err := clientDialOptions(*token, secure.ClientConfig{
-			Enabled: *useTLS, CAFile: *tlsCA, ServerName: *tlsServerName, SkipVerify: *tlsInsecure,
-		})
+		reg.SetPurgeAfter(cfg.Span("purge-after", 15*time.Minute))
+		dialOpts, err := clientDialOptions(token, tlsCfg)
 		if err != nil {
 			fail(err)
 		}
 		lastRecv := new(atomic.Int64)
-		go subscribeHub(*hubAddr, reg, dialOpts, lastRecv)
-		source = *hubAddr
+		go subscribeHub(hubAddr, reg, dialOpts, lastRecv)
+		source = hubAddr
 		live = func() bool {
 			ms := lastRecv.Load()
 			return ms > 0 && time.Since(time.UnixMilli(ms)) < 5*time.Second

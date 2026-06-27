@@ -16,11 +16,33 @@ import (
 
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/helper"
+	"heimdall/app/internal/options"
 	"heimdall/app/internal/selfupdate"
 )
 
 // version is the Heimdall build version, set via -ldflags "-X main.version=…".
 var version = "dev"
+
+func usage() {
+	out := flag.CommandLine.Output()
+	fmt.Fprintf(out, `heimdall-helper — Heimdall privileged metrics unit
+
+Runs as a privileged process (sudo) and serves power, GPU, and thermal readings
+to the local unprivileged daemon over a unix socket, so the daemon never runs as
+root. Install it on a host only where you want power/GPU/temperature.
+
+Usage:
+  sudo heimdall-helper [flags]
+  heimdall-helper update          update to the latest release
+  heimdall-helper --version       print version
+
+First run with no config and no flags starts a short setup wizard and saves the
+result; any flag you pass is saved to the config file too.
+
+Flags:
+`)
+	flag.PrintDefaults()
+}
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "update" {
@@ -30,21 +52,31 @@ func main() {
 		}
 		return
 	}
-	sock := flag.String("socket", helper.DefaultSocketPath(), "unix socket to listen on")
-	demo := flag.Bool("demo", false, "serve canned sample metrics (no root needed; for trying the needs-helper UI)")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	demo := flag.Bool("demo", false, "serve canned sample metrics (no root needed; for trying the needs-helper UI)")
+	cat := options.NewCatalog(
+		options.Define("socket").Default(helper.DefaultSocketPath()).
+			Help("unix socket to listen on").Ask("Unix socket path"),
+	)
+	cat.Register(flag.CommandLine)
+	flag.Usage = usage
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("heimdall-helper", version)
 		return
 	}
 
+	cfg := options.Resolve("helper", cat,
+		"heimdall-helper — first-run setup",
+		"Serves privileged power/GPU/thermal metrics to the local daemon over a unix socket.")
+	sock := cfg.Text("socket")
+
 	collect := helper.PrivilegedMetrics
 	if *demo {
 		collect = demoMetrics
 	}
 
-	srv := &helper.Server{SockPath: *sock, Collect: collect}
+	srv := &helper.Server{SockPath: sock, Collect: collect}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -56,7 +88,7 @@ func main() {
 		cancel()
 	}()
 
-	fmt.Fprintf(os.Stderr, "heimdall-helper: serving privileged metrics on %s (demo=%t)\n", *sock, *demo)
+	fmt.Fprintf(os.Stderr, "heimdall-helper: serving privileged metrics on %s (demo=%t)\n", sock, *demo)
 	if err := srv.Serve(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "heimdall-helper:", err)
 		os.Exit(1)
