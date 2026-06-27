@@ -46,6 +46,7 @@ dashboards. Optionally relays upstream to a parent hub (federation).
 | `--upstream-tls-insecure` | `false` | dev only — skip parent verification |
 | `--relay-interval` | `2s` | how often to relay hosts upstream |
 | `--metrics-listen` | — | serve Prometheus/OpenMetrics + history on this address (e.g. `:9091`); empty = off (Mímir) |
+| `--discoverable` | `false` | advertise this hub over mDNS so daemons can auto-discover it (Ratatoskr) |
 | `--alert-rules` | — | path to a JSON alert-rules file; empty = alerting off (Gjallarhorn) |
 | `--alert-webhook` | — | URL to POST alert events to on fire/clear (Gjallarhorn) |
 
@@ -60,7 +61,9 @@ Without `--hub`, it prints samples locally (see print mode below).
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--hub` | — | hub address to stream to; **empty prints locally** |
+| `--hub` | — | hub address to stream to; **empty prints locally**; `auto` = discover via mDNS (Ratatoskr) |
+| `--discover` | `false` | auto-discover the hub via mDNS when `--hub` is unset (explicit `--hub` always wins) |
+| `--discover-seed` | — | fallback hub address for discovery on overlay networks (Tailscale, etc.) with no multicast |
 | `--name` | hostname | host display name shown in the dashboard |
 | `--interval` | `2s` | sample interval |
 | `--ping-target` | `1.1.1.1` | internet host pinged for `net.latency` |

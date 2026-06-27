@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -21,6 +22,7 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/alert"
+	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/hub"
 	"heimdall/app/internal/observe"
 	"heimdall/app/internal/options"
@@ -123,6 +125,20 @@ func main() {
 		}()
 		go func() { <-ctx.Done(); _ = ms.Close() }()
 		fmt.Fprintf(os.Stderr, "heimdall-hub: serving Prometheus metrics on %s (Mímir)\n", mAddr)
+	}
+
+	// Ratatoskr: advertise over mDNS so daemons can auto-discover this hub.
+	if cfg.Toggle("discoverable") {
+		if _, portStr, err := net.SplitHostPort(addrs[0]); err == nil {
+			if port, err := strconv.Atoi(portStr); err == nil {
+				if closer, err := discovery.Advertise(cfg.Text("id"), port, []string{"id=" + cfg.Text("id")}); err == nil {
+					go func() { <-ctx.Done(); _ = closer.Close() }()
+					fmt.Fprintf(os.Stderr, "heimdall-hub: advertising over mDNS as %s (Ratatoskr)\n", discovery.Service)
+				} else {
+					fmt.Fprintln(os.Stderr, "heimdall-hub: mDNS advertise failed:", err)
+				}
+			}
+		}
 	}
 
 	// Gjallarhorn: evaluate threshold rules and notify on fire/clear.

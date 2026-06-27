@@ -24,6 +24,10 @@ func daemonCatalog() options.Catalog {
 		options.Define("tags").
 			Help("host tags as k=v,k2=v2 (Realms), e.g. env=prod,role=db").
 			Ask("Host tags (k=v,k2=v2; blank = none)"),
+		options.Define("discover").Of(options.KindToggle).Default("false").
+			Help("auto-discover the hub via mDNS when --hub is unset (Ratatoskr); --hub auto forces it"),
+		options.Define("discover-seed").
+			Help("fallback hub address for discovery on overlay networks (Tailscale, etc.) with no multicast"),
 		options.Define("json").Of(options.KindToggle).Default("false").
 			Help("emit one JSON object per metric (print mode)"),
 		options.Define("token").Of(options.KindSecret).Env("HEIMDALL_TOKEN").

@@ -38,6 +38,8 @@ func hubCatalog() options.Catalog {
 			Ask("Prometheus metrics address (blank = off, e.g. :9091)"),
 		options.Define("alert-rules").Help("path to a JSON alert-rules file; empty disables alerting (Gjallarhorn)"),
 		options.Define("alert-webhook").Help("URL to POST alert events to on fire/clear (Gjallarhorn)"),
+		options.Define("discoverable").Of(options.KindToggle).Default("false").
+			Help("advertise this hub over mDNS so daemons can auto-discover it (Ratatoskr)"),
 	)
 }
 

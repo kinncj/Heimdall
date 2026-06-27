@@ -26,6 +26,7 @@ import (
 
 	"heimdall/app/internal/adapters"
 	"heimdall/app/internal/control"
+	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/logs"
 	"heimdall/app/internal/options"
@@ -104,7 +105,20 @@ func main() {
 	}
 
 	hubAddr := cfg.Address("hub")
-	if !*printLocal && !*once && !hubAddr.IsEmpty() {
+	hubTarget := hubAddr.String()
+	// Ratatoskr: discover the hub when --hub is "auto", or when --discover is set
+	// and no explicit --hub was given. An explicit --hub always wins.
+	discover := cfg.Text("hub") == "auto" || (cfg.Toggle("discover") && hubAddr.IsEmpty())
+	streaming := !*printLocal && !*once && (discover || !hubAddr.IsEmpty())
+	if streaming && discover {
+		addr, err := discoverHub(cfg.Text("discover-seed"))
+		if err != nil {
+			fatal("hub discovery failed (Ratatoskr)", err)
+		}
+		hubTarget = addr
+		logger.Info("discovered hub", "addr", addr)
+	}
+	if streaming {
 		dialOpts, err := clientDialOptions(cfg.Secret("token").Reveal(), secure.ClientConfig{
 			Enabled: cfg.Toggle("tls"), CAFile: cfg.Text("tls-ca"),
 			ServerName: cfg.Text("tls-server-name"), SkipVerify: cfg.Toggle("tls-insecure"),
@@ -112,7 +126,7 @@ func main() {
 		if err != nil {
 			fatal("invalid client TLS configuration", err)
 		}
-		streamToHub(hubAddr.String(), host, interval, tags, reg, sig, dialOpts)
+		streamToHub(hubTarget, host, interval, tags, reg, sig, dialOpts)
 		return
 	}
 
@@ -273,6 +287,14 @@ func startControlServer(addr, token, tlsCert, tlsKey, host string, sources logs.
 		}
 	}()
 	return nil
+}
+
+// discoverHub resolves a hub address via mDNS (Ratatoskr), falling back to a
+// static seed for overlay networks where multicast does not reach.
+func discoverHub(seed string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return discovery.Chain{discovery.MDNS{}, discovery.Static{Addr: seed}}.Discover(ctx)
 }
 
 // streamToHub streams snapshots to the hub, reconnecting with backoff on error.
