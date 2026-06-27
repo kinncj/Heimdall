@@ -37,10 +37,10 @@ func (h *Hub) Relay(stream v1.FederationService_RelayServer) error {
 		if snap == nil {
 			continue
 		}
-		hostID, ms := transport.FromSnapshot(snap)
+		hostID, ms, labels := transport.FromSnapshot(snap)
 		id := domain.HostID(hostID)
 		h.reg.Enroll(domain.Host{ID: id, Hostname: hostID, DisplayName: hostID}, time.Now())
-		h.reg.Observe(id, ms, time.Now())
+		h.reg.Observe(id, ms, labels, time.Now())
 		origin := env.GetOriginHubId()
 		if origin == "" {
 			origin = self
@@ -70,7 +70,7 @@ func (h *Hub) RelayEnvelopes() []*v1.RelayEnvelope {
 		out = append(out, &v1.RelayEnvelope{
 			OriginHubId: origin,
 			Path:        path,
-			Snapshot:    transport.ToSnapshot(string(v.Host.ID), v.LastSnapshot, 0, v.LastSeen),
+			Snapshot:    transport.ToSnapshot(string(v.Host.ID), v.LastSnapshot, v.Host.Context.Labels, 0, v.LastSeen),
 		})
 	}
 	return out

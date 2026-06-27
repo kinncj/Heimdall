@@ -22,7 +22,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             v7.34.0
-// source: monitoring/v1/monitoring.proto
+// source: common/proto/monitoring/v1/monitoring.proto
 
 package monitoringv1
 
@@ -180,7 +180,7 @@ var FederationService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "monitoring/v1/monitoring.proto",
+	Metadata: "common/proto/monitoring/v1/monitoring.proto",
 }
 
 const (
@@ -280,7 +280,7 @@ var ControlPlaneService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "monitoring/v1/monitoring.proto",
+	Metadata: "common/proto/monitoring/v1/monitoring.proto",
 }
 
 const (
@@ -391,7 +391,7 @@ var LogStreamService_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 	},
-	Metadata: "monitoring/v1/monitoring.proto",
+	Metadata: "common/proto/monitoring/v1/monitoring.proto",
 }
 
 const (
@@ -497,7 +497,7 @@ var EnrollmentService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "monitoring/v1/monitoring.proto",
+	Metadata: "common/proto/monitoring/v1/monitoring.proto",
 }
 
 const (
@@ -601,5 +601,5 @@ var MetricStreamService_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 	},
-	Metadata: "monitoring/v1/monitoring.proto",
+	Metadata: "common/proto/monitoring/v1/monitoring.proto",
 }

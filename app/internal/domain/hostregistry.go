@@ -18,6 +18,7 @@ type HostRegistry struct {
 	staleAfter   time.Duration
 	offlineAfter time.Duration
 	purgeAfter   time.Duration
+	hubLabels    map[string]string
 	hosts        map[HostID]*hostEntry
 }
 
@@ -27,6 +28,7 @@ type hostEntry struct {
 	lastSeen time.Time
 	observed bool
 	snapshot []Metric
+	labels   map[string]string
 }
 
 // NewHostRegistry returns a registry with the given liveness thresholds.
@@ -60,9 +62,18 @@ func (r *HostRegistry) Enroll(h Host, now time.Time) {
 	r.hosts[h.ID] = &hostEntry{host: h, state: StateEnrolling, lastSeen: now}
 }
 
+// SetHubLabels sets this hub's own tags (Realms). They are inherited by every
+// host the hub reports, but a host's own tag of the same key wins.
+func (r *HostRegistry) SetHubLabels(labels map[string]string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.hubLabels = labels
+}
+
 // Observe records a fresh metric snapshot, marking the host Online and storing
-// the snapshot as the last-known values.
-func (r *HostRegistry) Observe(id HostID, snapshot []Metric, now time.Time) {
+// the snapshot as the last-known values. labels are the host's effective tags as
+// received on the wire; nil leaves the previous labels untouched.
+func (r *HostRegistry) Observe(id HostID, snapshot []Metric, labels map[string]string, now time.Time) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	e, ok := r.hosts[id]
@@ -73,6 +84,9 @@ func (r *HostRegistry) Observe(id HostID, snapshot []Metric, now time.Time) {
 	e.observed = true
 	e.lastSeen = now
 	e.snapshot = snapshot
+	if labels != nil {
+		e.labels = labels
+	}
 	e.state = StateOnline
 }
 
@@ -111,7 +125,7 @@ func (r *HostRegistry) Host(id HostID) (HostView, bool) {
 	if !ok {
 		return HostView{}, false
 	}
-	return e.view(), true
+	return e.view(r.hubLabels), true
 }
 
 // Hosts returns all host views, sorted by ID for stable dashboard rendering.
@@ -120,7 +134,7 @@ func (r *HostRegistry) Hosts() []HostView {
 	defer r.mu.RUnlock()
 	out := make([]HostView, 0, len(r.hosts))
 	for _, e := range r.hosts {
-		out = append(out, e.view())
+		out = append(out, e.view(r.hubLabels))
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Host.ID < out[j].Host.ID })
 	return out
@@ -133,10 +147,31 @@ func (r *HostRegistry) Count() int {
 	return len(r.hosts)
 }
 
-func (e *hostEntry) view() HostView {
+func (e *hostEntry) view(hubLabels map[string]string) HostView {
 	var snap []Metric
 	if e.snapshot != nil {
 		snap = append([]Metric(nil), e.snapshot...)
 	}
-	return HostView{Host: e.host, State: e.state, LastSeen: e.lastSeen, LastSnapshot: snap}
+	host := e.host
+	// Precedence: hub tags < enrolled tags < live (observed) tags. The host's own
+	// tags win over the hub's; the latest from the wire wins over enrollment.
+	host.Context.Labels = mergeLabels(hubLabels, mergeLabels(e.host.Context.Labels, e.labels))
+	return HostView{Host: host, State: e.state, LastSeen: e.lastSeen, LastSnapshot: snap}
+}
+
+// mergeLabels combines hub-level tags with a host's own tags; the host's value
+// wins on a key conflict (Realms inheritance, host overrides hub). Returns nil
+// when both are empty so the common untagged case allocates nothing.
+func mergeLabels(hub, host map[string]string) map[string]string {
+	if len(hub) == 0 && len(host) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(hub)+len(host))
+	for k, v := range hub {
+		out[k] = v
+	}
+	for k, v := range host {
+		out[k] = v
+	}
+	return out
 }

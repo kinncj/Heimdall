@@ -23,6 +23,7 @@ func hubCatalog() options.Catalog {
 		options.Define("tls-cert").Help("PEM server certificate; enables TLS with tls-key"),
 		options.Define("tls-key").Help("PEM server private key; enables TLS with tls-cert"),
 		options.Define("id").Default(defaultHubID()).Help("this hub's federation id"),
+		options.Define("tags").Help("hub tags as k=v,k2=v2 (Realms); inherited by this hub's hosts, e.g. region=apac,tier=edge"),
 		options.Define("stale-after").Of(options.KindSpan).Default("10s").Help("mark a host stale after no updates for this long"),
 		options.Define("offline-after").Of(options.KindSpan).Default("30s").Help("mark a host offline after no updates for this long"),
 		options.Define("purge-after").Of(options.KindSpan).Default("15m").Help("drop a host after it has been unseen this long (0 disables)"),

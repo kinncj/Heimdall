@@ -114,8 +114,8 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 		if err != nil {
 			return err
 		}
-		hostID, ms := transport.FromSnapshot(snap)
-		h.reg.Observe(domain.HostID(hostID), ms, time.Now())
+		hostID, ms, labels := transport.FromSnapshot(snap)
+		h.reg.Observe(domain.HostID(hostID), ms, labels, time.Now())
 		h.recordOrigin(domain.HostID(hostID), h.idOrDefault(), nil)
 		h.publish(snap)
 	}
@@ -128,7 +128,7 @@ func (h *Hub) Subscribe(_ *v1.SubscribeRequest, stream v1.FederationService_Subs
 	defer h.removeSub(ch)
 
 	for _, hv := range h.reg.Hosts() {
-		if err := stream.Send(transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, 0, hv.LastSeen)); err != nil {
+		if err := stream.Send(transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, hv.LastSeen)); err != nil {
 			return err
 		}
 	}

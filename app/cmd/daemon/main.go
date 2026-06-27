@@ -28,6 +28,7 @@ import (
 	"heimdall/app/internal/control"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/logs"
+	"heimdall/app/internal/options"
 	"heimdall/app/internal/secure"
 	"heimdall/app/internal/selfupdate"
 	"heimdall/app/internal/transport"
@@ -82,6 +83,7 @@ func main() {
 	}
 
 	interval := cfg.Span("interval", 2*time.Second)
+	tags := options.ParseTags(cfg.Text("tags"))
 	reg := domain.NewRegistry(interval)
 	for _, a := range adapters.Build(adapters.Options{PingTarget: cfg.Text("ping-target"), Version: version}) {
 		reg.Register(a)
@@ -110,7 +112,7 @@ func main() {
 		if err != nil {
 			fatal("invalid client TLS configuration", err)
 		}
-		streamToHub(hubAddr.String(), host, interval, reg, sig, dialOpts)
+		streamToHub(hubAddr.String(), host, interval, tags, reg, sig, dialOpts)
 		return
 	}
 
@@ -274,10 +276,10 @@ func startControlServer(addr, token, tlsCert, tlsKey, host string, sources logs.
 }
 
 // streamToHub streams snapshots to the hub, reconnecting with backoff on error.
-func streamToHub(addr, host string, interval time.Duration, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption) {
+func streamToHub(addr, host string, interval time.Duration, labels map[string]string, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption) {
 	backoff := time.Second
 	for {
-		connected, err := streamOnce(addr, host, interval, reg, sig, dialOpts)
+		connected, err := streamOnce(addr, host, interval, labels, reg, sig, dialOpts)
 		if err == nil {
 			return // clean shutdown
 		}
@@ -297,7 +299,7 @@ func streamToHub(addr, host string, interval time.Duration, reg *domain.Registry
 	}
 }
 
-func streamOnce(addr, host string, interval time.Duration, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption) (bool, error) {
+func streamOnce(addr, host string, interval time.Duration, labels map[string]string, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption) (bool, error) {
 	conn, err := grpc.NewClient(addr, dialOpts...)
 	if err != nil {
 		return false, fmt.Errorf("dial %s: %w", addr, err)
@@ -307,7 +309,7 @@ func streamOnce(addr, host string, interval time.Duration, reg *domain.Registry,
 	ctx := context.Background()
 	enrollReq := &v1.EnrollRequest{Host: &v1.Host{
 		HostId: host, Hostname: host, DisplayName: host,
-		Context: &v1.HostContext{Os: runtime.GOOS, Arch: runtime.GOARCH},
+		Context: &v1.HostContext{Os: runtime.GOOS, Arch: runtime.GOARCH, Labels: labels},
 	}}
 	if _, err := v1.NewEnrollmentServiceClient(conn).Enroll(ctx, enrollReq); err != nil {
 		return false, fmt.Errorf("enroll: %w", err)
@@ -321,7 +323,7 @@ func streamOnce(addr, host string, interval time.Duration, reg *domain.Registry,
 	var seq uint64
 	send := func() error {
 		seq++
-		return stream.Send(transport.ToSnapshot(host, reg.Collect(ctx), seq, time.Now()))
+		return stream.Send(transport.ToSnapshot(host, reg.Collect(ctx), labels, seq, time.Now()))
 	}
 	if err := send(); err != nil {
 		return true, fmt.Errorf("send: %w", err)

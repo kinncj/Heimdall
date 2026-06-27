@@ -31,6 +31,7 @@ dashboards. Optionally relays upstream to a parent hub (federation).
 |---|---|---|
 | `--listen` | `:9090` | gRPC listen address |
 | `--id` | hostname | federation id — origin of local hosts, appended to relay paths |
+| `--tags` | — | hub tags `k=v,k2=v2` (Realms); inherited by this hub's hosts (a host's own tag wins), e.g. `region=apac,tier=edge` |
 | `--token` | env `HEIMDALL_TOKEN` | required enrollment token; empty disables auth |
 | `--tls-cert` | — | PEM server certificate (enables TLS with `--tls-key`) |
 | `--tls-key` | — | PEM server private key |
@@ -61,6 +62,7 @@ Without `--hub`, it prints samples locally (see print mode below).
 | `--name` | hostname | host display name shown in the dashboard |
 | `--interval` | `2s` | sample interval |
 | `--ping-target` | `1.1.1.1` | internet host pinged for `net.latency` |
+| `--tags` | — | host tags `k=v,k2=v2` (Realms), e.g. `env=prod,role=db`; shown in the dashboard and exported as labels |
 
 ### Print mode (no `--hub`)
 

@@ -21,6 +21,9 @@ func daemonCatalog() options.Catalog {
 		options.Define("ping-target").Default("1.1.1.1").
 			Help("internet host pinged for reachability/latency").
 			Ask("Internet reachability ping target"),
+		options.Define("tags").
+			Help("host tags as k=v,k2=v2 (Realms), e.g. env=prod,role=db").
+			Ask("Host tags (k=v,k2=v2; blank = none)"),
 		options.Define("json").Of(options.KindToggle).Default("false").
 			Help("emit one JSON object per metric (print mode)"),
 		options.Define("token").Of(options.KindSecret).Env("HEIMDALL_TOKEN").

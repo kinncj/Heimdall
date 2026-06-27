@@ -61,7 +61,7 @@ func TestTwoHubRelay(t *testing.T) {
 	child := New(2*time.Second, 5*time.Second)
 	child.SetID("C")
 	child.reg.Enroll(domain.Host{ID: "alpha", Hostname: "alpha", DisplayName: "alpha"}, time.Now())
-	child.reg.Observe("alpha", []domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 10}}, time.Now())
+	child.reg.Observe("alpha", []domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 10}}, nil, time.Now())
 	child.recordOrigin("alpha", "C", nil)
 
 	envs := child.RelayEnvelopes()
@@ -103,7 +103,7 @@ func TestMultipleSubscribers(t *testing.T) {
 	lis, h, stop := serve(t, "")
 	defer stop()
 	h.reg.Enroll(domain.Host{ID: "alpha", Hostname: "alpha"}, time.Now())
-	h.reg.Observe("alpha", []domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 5}}, time.Now())
+	h.reg.Observe("alpha", []domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 5}}, nil, time.Now())
 
 	subscribeOnce := func() {
 		conn := dial(t, lis, "")

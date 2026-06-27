@@ -21,6 +21,27 @@ func snapshot() []Metric {
 	return []Metric{{Name: "cpu.util", Status: StatusOK, Gauge: 33}}
 }
 
+// Realms: hub tags are inherited by hosts, but a host's own tag of the same key
+// wins; the host keeps tags the hub does not set.
+func TestLabelMergeHostWinsOverHub(t *testing.T) {
+	r := NewHostRegistry(10*time.Second, 30*time.Second)
+	r.SetHubLabels(map[string]string{"region": "apac", "tier": "edge"})
+	r.Enroll(Host{ID: "h1"}, time.Unix(1_000, 0))
+	r.Observe("h1", snapshot(), map[string]string{"region": "us", "role": "db"}, time.Unix(1_000, 0))
+
+	got, _ := r.Host("h1")
+	labels := got.Host.Context.Labels
+	if labels["region"] != "us" {
+		t.Errorf("region = %q, want us (host overrides hub)", labels["region"])
+	}
+	if labels["tier"] != "edge" {
+		t.Errorf("tier = %q, want edge (inherited from hub)", labels["tier"])
+	}
+	if labels["role"] != "db" {
+		t.Errorf("role = %q, want db (host's own tag)", labels["role"])
+	}
+}
+
 // A freshly enrolled host is Enrolling until its first observation, then Online.
 func TestEnrollThenObserveBecomesOnline(t *testing.T) {
 	t0 := time.Unix(1_000, 0)
@@ -31,7 +52,7 @@ func TestEnrollThenObserveBecomesOnline(t *testing.T) {
 		t.Fatalf("want Enrolling before first observation, got %v", v.State)
 	}
 
-	r.Observe("dgx", snapshot(), t0.Add(time.Second))
+	r.Observe("dgx", snapshot(), nil, t0.Add(time.Second))
 	v, ok := r.Host("dgx")
 	if !ok || v.State != StateOnline {
 		t.Fatalf("want Online after observation, got %v (ok=%v)", v.State, ok)
@@ -46,7 +67,7 @@ func TestGoesStaleButRetainsLastKnown(t *testing.T) {
 	t0 := time.Unix(2_000, 0)
 	r := NewHostRegistry(10*time.Second, 30*time.Second)
 	r.Enroll(sampleHost("rpi"), t0)
-	r.Observe("rpi", snapshot(), t0)
+	r.Observe("rpi", snapshot(), nil, t0)
 
 	r.Evaluate(t0.Add(15 * time.Second)) // > stale_after, < offline_after
 	v, _ := r.Host("rpi")
@@ -66,7 +87,7 @@ func TestGoesOfflineAfterThreshold(t *testing.T) {
 	t0 := time.Unix(3_000, 0)
 	r := NewHostRegistry(10*time.Second, 30*time.Second)
 	r.Enroll(sampleHost("mac"), t0)
-	r.Observe("mac", snapshot(), t0)
+	r.Observe("mac", snapshot(), nil, t0)
 
 	r.Evaluate(t0.Add(45 * time.Second))
 	if v, _ := r.Host("mac"); v.State != StateOffline {
@@ -80,12 +101,12 @@ func TestReconnectResumesSameHostNoDuplicate(t *testing.T) {
 	t0 := time.Unix(4_000, 0)
 	r := NewHostRegistry(10*time.Second, 30*time.Second)
 	r.Enroll(sampleHost("alien"), t0)
-	r.Observe("alien", snapshot(), t0)
+	r.Observe("alien", snapshot(), nil, t0)
 	r.Evaluate(t0.Add(45 * time.Second)) // offline
 
 	// network returns; daemon reconnects and re-enrolls with the same stable id
 	r.Enroll(sampleHost("alien"), t0.Add(60*time.Second))
-	r.Observe("alien", snapshot(), t0.Add(61*time.Second))
+	r.Observe("alien", snapshot(), nil, t0.Add(61*time.Second))
 
 	if n := r.Count(); n != 1 {
 		t.Fatalf("reconnect must not duplicate host registration, count=%d", n)
@@ -103,7 +124,7 @@ func TestPurgesLongOfflineHost(t *testing.T) {
 	r := NewHostRegistry(10*time.Second, 30*time.Second)
 	r.SetPurgeAfter(5 * time.Minute)
 	r.Enroll(sampleHost("ephemeral"), t0)
-	r.Observe("ephemeral", snapshot(), t0)
+	r.Observe("ephemeral", snapshot(), nil, t0)
 
 	r.Evaluate(t0.Add(45 * time.Second)) // offline, still retained for visibility
 	if r.Count() != 1 {

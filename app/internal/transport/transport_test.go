@@ -19,14 +19,17 @@ func TestSnapshotRoundTrip(t *testing.T) {
 		{Name: "temp.pkg", Status: domain.StatusError, Detail: "sensor offline"},
 	}
 
-	snap := ToSnapshot("dgx-spark", in, 7, ts)
+	snap := ToSnapshot("dgx-spark", in, map[string]string{"env": "prod"}, 7, ts)
 	if snap.GetHostId() != "dgx-spark" || snap.GetSeq() != 7 || snap.GetTsUnixMillis() != ts.UnixMilli() {
 		t.Fatalf("snapshot header wrong: %+v", snap)
 	}
 
-	host, out := FromSnapshot(snap)
+	host, out, labels := FromSnapshot(snap)
 	if host != "dgx-spark" {
 		t.Errorf("host = %q", host)
+	}
+	if labels["env"] != "prod" {
+		t.Errorf("labels did not round-trip: %v", labels)
 	}
 	if len(out) != len(in) {
 		t.Fatalf("got %d metrics, want %d", len(out), len(in))

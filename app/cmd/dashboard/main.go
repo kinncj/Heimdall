@@ -314,12 +314,12 @@ func subscribeHub(addr string, reg *domain.HostRegistry, dialOpts []grpc.DialOpt
 // dead daemon — replayed on connect or reconnect — ages from its real timestamp
 // instead of looking freshly seen. A missing timestamp falls back to now.
 func foldSnapshot(reg *domain.HostRegistry, snap *v1.Snapshot) {
-	id, ms := transport.FromSnapshot(snap)
+	id, ms, labels := transport.FromSnapshot(snap)
 	hid := domain.HostID(id)
 	seen := time.Now()
 	if t := snap.GetTsUnixMillis(); t > 0 {
 		seen = time.UnixMilli(t)
 	}
 	reg.Enroll(domain.Host{ID: hid, Hostname: id, DisplayName: id}, seen)
-	reg.Observe(hid, ms, seen)
+	reg.Observe(hid, ms, labels, seen)
 }

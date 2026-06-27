@@ -57,6 +57,7 @@ func main() {
 	h.SetToken(cfg.Secret("token").Reveal())
 	h.SetID(cfg.Text("id"))
 	h.Registry().SetPurgeAfter(cfg.Span("purge-after", 15*time.Minute))
+	h.Registry().SetHubLabels(options.ParseTags(cfg.Text("tags")))
 
 	creds, err := secure.ServerOption(cfg.Text("tls-cert"), cfg.Text("tls-key"))
 	if err != nil {

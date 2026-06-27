@@ -114,6 +114,7 @@ message Snapshot {
   bool   delta = 4;                   // true = changed samples only
   bool   keyframe = 5;                // true = full set (resync point)
   repeated MetricSample samples = 6;
+  map<string, string> labels = 7;     // effective host tags (host wins over hub); inherited across Bifröst relay
 }
 
 // ---------------------------------------------------------------------------

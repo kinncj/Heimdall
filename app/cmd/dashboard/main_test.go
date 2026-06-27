@@ -20,6 +20,7 @@ func TestFoldSnapshotHonorsTimestamp(t *testing.T) {
 	stale := transport.ToSnapshot(
 		"host-a",
 		[]domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 12}},
+		nil,
 		0,
 		time.Now().Add(-60*time.Second),
 	)
@@ -41,6 +42,7 @@ func TestFoldSnapshotFreshIsOnline(t *testing.T) {
 	fresh := transport.ToSnapshot(
 		"host-b",
 		[]domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 5}},
+		nil,
 		0,
 		time.Now(),
 	)

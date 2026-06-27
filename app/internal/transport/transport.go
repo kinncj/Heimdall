@@ -80,8 +80,10 @@ func MetricFromProto(s *v1.MetricSample) domain.Metric {
 	return m
 }
 
-// ToSnapshot builds a keyframe snapshot for a host's metrics.
-func ToSnapshot(hostID string, ms []domain.Metric, seq uint64, ts time.Time) *v1.Snapshot {
+// ToSnapshot builds a keyframe snapshot for a host's metrics. labels carries the
+// host's effective tags (Realms) so they ride the stream and inherit across the
+// Bifröst relay; nil/empty is fine.
+func ToSnapshot(hostID string, ms []domain.Metric, labels map[string]string, seq uint64, ts time.Time) *v1.Snapshot {
 	samples := make([]*v1.MetricSample, 0, len(ms))
 	for _, m := range ms {
 		samples = append(samples, MetricToProto(m))
@@ -92,14 +94,15 @@ func ToSnapshot(hostID string, ms []domain.Metric, seq uint64, ts time.Time) *v1
 		Seq:          seq,
 		Keyframe:     true,
 		Samples:      samples,
+		Labels:       labels,
 	}
 }
 
-// FromSnapshot extracts the host id and metrics from a wire snapshot.
-func FromSnapshot(s *v1.Snapshot) (string, []domain.Metric) {
+// FromSnapshot extracts the host id, metrics, and labels from a wire snapshot.
+func FromSnapshot(s *v1.Snapshot) (string, []domain.Metric, map[string]string) {
 	ms := make([]domain.Metric, 0, len(s.GetSamples()))
 	for _, x := range s.GetSamples() {
 		ms = append(ms, MetricFromProto(x))
 	}
-	return s.GetHostId(), ms
+	return s.GetHostId(), ms, s.GetLabels()
 }

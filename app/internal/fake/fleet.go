@@ -65,7 +65,7 @@ func (s *Source) Tick(now time.Time) {
 			h.gpu = walk(h.gpu, 7)
 		}
 		h.mem = walk(h.mem, 2)
-		s.reg.Observe(domain.HostID(h.id), metricsFor(h), now.Add(-h.lastSeenAgo))
+		s.reg.Observe(domain.HostID(h.id), metricsFor(h), nil, now.Add(-h.lastSeenAgo))
 	}
 	s.reg.Evaluate(now)
 }

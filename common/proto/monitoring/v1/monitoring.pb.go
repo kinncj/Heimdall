@@ -22,7 +22,7 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.0
-// source: monitoring/v1/monitoring.proto
+// source: common/proto/monitoring/v1/monitoring.proto
 
 package monitoringv1
 
@@ -85,11 +85,11 @@ func (x MetricStatus) String() string {
 }
 
 func (MetricStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_monitoring_v1_monitoring_proto_enumTypes[0].Descriptor()
+	return file_common_proto_monitoring_v1_monitoring_proto_enumTypes[0].Descriptor()
 }
 
 func (MetricStatus) Type() protoreflect.EnumType {
-	return &file_monitoring_v1_monitoring_proto_enumTypes[0]
+	return &file_common_proto_monitoring_v1_monitoring_proto_enumTypes[0]
 }
 
 func (x MetricStatus) Number() protoreflect.EnumNumber {
@@ -98,7 +98,7 @@ func (x MetricStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use MetricStatus.Descriptor instead.
 func (MetricStatus) EnumDescriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{0}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{0}
 }
 
 // Host — stable identity of a monitored machine.
@@ -116,7 +116,7 @@ type Host struct {
 
 func (x *Host) Reset() {
 	*x = Host{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[0]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -128,7 +128,7 @@ func (x *Host) String() string {
 func (*Host) ProtoMessage() {}
 
 func (x *Host) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[0]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -141,7 +141,7 @@ func (x *Host) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Host.ProtoReflect.Descriptor instead.
 func (*Host) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{0}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Host) GetHostId() string {
@@ -191,7 +191,7 @@ type HostContext struct {
 
 func (x *HostContext) Reset() {
 	*x = HostContext{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[1]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -203,7 +203,7 @@ func (x *HostContext) String() string {
 func (*HostContext) ProtoMessage() {}
 
 func (x *HostContext) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[1]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -216,7 +216,7 @@ func (x *HostContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostContext.ProtoReflect.Descriptor instead.
 func (*HostContext) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{1}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *HostContext) GetOs() string {
@@ -292,7 +292,7 @@ type PerCore struct {
 
 func (x *PerCore) Reset() {
 	*x = PerCore{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[2]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -304,7 +304,7 @@ func (x *PerCore) String() string {
 func (*PerCore) ProtoMessage() {}
 
 func (x *PerCore) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[2]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -317,7 +317,7 @@ func (x *PerCore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PerCore.ProtoReflect.Descriptor instead.
 func (*PerCore) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{2}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PerCore) GetValues() []float64 {
@@ -340,7 +340,7 @@ type Counter struct {
 
 func (x *Counter) Reset() {
 	*x = Counter{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[3]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -352,7 +352,7 @@ func (x *Counter) String() string {
 func (*Counter) ProtoMessage() {}
 
 func (x *Counter) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[3]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,7 +365,7 @@ func (x *Counter) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Counter.ProtoReflect.Descriptor instead.
 func (*Counter) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{3}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Counter) GetTotal() uint64 {
@@ -404,7 +404,7 @@ type MetricSample struct {
 
 func (x *MetricSample) Reset() {
 	*x = MetricSample{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[4]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -416,7 +416,7 @@ func (x *MetricSample) String() string {
 func (*MetricSample) ProtoMessage() {}
 
 func (x *MetricSample) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[4]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -429,7 +429,7 @@ func (x *MetricSample) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MetricSample.ProtoReflect.Descriptor instead.
 func (*MetricSample) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{4}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MetricSample) GetMetric() string {
@@ -529,13 +529,14 @@ type Snapshot struct {
 	Delta         bool                   `protobuf:"varint,4,opt,name=delta,proto3" json:"delta,omitempty"`       // true = changed samples only
 	Keyframe      bool                   `protobuf:"varint,5,opt,name=keyframe,proto3" json:"keyframe,omitempty"` // true = full set (resync point)
 	Samples       []*MetricSample        `protobuf:"bytes,6,rep,name=samples,proto3" json:"samples,omitempty"`
+	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // effective host tags (host wins over hub); inherited across Bifröst relay
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Snapshot) Reset() {
 	*x = Snapshot{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[5]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -547,7 +548,7 @@ func (x *Snapshot) String() string {
 func (*Snapshot) ProtoMessage() {}
 
 func (x *Snapshot) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[5]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -560,7 +561,7 @@ func (x *Snapshot) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Snapshot.ProtoReflect.Descriptor instead.
 func (*Snapshot) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{5}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Snapshot) GetHostId() string {
@@ -605,6 +606,13 @@ func (x *Snapshot) GetSamples() []*MetricSample {
 	return nil
 }
 
+func (x *Snapshot) GetLabels() map[string]string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
 // EnrollRequest — a daemon presents its enrollment token and self-declared
 // identity. Optionally includes a CSR so the hub can issue a client cert for
 // subsequent mTLS on the metric stream.
@@ -619,7 +627,7 @@ type EnrollRequest struct {
 
 func (x *EnrollRequest) Reset() {
 	*x = EnrollRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[6]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +639,7 @@ func (x *EnrollRequest) String() string {
 func (*EnrollRequest) ProtoMessage() {}
 
 func (x *EnrollRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[6]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +652,7 @@ func (x *EnrollRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollRequest.ProtoReflect.Descriptor instead.
 func (*EnrollRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{6}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *EnrollRequest) GetEnrollmentToken() string {
@@ -684,7 +692,7 @@ type EnrollResponse struct {
 
 func (x *EnrollResponse) Reset() {
 	*x = EnrollResponse{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[7]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -696,7 +704,7 @@ func (x *EnrollResponse) String() string {
 func (*EnrollResponse) ProtoMessage() {}
 
 func (x *EnrollResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[7]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -709,7 +717,7 @@ func (x *EnrollResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnrollResponse.ProtoReflect.Descriptor instead.
 func (*EnrollResponse) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{7}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *EnrollResponse) GetHostId() string {
@@ -770,7 +778,7 @@ type AckResume struct {
 
 func (x *AckResume) Reset() {
 	*x = AckResume{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[8]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -782,7 +790,7 @@ func (x *AckResume) String() string {
 func (*AckResume) ProtoMessage() {}
 
 func (x *AckResume) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[8]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -795,7 +803,7 @@ func (x *AckResume) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckResume.ProtoReflect.Descriptor instead.
 func (*AckResume) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{8}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AckResume) GetAckedSeq() uint64 {
@@ -814,7 +822,7 @@ type CadenceUpdate struct {
 
 func (x *CadenceUpdate) Reset() {
 	*x = CadenceUpdate{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[9]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -826,7 +834,7 @@ func (x *CadenceUpdate) String() string {
 func (*CadenceUpdate) ProtoMessage() {}
 
 func (x *CadenceUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[9]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -839,7 +847,7 @@ func (x *CadenceUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CadenceUpdate.ProtoReflect.Descriptor instead.
 func (*CadenceUpdate) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{9}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CadenceUpdate) GetSampleIntervalMs() int32 {
@@ -858,7 +866,7 @@ type KeyframeRequest struct {
 
 func (x *KeyframeRequest) Reset() {
 	*x = KeyframeRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[10]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -870,7 +878,7 @@ func (x *KeyframeRequest) String() string {
 func (*KeyframeRequest) ProtoMessage() {}
 
 func (x *KeyframeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[10]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -883,7 +891,7 @@ func (x *KeyframeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyframeRequest.ProtoReflect.Descriptor instead.
 func (*KeyframeRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{10}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *KeyframeRequest) GetReason() string {
@@ -908,7 +916,7 @@ type StreamControl struct {
 
 func (x *StreamControl) Reset() {
 	*x = StreamControl{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[11]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -920,7 +928,7 @@ func (x *StreamControl) String() string {
 func (*StreamControl) ProtoMessage() {}
 
 func (x *StreamControl) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[11]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -933,7 +941,7 @@ func (x *StreamControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamControl.ProtoReflect.Descriptor instead.
 func (*StreamControl) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{11}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *StreamControl) GetControl() isStreamControl_Control {
@@ -1006,7 +1014,7 @@ type RelayEnvelope struct {
 
 func (x *RelayEnvelope) Reset() {
 	*x = RelayEnvelope{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[12]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1018,7 +1026,7 @@ func (x *RelayEnvelope) String() string {
 func (*RelayEnvelope) ProtoMessage() {}
 
 func (x *RelayEnvelope) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[12]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1031,7 +1039,7 @@ func (x *RelayEnvelope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayEnvelope.ProtoReflect.Descriptor instead.
 func (*RelayEnvelope) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{12}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *RelayEnvelope) GetOriginHubId() string {
@@ -1064,7 +1072,7 @@ type RelayControl struct {
 
 func (x *RelayControl) Reset() {
 	*x = RelayControl{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[13]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1076,7 +1084,7 @@ func (x *RelayControl) String() string {
 func (*RelayControl) ProtoMessage() {}
 
 func (x *RelayControl) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[13]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1089,7 +1097,7 @@ func (x *RelayControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayControl.ProtoReflect.Descriptor instead.
 func (*RelayControl) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{13}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *RelayControl) GetAckedSeq() uint64 {
@@ -1111,7 +1119,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[14]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1123,7 +1131,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[14]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1136,7 +1144,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{14}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *SubscribeRequest) GetSubscriberId() string {
@@ -1177,7 +1185,7 @@ type ControlRequest struct {
 
 func (x *ControlRequest) Reset() {
 	*x = ControlRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[15]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1189,7 +1197,7 @@ func (x *ControlRequest) String() string {
 func (*ControlRequest) ProtoMessage() {}
 
 func (x *ControlRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[15]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1202,7 +1210,7 @@ func (x *ControlRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlRequest.ProtoReflect.Descriptor instead.
 func (*ControlRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{15}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *ControlRequest) GetRequestId() string {
@@ -1257,7 +1265,7 @@ type ControlResponse struct {
 
 func (x *ControlResponse) Reset() {
 	*x = ControlResponse{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[16]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1269,7 +1277,7 @@ func (x *ControlResponse) String() string {
 func (*ControlResponse) ProtoMessage() {}
 
 func (x *ControlResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[16]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1282,7 +1290,7 @@ func (x *ControlResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlResponse.ProtoReflect.Descriptor instead.
 func (*ControlResponse) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{16}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ControlResponse) GetRequestId() string {
@@ -1341,7 +1349,7 @@ type LogTailRequest struct {
 
 func (x *LogTailRequest) Reset() {
 	*x = LogTailRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[17]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1353,7 +1361,7 @@ func (x *LogTailRequest) String() string {
 func (*LogTailRequest) ProtoMessage() {}
 
 func (x *LogTailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[17]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1366,7 +1374,7 @@ func (x *LogTailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogTailRequest.ProtoReflect.Descriptor instead.
 func (*LogTailRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{17}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *LogTailRequest) GetHostId() string {
@@ -1413,7 +1421,7 @@ type LogLine struct {
 
 func (x *LogLine) Reset() {
 	*x = LogLine{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[18]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1425,7 +1433,7 @@ func (x *LogLine) String() string {
 func (*LogLine) ProtoMessage() {}
 
 func (x *LogLine) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[18]
+	mi := &file_common_proto_monitoring_v1_monitoring_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1438,7 +1446,7 @@ func (x *LogLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogLine.ProtoReflect.Descriptor instead.
 func (*LogLine) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{18}
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *LogLine) GetHostId() string {
@@ -1483,11 +1491,11 @@ func (x *LogLine) GetRateLimited() bool {
 	return false
 }
 
-var File_monitoring_v1_monitoring_proto protoreflect.FileDescriptor
+var File_common_proto_monitoring_v1_monitoring_proto protoreflect.FileDescriptor
 
-const file_monitoring_v1_monitoring_proto_rawDesc = "" +
+const file_common_proto_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\n" +
-	"\x1emonitoring/v1/monitoring.proto\x12\rmonitoring.v1\"\x94\x01\n" +
+	"+common/proto/monitoring/v1/monitoring.proto\x12\rmonitoring.v1\"\x94\x01\n" +
 	"\x04Host\x12\x17\n" +
 	"\ahost_id\x18\x01 \x01(\tR\x06hostId\x12\x1a\n" +
 	"\bhostname\x18\x02 \x01(\tR\bhostname\x12!\n" +
@@ -1520,14 +1528,18 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x05gauge\x18\x05 \x01(\x01H\x00R\x05gauge\x123\n" +
 	"\bper_core\x18\x06 \x01(\v2\x16.monitoring.v1.PerCoreH\x00R\aperCore\x122\n" +
 	"\acounter\x18\a \x01(\v2\x16.monitoring.v1.CounterH\x00R\acounterB\a\n" +
-	"\x05value\"\xc4\x01\n" +
+	"\x05value\"\xbc\x02\n" +
 	"\bSnapshot\x12\x17\n" +
 	"\ahost_id\x18\x01 \x01(\tR\x06hostId\x12$\n" +
 	"\x0ets_unix_millis\x18\x02 \x01(\x03R\ftsUnixMillis\x12\x10\n" +
 	"\x03seq\x18\x03 \x01(\x04R\x03seq\x12\x14\n" +
 	"\x05delta\x18\x04 \x01(\bR\x05delta\x12\x1a\n" +
 	"\bkeyframe\x18\x05 \x01(\bR\bkeyframe\x125\n" +
-	"\asamples\x18\x06 \x03(\v2\x1b.monitoring.v1.MetricSampleR\asamples\"|\n" +
+	"\asamples\x18\x06 \x03(\v2\x1b.monitoring.v1.MetricSampleR\asamples\x12;\n" +
+	"\x06labels\x18\a \x03(\v2#.monitoring.v1.Snapshot.LabelsEntryR\x06labels\x1a9\n" +
+	"\vLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"|\n" +
 	"\rEnrollRequest\x12)\n" +
 	"\x10enrollment_token\x18\x01 \x01(\tR\x0fenrollmentToken\x12'\n" +
 	"\x04host\x18\x02 \x01(\v2\x13.monitoring.v1.HostR\x04host\x12\x17\n" +
@@ -1608,20 +1620,20 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x06Stream\x12\x17.monitoring.v1.Snapshot\x1a\x1c.monitoring.v1.StreamControl(\x010\x01B2Z0heimdall/common/proto/monitoring/v1;monitoringv1b\x06proto3"
 
 var (
-	file_monitoring_v1_monitoring_proto_rawDescOnce sync.Once
-	file_monitoring_v1_monitoring_proto_rawDescData []byte
+	file_common_proto_monitoring_v1_monitoring_proto_rawDescOnce sync.Once
+	file_common_proto_monitoring_v1_monitoring_proto_rawDescData []byte
 )
 
-func file_monitoring_v1_monitoring_proto_rawDescGZIP() []byte {
-	file_monitoring_v1_monitoring_proto_rawDescOnce.Do(func() {
-		file_monitoring_v1_monitoring_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_monitoring_v1_monitoring_proto_rawDesc), len(file_monitoring_v1_monitoring_proto_rawDesc)))
+func file_common_proto_monitoring_v1_monitoring_proto_rawDescGZIP() []byte {
+	file_common_proto_monitoring_v1_monitoring_proto_rawDescOnce.Do(func() {
+		file_common_proto_monitoring_v1_monitoring_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_common_proto_monitoring_v1_monitoring_proto_rawDesc), len(file_common_proto_monitoring_v1_monitoring_proto_rawDesc)))
 	})
-	return file_monitoring_v1_monitoring_proto_rawDescData
+	return file_common_proto_monitoring_v1_monitoring_proto_rawDescData
 }
 
-var file_monitoring_v1_monitoring_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_monitoring_v1_monitoring_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
-var file_monitoring_v1_monitoring_proto_goTypes = []any{
+var file_common_proto_monitoring_v1_monitoring_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_common_proto_monitoring_v1_monitoring_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_common_proto_monitoring_v1_monitoring_proto_goTypes = []any{
 	(MetricStatus)(0),        // 0: monitoring.v1.MetricStatus
 	(*Host)(nil),             // 1: monitoring.v1.Host
 	(*HostContext)(nil),      // 2: monitoring.v1.HostContext
@@ -1643,50 +1655,52 @@ var file_monitoring_v1_monitoring_proto_goTypes = []any{
 	(*LogTailRequest)(nil),   // 18: monitoring.v1.LogTailRequest
 	(*LogLine)(nil),          // 19: monitoring.v1.LogLine
 	nil,                      // 20: monitoring.v1.HostContext.LabelsEntry
+	nil,                      // 21: monitoring.v1.Snapshot.LabelsEntry
 }
-var file_monitoring_v1_monitoring_proto_depIdxs = []int32{
+var file_common_proto_monitoring_v1_monitoring_proto_depIdxs = []int32{
 	2,  // 0: monitoring.v1.Host.context:type_name -> monitoring.v1.HostContext
 	20, // 1: monitoring.v1.HostContext.labels:type_name -> monitoring.v1.HostContext.LabelsEntry
 	0,  // 2: monitoring.v1.MetricSample.status:type_name -> monitoring.v1.MetricStatus
 	3,  // 3: monitoring.v1.MetricSample.per_core:type_name -> monitoring.v1.PerCore
 	4,  // 4: monitoring.v1.MetricSample.counter:type_name -> monitoring.v1.Counter
 	5,  // 5: monitoring.v1.Snapshot.samples:type_name -> monitoring.v1.MetricSample
-	1,  // 6: monitoring.v1.EnrollRequest.host:type_name -> monitoring.v1.Host
-	9,  // 7: monitoring.v1.StreamControl.ack:type_name -> monitoring.v1.AckResume
-	10, // 8: monitoring.v1.StreamControl.cadence:type_name -> monitoring.v1.CadenceUpdate
-	11, // 9: monitoring.v1.StreamControl.keyframe:type_name -> monitoring.v1.KeyframeRequest
-	6,  // 10: monitoring.v1.RelayEnvelope.snapshot:type_name -> monitoring.v1.Snapshot
-	0,  // 11: monitoring.v1.ControlResponse.status:type_name -> monitoring.v1.MetricStatus
-	13, // 12: monitoring.v1.FederationService.Relay:input_type -> monitoring.v1.RelayEnvelope
-	15, // 13: monitoring.v1.FederationService.Subscribe:input_type -> monitoring.v1.SubscribeRequest
-	16, // 14: monitoring.v1.ControlPlaneService.Execute:input_type -> monitoring.v1.ControlRequest
-	18, // 15: monitoring.v1.LogStreamService.Tail:input_type -> monitoring.v1.LogTailRequest
-	7,  // 16: monitoring.v1.EnrollmentService.Enroll:input_type -> monitoring.v1.EnrollRequest
-	6,  // 17: monitoring.v1.MetricStreamService.Stream:input_type -> monitoring.v1.Snapshot
-	14, // 18: monitoring.v1.FederationService.Relay:output_type -> monitoring.v1.RelayControl
-	6,  // 19: monitoring.v1.FederationService.Subscribe:output_type -> monitoring.v1.Snapshot
-	17, // 20: monitoring.v1.ControlPlaneService.Execute:output_type -> monitoring.v1.ControlResponse
-	19, // 21: monitoring.v1.LogStreamService.Tail:output_type -> monitoring.v1.LogLine
-	8,  // 22: monitoring.v1.EnrollmentService.Enroll:output_type -> monitoring.v1.EnrollResponse
-	12, // 23: monitoring.v1.MetricStreamService.Stream:output_type -> monitoring.v1.StreamControl
-	18, // [18:24] is the sub-list for method output_type
-	12, // [12:18] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	21, // 6: monitoring.v1.Snapshot.labels:type_name -> monitoring.v1.Snapshot.LabelsEntry
+	1,  // 7: monitoring.v1.EnrollRequest.host:type_name -> monitoring.v1.Host
+	9,  // 8: monitoring.v1.StreamControl.ack:type_name -> monitoring.v1.AckResume
+	10, // 9: monitoring.v1.StreamControl.cadence:type_name -> monitoring.v1.CadenceUpdate
+	11, // 10: monitoring.v1.StreamControl.keyframe:type_name -> monitoring.v1.KeyframeRequest
+	6,  // 11: monitoring.v1.RelayEnvelope.snapshot:type_name -> monitoring.v1.Snapshot
+	0,  // 12: monitoring.v1.ControlResponse.status:type_name -> monitoring.v1.MetricStatus
+	13, // 13: monitoring.v1.FederationService.Relay:input_type -> monitoring.v1.RelayEnvelope
+	15, // 14: monitoring.v1.FederationService.Subscribe:input_type -> monitoring.v1.SubscribeRequest
+	16, // 15: monitoring.v1.ControlPlaneService.Execute:input_type -> monitoring.v1.ControlRequest
+	18, // 16: monitoring.v1.LogStreamService.Tail:input_type -> monitoring.v1.LogTailRequest
+	7,  // 17: monitoring.v1.EnrollmentService.Enroll:input_type -> monitoring.v1.EnrollRequest
+	6,  // 18: monitoring.v1.MetricStreamService.Stream:input_type -> monitoring.v1.Snapshot
+	14, // 19: monitoring.v1.FederationService.Relay:output_type -> monitoring.v1.RelayControl
+	6,  // 20: monitoring.v1.FederationService.Subscribe:output_type -> monitoring.v1.Snapshot
+	17, // 21: monitoring.v1.ControlPlaneService.Execute:output_type -> monitoring.v1.ControlResponse
+	19, // 22: monitoring.v1.LogStreamService.Tail:output_type -> monitoring.v1.LogLine
+	8,  // 23: monitoring.v1.EnrollmentService.Enroll:output_type -> monitoring.v1.EnrollResponse
+	12, // 24: monitoring.v1.MetricStreamService.Stream:output_type -> monitoring.v1.StreamControl
+	19, // [19:25] is the sub-list for method output_type
+	13, // [13:19] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
-func init() { file_monitoring_v1_monitoring_proto_init() }
-func file_monitoring_v1_monitoring_proto_init() {
-	if File_monitoring_v1_monitoring_proto != nil {
+func init() { file_common_proto_monitoring_v1_monitoring_proto_init() }
+func file_common_proto_monitoring_v1_monitoring_proto_init() {
+	if File_common_proto_monitoring_v1_monitoring_proto != nil {
 		return
 	}
-	file_monitoring_v1_monitoring_proto_msgTypes[4].OneofWrappers = []any{
+	file_common_proto_monitoring_v1_monitoring_proto_msgTypes[4].OneofWrappers = []any{
 		(*MetricSample_Gauge)(nil),
 		(*MetricSample_PerCore)(nil),
 		(*MetricSample_Counter)(nil),
 	}
-	file_monitoring_v1_monitoring_proto_msgTypes[11].OneofWrappers = []any{
+	file_common_proto_monitoring_v1_monitoring_proto_msgTypes[11].OneofWrappers = []any{
 		(*StreamControl_Ack)(nil),
 		(*StreamControl_Cadence)(nil),
 		(*StreamControl_Keyframe)(nil),
@@ -1695,18 +1709,18 @@ func file_monitoring_v1_monitoring_proto_init() {
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_monitoring_v1_monitoring_proto_rawDesc), len(file_monitoring_v1_monitoring_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_common_proto_monitoring_v1_monitoring_proto_rawDesc), len(file_common_proto_monitoring_v1_monitoring_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   20,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   5,
 		},
-		GoTypes:           file_monitoring_v1_monitoring_proto_goTypes,
-		DependencyIndexes: file_monitoring_v1_monitoring_proto_depIdxs,
-		EnumInfos:         file_monitoring_v1_monitoring_proto_enumTypes,
-		MessageInfos:      file_monitoring_v1_monitoring_proto_msgTypes,
+		GoTypes:           file_common_proto_monitoring_v1_monitoring_proto_goTypes,
+		DependencyIndexes: file_common_proto_monitoring_v1_monitoring_proto_depIdxs,
+		EnumInfos:         file_common_proto_monitoring_v1_monitoring_proto_enumTypes,
+		MessageInfos:      file_common_proto_monitoring_v1_monitoring_proto_msgTypes,
 	}.Build()
-	File_monitoring_v1_monitoring_proto = out.File
-	file_monitoring_v1_monitoring_proto_goTypes = nil
-	file_monitoring_v1_monitoring_proto_depIdxs = nil
+	File_common_proto_monitoring_v1_monitoring_proto = out.File
+	file_common_proto_monitoring_v1_monitoring_proto_goTypes = nil
+	file_common_proto_monitoring_v1_monitoring_proto_depIdxs = nil
 }
