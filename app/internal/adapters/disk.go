@@ -27,5 +27,8 @@ func (d Disk) Collect(ctx context.Context) ([]domain.Metric, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []domain.Metric{{Name: "disk.used", Unit: "percent", Status: domain.StatusOK, Gauge: u.UsedPercent}}, nil
+	return []domain.Metric{{
+		Name: "disk.used", Unit: "percent", Status: domain.StatusOK,
+		Gauge: u.UsedPercent, Detail: usedTotal(u.Used, u.Total),
+	}}, nil
 }

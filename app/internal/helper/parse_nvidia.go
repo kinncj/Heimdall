@@ -4,6 +4,7 @@
 package helper
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -33,7 +34,11 @@ func parseNvidiaSMI(text string) []domain.Metric {
 	used, uok := parseField(f, 1)
 	total, tok := parseField(f, 2)
 	if uok && tok && total > 0 {
-		out = append(out, domain.Metric{Name: "gpu.vram", Unit: "percent", Status: domain.StatusOK, Gauge: used / total * 100})
+		out = append(out, domain.Metric{
+			Name: "gpu.vram", Unit: "percent", Status: domain.StatusOK,
+			Gauge:  used / total * 100,
+			Detail: fmt.Sprintf("%.1f / %.1f GB", used/1024, total/1024),
+		})
 	}
 	if v, ok := parseField(f, 3); ok {
 		out = append(out, domain.Metric{Name: "gpu.temp", Unit: "celsius", Status: domain.StatusOK, Gauge: v})

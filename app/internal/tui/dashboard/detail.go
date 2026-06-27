@@ -122,7 +122,7 @@ func (m Model) DetailView() string {
 	hist := m.history[h.Host.ID]
 	// Cap the trend to the space between the value column and the right edge so
 	// it scrolls in place instead of growing past the frame as history fills.
-	sparkW := w - 50
+	sparkW := w - 66
 	if sparkW < 12 {
 		sparkW = 12
 	}
@@ -146,12 +146,15 @@ func (m Model) DetailView() string {
 			continue
 		}
 		gauge := render.Gauge(m.mode, mm.Gauge, 28)
-		value := val.Style().Render(fmt.Sprintf("%5.0f%s", mm.Gauge, d.unit))
+		valAbs := val.Style().Render(fmt.Sprintf("%5.0f%s", mm.Gauge, d.unit))
+		if mm.Detail != "" {
+			valAbs += "  " + muted.Style().Render(mm.Detail)
+		}
 		spark := ""
 		if hist != nil {
 			spark = render.Sparkline(m.mode, hist[mm.Name], sparkW)
 		}
-		b.WriteString(lab + "  " + gauge + " " + value + "   " + spark + "\n")
+		b.WriteString(lab + "  " + gauge + " " + cell(valAbs, 26) + " " + spark + "\n")
 	}
 
 	if cores := byName["cpu.cores"]; cores.Status == domain.StatusOK && len(cores.PerCore) > 0 {

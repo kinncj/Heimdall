@@ -23,5 +23,8 @@ func (Mem) Collect(ctx context.Context) ([]domain.Metric, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []domain.Metric{{Name: "mem.used", Unit: "percent", Status: domain.StatusOK, Gauge: vm.UsedPercent}}, nil
+	return []domain.Metric{{
+		Name: "mem.used", Unit: "percent", Status: domain.StatusOK,
+		Gauge: vm.UsedPercent, Detail: usedTotal(vm.Used, vm.Total),
+	}}, nil
 }
