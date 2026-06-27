@@ -75,25 +75,20 @@ func FatHeader(m theme.Mode, width, online, total int, clock string) string {
 	return chrome(m, width, line1+"\n"+line2)
 }
 
-// StatusBar renders the footer chrome: brand · streaming · poll · transport ·
-// relay · rate-limit · clock, matching assets/TUI_STATUS_BAR.
-func StatusBar(m theme.Mode, width int, streaming bool, poll, transport string, relay string, rateLimited bool, clock string) string {
-	segs := []string{wordmark(m)}
-	if streaming {
-		s, _ := m.State("online")
-		segs = append(segs, s.Style().Render("● streaming"))
+// StatusBar renders the footer chrome: brand · connection · source · transport ·
+// clock. It reflects real state — whether the dashboard is currently receiving
+// from its hub, and which hub (or "demo") it is bound to.
+func StatusBar(m theme.Mode, width int, connected bool, source, clock string) string {
+	conn, connRole := "○ connecting", "stale"
+	if connected {
+		conn, connRole = "● live", "online"
 	}
-	segs = append(segs, role(m, "text_muted").Render("poll "+poll))
-	segs = append(segs, role(m, "text_muted").Render(transport))
-	if relay != "" {
-		r, _ := m.State("relaying")
-		segs = append(segs, r.Style().Render("↑ "+relay))
+	cs, _ := m.State(connRole)
+	segs := []string{wordmark(m), cs.Style().Render(conn)}
+	if source != "" {
+		segs = append(segs, role(m, "text_muted").Render(source))
 	}
-	if rateLimited {
-		rl, _ := m.State("rate_limited")
-		segs = append(segs, rl.Style().Render("⚡ rate-limited"))
-	}
-	segs = append(segs, clockSeg(m, clock))
+	segs = append(segs, role(m, "text_muted").Render("gRPC"), clockSeg(m, clock))
 
 	content := segs[0]
 	for _, s := range segs[1:] {

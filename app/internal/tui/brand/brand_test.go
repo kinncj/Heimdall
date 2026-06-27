@@ -52,8 +52,8 @@ func TestHeaderFitsWidth(t *testing.T) {
 
 func TestStatusBarHasFields(t *testing.T) {
 	m := darkMode(t)
-	out := strip(StatusBar(m, 120, true, "2s", "low-bw gRPC", "edge relay", true, "14:03:12"))
-	for _, want := range []string{"HEIMDALL", "streaming", "poll 2s", "low-bw gRPC", "edge relay", "rate-limited", "14:03:12"} {
+	out := strip(StatusBar(m, 120, true, "localhost:9090", "14:03:12"))
+	for _, want := range []string{"HEIMDALL", "live", "localhost:9090", "gRPC", "14:03:12"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("status bar missing %q\n%s", want, out)
 		}

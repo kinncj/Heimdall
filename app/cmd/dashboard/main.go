@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -95,11 +96,15 @@ func main() {
 	// a synthetic fleet so the UI can be explored without any infrastructure.
 	var reg *domain.HostRegistry
 	var tickFn func(time.Time)
+	var source string
+	var live func() bool
 	switch {
 	case *demoMode:
 		src := fake.New(now)
 		reg = src.Registry()
 		tickFn = src.Tick
+		source = "demo"
+		live = func() bool { return true }
 	default:
 		reg = domain.NewHostRegistry(10*time.Second, 30*time.Second)
 		dialOpts, err := clientDialOptions(*token, secure.ClientConfig{
@@ -108,13 +113,19 @@ func main() {
 		if err != nil {
 			fail(err)
 		}
-		go subscribeHub(*hubAddr, reg, dialOpts)
+		lastRecv := new(atomic.Int64)
+		go subscribeHub(*hubAddr, reg, dialOpts, lastRecv)
+		source = *hubAddr
+		live = func() bool {
+			ms := lastRecv.Load()
+			return ms > 0 && time.Since(time.UnixMilli(ms)) < 5*time.Second
+		}
 		if *snapshot {
 			time.Sleep(1200 * time.Millisecond) // gather a few updates for the frame
 		}
 	}
 
-	model := dashboard.New(md, reg, now)
+	model := dashboard.New(md, reg, now).WithStatus(source, live)
 	if tickFn != nil {
 		model = model.WithTick(tickFn)
 	}
@@ -260,8 +271,9 @@ func runTail(addr, alias string, dialOpts []grpc.DialOption) {
 }
 
 // subscribeHub keeps a live subscription to the hub, folding incoming snapshots
-// into the registry; it reconnects on error so the dashboard self-heals.
-func subscribeHub(addr string, reg *domain.HostRegistry, dialOpts []grpc.DialOption) {
+// into the registry; it reconnects on error so the dashboard self-heals. Each
+// folded snapshot stamps lastRecv so the footer can report live connectivity.
+func subscribeHub(addr string, reg *domain.HostRegistry, dialOpts []grpc.DialOption, lastRecv *atomic.Int64) {
 	for {
 		conn, err := grpc.NewClient(addr, dialOpts...)
 		if err != nil {
@@ -281,6 +293,7 @@ func subscribeHub(addr string, reg *domain.HostRegistry, dialOpts []grpc.DialOpt
 				break
 			}
 			foldSnapshot(reg, snap)
+			lastRecv.Store(time.Now().UnixMilli())
 		}
 		_ = conn.Close()
 		time.Sleep(time.Second)

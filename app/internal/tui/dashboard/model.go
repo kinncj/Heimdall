@@ -30,6 +30,8 @@ type Model struct {
 	detail        bool
 	help          bool
 	history       map[domain.HostID]map[string][]float64
+	source        string
+	live          func() bool
 }
 
 type tickMsg time.Time
@@ -43,6 +45,14 @@ func New(mode theme.Mode, reg *domain.HostRegistry, now time.Time) Model {
 // WithTick sets a per-tick callback (e.g. a live metric collector).
 func (m Model) WithTick(fn func(time.Time)) Model {
 	m.onTick = fn
+	return m
+}
+
+// WithStatus sets what the footer reports: the data source (hub address or
+// "demo") and a predicate telling whether the dashboard is currently receiving.
+func (m Model) WithStatus(source string, live func() bool) Model {
+	m.source = source
+	m.live = live
 	return m
 }
 
@@ -139,7 +149,7 @@ func (m Model) GridView() string {
 		rows = append(rows, m.row(h, i == m.cursor))
 	}
 
-	status := brand.StatusBar(m.mode, w, true, "2s", "low-bw gRPC", "edge relay", true, clock)
+	status := brand.StatusBar(m.mode, w, m.live != nil && m.live(), m.source, clock)
 	foot, _ := m.mode.Role("text_muted")
 	keys, _ := m.mode.Role("keybinding")
 	footer := foot.Style().Render("  ") + keys.Style().Render("↑/↓") + foot.Style().Render(" nav  ") +
