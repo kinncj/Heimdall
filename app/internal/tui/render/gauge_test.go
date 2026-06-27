@@ -61,8 +61,21 @@ func TestGaugeExtremes(t *testing.T) {
 
 func TestSparklineLength(t *testing.T) {
 	m := darkMode(t)
-	got := strip(Sparkline(m, []float64{0, 25, 50, 75, 100}))
+	got := strip(Sparkline(m, []float64{0, 25, 50, 75, 100}, 0))
 	if len([]rune(got)) != 5 {
 		t.Errorf("sparkline len = %d, want 5 (%q)", len([]rune(got)), got)
+	}
+}
+
+func TestSparklineClampsToWidth(t *testing.T) {
+	m := darkMode(t)
+	history := []float64{0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
+	got := strip(Sparkline(m, history, 4))
+	if n := len([]rune(got)); n != 4 {
+		t.Fatalf("clamped sparkline len = %d, want 4 (%q)", n, got)
+	}
+	// Must keep the most recent samples (the tail), not the head.
+	if want := strip(Sparkline(m, history[len(history)-4:], 0)); got != want {
+		t.Errorf("clamped sparkline = %q, want tail %q", got, want)
 	}
 }

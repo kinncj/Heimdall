@@ -99,6 +99,12 @@ func (m Model) DetailView() string {
 		byName[mm.Name] = mm
 	}
 	hist := m.history[h.Host.ID]
+	// Cap the trend to the space between the value column and the right edge so
+	// it scrolls in place instead of growing past the frame as history fills.
+	sparkW := w - 50
+	if sparkW < 12 {
+		sparkW = 12
+	}
 
 	for _, d := range []struct{ key, lab, unit string }{
 		{"cpu.util", "CPU", "%"}, {"mem.used", "MEM", "%"}, {"disk.used", "DISK", "%"},
@@ -114,14 +120,14 @@ func (m Model) DetailView() string {
 		value := val.Style().Render(fmt.Sprintf("%5.0f%s", mm.Gauge, d.unit))
 		spark := ""
 		if hist != nil {
-			spark = render.Sparkline(m.mode, hist[d.key])
+			spark = render.Sparkline(m.mode, hist[d.key], sparkW)
 		}
 		b.WriteString(lab + "  " + gauge + " " + value + "   " + spark + "\n")
 	}
 
 	if cores := byName["cpu.cores"]; cores.Status == domain.StatusOK && len(cores.PerCore) > 0 {
 		b.WriteString("\n  " + heading.Style().Render("CPU CORES") + "\n")
-		b.WriteString("  " + render.Sparkline(m.mode, cores.PerCore) + "  " +
+		b.WriteString("  " + render.Sparkline(m.mode, cores.PerCore, w-4) + "  " +
 			muted.Style().Render(fmt.Sprintf("%d cores", len(cores.PerCore))) + "\n")
 	}
 

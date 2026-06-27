@@ -43,8 +43,13 @@ func Gauge(m theme.Mode, pct float64, cells int) string {
 
 var sparkRunes = []rune("▁▂▃▄▅▆▇█")
 
-// Sparkline renders a value history (each 0–100) as a braille-ish trend.
-func Sparkline(m theme.Mode, history []float64) string {
+// Sparkline renders the trailing window of a value history (each 0–100) as a
+// braille-ish trend. width caps how many samples are drawn so the line never
+// runs past its column; width <= 0 draws the whole history.
+func Sparkline(m theme.Mode, history []float64, width int) string {
+	if width > 0 && len(history) > width {
+		history = history[len(history)-width:]
+	}
 	if len(history) == 0 {
 		return ""
 	}
