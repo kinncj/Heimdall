@@ -5,6 +5,21 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-06-27
+
+### Fixed
+- `<binary> update` now elevates when the install directory needs root — `sudo`
+  on Linux/macOS, a UAC prompt on Windows — instead of failing with a permission
+  error in a system path like `/usr/local/bin`. Affects all four binaries.
+
+### Docs
+- New guides: **Metrics export (Mímir)** — scrape Heimdall from Prometheus/Grafana —
+  and **Alerting (Gjallarhorn)**.
+- Fleet, privileged-metrics, and federation guides updated for discovery (Ratatoskr),
+  tags (Realms), and Linux power/thermal.
+- README: clearer "what & why", v1.2.0 capabilities, a Contributing section, and a
+  changelog link.
+
 ## [1.2.0] - 2026-06-27
 
 The *Watch Over All Realms* release — discovery, tags, alerting, export, and
@@ -165,6 +180,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.2.1]: https://github.com/kinncj/Heimdall/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/kinncj/Heimdall/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/kinncj/Heimdall/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/kinncj/Heimdall/compare/v1.0.7...v1.1.0

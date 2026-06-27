@@ -19,17 +19,37 @@ Heimdall is a lightweight, cross-platform **hardware monitoring** system with a 
 gRPC link to a central hub; a btop/mactop-class Go TUI renders the fleet live. It **sees** (metrics)
 and **hears** (opt-in logs) across every realm.
 
+Point it at your homelab, GPU boxes, a rack of servers, or just your laptop, and watch CPU,
+memory, disk, network, temperature, GPU, and power from every machine in one terminal.
+
 <p align="center">
   <img src="demo.gif" alt="Heimdall dashboard demo" width="900">
 </p>
 
+## Why Heimdall?
+
+- **One terminal for the whole fleet** — not a separate btop/mactop window per box.
+- **Lightweight** — four small static binaries. No Prometheus + Grafana + exporters + a
+  time-series database to stand up (though Heimdall speaks OpenMetrics if you already run them).
+- **Unprivileged by default** — hosts need no inbound ports and no root. Power, GPU, and thermal
+  come from no-sudo paths where they exist, and an optional helper where they don't.
+- **Built for distance** — compact gRPC over a low-bandwidth link; happy across a VPN or Tailscale.
+- **Zero-config when you want it** — daemons can discover their hub over mDNS; tag hosts to organize
+  a growing fleet; alert on thresholds; scrape it all into your existing Grafana.
+
 ## Capabilities
 
+Feature codenames are Norse — see the [glossary](docs/glossary.md) for what they mean and how to say them.
+
 - **Cross-platform daemon** — Windows/macOS/Linux × amd64/arm64; enrolls over TLS, auto-reconnects, low bandwidth.
-- **SOLID metric adapters** — CPU (with per-core), memory, disk, network throughput, temperature, GPU, power, internet + per-NIC gateway latency, uptime, host context. New signals add without touching existing adapters; a failing adapter is isolated, never dropping the host.
-- **Unprivileged by default** — Apple Silicon GPU/power via IOReport (no sudo) and an optional privileged helper for full thermal/CPU/ANE power; adapters self-report `unavailable` / `needs-helper` rather than failing.
+- **SOLID metric adapters** — CPU (with per-core), memory, disk + disk I/O, network throughput, temperature, GPU, power, internet + per-NIC gateway latency, uptime, host context. New signals add without touching existing adapters; a failing adapter is isolated, never dropping the host.
+- **Unprivileged by default** — power, GPU, and thermal from no-sudo paths (Apple Silicon IOReport, Linux RAPL + hwmon) and an optional helper for the rest; adapters self-report `unavailable` / `needs-helper` rather than failing.
 - **Real-time TUI** — live grid, per-host detail, gradient gauges, stale/offline with last-known values; high-fidelity and graceful-degradation render modes.
 - **Bifröst federation** — a hub relays upstream (local → cloud); multiple dashboards subscribe to one hub.
+- **Ratatoskr discovery** — daemons find their hub over mDNS (`--hub auto`); no hardcoded address on a LAN.
+- **Realms tags** — tag hosts and hubs (`env=prod`, `region=apac`); hub tags inherit to their hosts, and the fleet is groupable by tag or origin hub.
+- **Mímir export** — a Prometheus/OpenMetrics `/metrics` endpoint over the whole fleet, plus short-range history, so it drops into an existing Grafana.
+- **Gjallarhorn alerting** — declarative threshold rules with hysteresis; fire to a webhook on breach and clear.
 - **Read-only control plane** — allow-listed, no-sudo remote queries, audited.
 - **Opt-in log streaming** — rate-limited, on its own channel.
 
@@ -89,11 +109,16 @@ Full docs live in **[`docs/`](docs/README.md)**.
 | [Control Plane](docs/guides/06-control-plane.md) | run read-only remote diagnostics |
 | [Log Streaming](docs/guides/07-log-streaming.md) | tail host logs in the dashboard |
 | [Demo Mode](docs/guides/08-demo-mode.md) | explore the UI with no setup |
+| [Metrics Export (Mímir)](docs/guides/09-metrics-export.md) | scrape Heimdall from Prometheus / Grafana |
+| [Alerting (Gjallarhorn)](docs/guides/10-alerting.md) | fire threshold alerts to a webhook |
 
 **Reference:** [Installation](docs/installation.md) ·
 [Configuration](docs/configuration.md) ·
+[Metrics](docs/metrics.md) ·
+[Glossary](docs/glossary.md) ·
 [Architecture & Operations](docs/deployment.md) ·
-[Troubleshooting](docs/troubleshooting.md)
+[Troubleshooting](docs/troubleshooting.md) ·
+[Changelog](CHANGELOG.md)
 
 ## Install
 
@@ -129,6 +154,26 @@ make test             # unit tests
 make lint             # gofmt + go vet
 make test-acceptance  # behave acceptance suite (drives the real binaries)
 ```
+
+## Contributing
+
+Contributions are welcome — a new metric adapter, a platform port, a guide, a bug fix.
+Heimdall is a single Go module with Clean Architecture and a story-driven workflow:
+
+- Every feature begins as a Gherkin story in [`docs/stories/`](docs/stories) — the story is the spec.
+- Significant decisions are written up as [ADRs](docs/architecture/).
+- Tests come first (TDD); `make test` and `make test-acceptance` must pass.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, …).
+
+Good first contributions:
+
+- **Add a metric adapter** — one file, one interface, isolated from the rest. See
+  [ADR 0003](docs/architecture/0003-metric-adapter-contract-and-failure-isolation.md).
+- **Port the privileged helper** to another platform (the Linux RAPL/hwmon path is a worked example).
+- **Improve a guide** in [`docs/guides/`](docs/guides).
+
+Browse the [open issues](https://github.com/kinncj/Heimdall/issues) and the
+[CHANGELOG](CHANGELOG.md) to see where Heimdall is heading.
 
 ## License
 
