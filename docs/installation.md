@@ -24,15 +24,24 @@ curl -fsSL https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/instal
 You can install several at once and pin a version:
 ```sh
 curl -fsSL https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/install.sh | sh -s -- hub dashboard
-HEIMDALL_VERSION=v0.1.0 sh install.sh daemon helper
+HEIMDALL_VERSION=v1.1.0 sh install.sh daemon helper
 ```
 
-Overrides:
+Binaries install to the system bin dir (`/usr/local/bin`) by default, elevating
+with `sudo` only if that directory is not writable. Install somewhere else with
+`--install-location`:
 
-| Variable | Default | Meaning |
+```sh
+curl -fsSL .../scripts/install.sh | sh -s -- --install-location ~/.local/bin daemon
+```
+
+Flags and overrides:
+
+| Flag / Variable | Default | Meaning |
 |---|---|---|
-| `HEIMDALL_VERSION` | latest release | tag to install (e.g. `v0.1.0`) |
-| `HEIMDALL_BIN_DIR` | `/usr/local/bin` (or `~/.local/bin` if not writable) | install directory |
+| `--install-location DIR` | `/usr/local/bin` | install directory (takes precedence over `HEIMDALL_BIN_DIR`) |
+| `HEIMDALL_VERSION` | latest release | tag to install (e.g. `v1.1.0`) |
+| `HEIMDALL_BIN_DIR` | `/usr/local/bin` | install directory (used if `--install-location` is not given) |
 | `HEIMDALL_REPO` | `kinncj/Heimdall` | source `owner/repo` |
 
 The installer verifies each binary against the release `SHA256SUMS`.

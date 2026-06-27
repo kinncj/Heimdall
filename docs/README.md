@@ -28,7 +28,8 @@ Start here, then jump to the guide for what you want to do.
 
 | Doc | Contents |
 |---|---|
-| [Configuration](configuration.md) | every flag and environment variable, per binary |
+| [Configuration](configuration.md) | every flag, env var, and the config file + first-run wizard, per binary |
+| [Metrics](metrics.md) | every metric collected, with units and meaning |
 | [Architecture & Operations](deployment.md) | topology, what-runs-where, sequence diagrams, ports |
 | [Troubleshooting](troubleshooting.md) | common issues and host-liveness states |
 

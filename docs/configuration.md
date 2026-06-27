@@ -1,8 +1,20 @@
 # Configuration Reference
 
-Every Heimdall binary is configured by command-line flags (and a few environment
-variables). Run any binary with `--help` for its built-in usage. This page is the
-complete reference.
+Every Heimdall binary is configured by command-line flags, a few environment
+variables, and a saved JSON config file. Run any binary with `--help` for its
+built-in usage. This page is the complete reference.
+
+Settings resolve in this order, highest precedence last:
+
+```
+defaults  <  config file  <  environment  <  flags
+```
+
+The first run on a terminal offers a wizard; see
+[Configuration file & first-run wizard](#configuration-file--first-run-wizard).
+
+Every binary also accepts `--version` (print the binary name and version, then
+exit) and `--help`.
 
 > **Secrets**: prefer the environment variables (`HEIMDALL_TOKEN`,
 > `HEIMDALL_CONTROL_TOKEN`, `HEIMDALL_UPSTREAM_TOKEN`) over flags so tokens stay out
@@ -24,6 +36,7 @@ dashboards. Optionally relays upstream to a parent hub (federation).
 | `--tls-key` | — | PEM server private key |
 | `--stale-after` | `10s` | mark a host stale after no updates for this long |
 | `--offline-after` | `30s` | mark a host offline after no updates for this long |
+| `--purge-after` | `15m` | drop a host from the registry after it has been unseen this long (`0` disables) |
 | `--upstream` | — | parent hub address to relay this hub's hosts to |
 | `--upstream-token` | env `HEIMDALL_UPSTREAM_TOKEN` | enrollment token for the parent |
 | `--upstream-tls` | `false` | relay to the parent over TLS |
@@ -108,6 +121,7 @@ metrics itself.
 | `--hub` | `localhost:9090` | hub address to subscribe to |
 | `--demo` | `false` | render a simulated fleet (no hub needed) |
 | `--mode` | `dark` | theme mode: `dark` or `light` |
+| `--purge-after` | `15m` | drop a host from the grid after it has been unseen this long (`0` disables) |
 
 ### One-shot rendering (no TTY)
 
@@ -148,6 +162,46 @@ daemon over a unix socket. See [Privileged Metrics](guides/04-privileged-metrics
 
 ---
 
+## Configuration file & first-run wizard
+
+Each binary persists its settings to a JSON file named after the binary —
+`daemon.json`, `hub.json`, `dashboard.json`, `helper.json` — in the Heimdall
+config directory, resolved in this order:
+
+| Lookup | Path |
+|---|---|
+| `$HEIMDALL_CONFIG_DIR` (if set) | the value verbatim |
+| `$XDG_CONFIG_HOME` (if set) | `$XDG_CONFIG_HOME/heimdall` |
+| Linux / macOS | `~/.config/heimdall` |
+| Windows | `%AppData%\heimdall` |
+
+The file is one JSON object, one key per setting (toggles as booleans). It is
+written `0600` (owner-only) because it can hold tokens.
+
+```json
+{
+  "hub": "station:9090",
+  "interval": "2s",
+  "ping-target": "1.1.1.1",
+  "tls": true
+}
+```
+
+**When the file is written.** A binary saves its resolved settings when the
+first-run wizard runs, or when you pass any setting flag — so
+`heimdall-daemon --hub station:9090` both runs once and records `hub` for next
+time. It prints `saved config to <path>` on stderr when it does.
+
+**First-run wizard.** On the first run, if no config file exists, no flags were
+passed, and stdin is a terminal, each binary walks through its main settings,
+showing the current value as the `[default]` — press Enter to accept. The wizard
+never runs under pipes, CI, or one-shot modes (`--once`, `--snapshot`), so
+scripted use is unaffected. Delete the config file to run it again.
+
+Precedence still applies after the file exists: a flag or environment variable
+overrides the saved value for that run without rewriting the file (unless a
+setting flag triggers a save).
+
 ## Environment variables
 
 | Variable | Used by | Equivalent flag |
@@ -156,6 +210,7 @@ daemon over a unix socket. See [Privileged Metrics](guides/04-privileged-metrics
 | `HEIMDALL_CONTROL_TOKEN` | daemon | `--control-token` |
 | `HEIMDALL_UPSTREAM_TOKEN` | hub | `--upstream-token` |
 | `HEIMDALL_HELPER_SOCKET` | helper, daemon | `--socket` |
+| `HEIMDALL_CONFIG_DIR` | all | overrides the config directory (see above) |
 
 ## Ports
 
