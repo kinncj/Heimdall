@@ -126,7 +126,9 @@ metrics itself.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--hub` | `localhost:9090` | hub address to subscribe to |
+| `--hub` | `localhost:9090` | hub address to subscribe to; `auto` = discover via mDNS (Ratatoskr) |
+| `--discover` | `false` | auto-discover the hub via mDNS when `--hub` is auto/unset |
+| `--discover-seed` | — | fallback hub address for discovery on overlay networks (Tailscale, etc.) |
 | `--demo` | `false` | render a simulated fleet (no hub needed) |
 | `--mode` | `dark` | theme mode: `dark` or `light` |
 | `--purge-after` | `15m` | drop a host from the grid after it has been unseen this long (`0` disables) |

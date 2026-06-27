@@ -292,9 +292,7 @@ func startControlServer(addr, token, tlsCert, tlsKey, host string, sources logs.
 // discoverHub resolves a hub address via mDNS (Ratatoskr), falling back to a
 // static seed for overlay networks where multicast does not reach.
 func discoverHub(seed string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	return discovery.Chain{discovery.MDNS{}, discovery.Static{Addr: seed}}.Discover(ctx)
+	return discovery.Resolve(seed, 5*time.Second)
 }
 
 // streamToHub streams snapshots to the hub, reconnecting with backoff on error.

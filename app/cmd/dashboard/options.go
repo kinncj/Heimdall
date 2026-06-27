@@ -11,8 +11,12 @@ import "heimdall/app/internal/options"
 func dashboardCatalog() options.Catalog {
 	return options.NewCatalog(
 		options.Define("hub").Default("localhost:9090").
-			Help("hub address to subscribe to for live host metrics").
+			Help("hub address to subscribe to; 'auto' discovers via mDNS (Ratatoskr)").
 			Ask("Hub address to subscribe to"),
+		options.Define("discover").Of(options.KindToggle).Default("false").
+			Help("auto-discover the hub via mDNS when --hub is auto/unset (Ratatoskr)"),
+		options.Define("discover-seed").
+			Help("fallback hub address for discovery on overlay networks (Tailscale, etc.)"),
 		options.Define("mode").Default("dark").Help("theme mode: dark|light"),
 		options.Define("token").Of(options.KindSecret).Env("HEIMDALL_TOKEN").
 			Help("enrollment token presented to the hub (env HEIMDALL_TOKEN)"),

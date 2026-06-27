@@ -10,7 +10,16 @@ package discovery
 import (
 	"context"
 	"errors"
+	"time"
 )
+
+// Resolve is the standard client discovery chain (mDNS on the LAN, then a static
+// seed for overlay networks). The daemon and dashboard both use it to find a hub.
+func Resolve(seed string, timeout time.Duration) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return Chain{MDNS{}, Static{Addr: seed}}.Discover(ctx)
+}
 
 // ErrNotFound means no hub was discovered.
 var ErrNotFound = errors.New("discovery: no hub found")

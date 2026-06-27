@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/control"
+	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/fake"
 	"heimdall/app/internal/secure"
@@ -117,6 +118,16 @@ func main() {
 	default:
 		reg = domain.NewHostRegistry(10*time.Second, 30*time.Second)
 		reg.SetPurgeAfter(cfg.Span("purge-after", 15*time.Minute))
+		// Ratatoskr: discover the hub when --hub is "auto" (or --discover with no
+		// explicit hub). Discovery only resolves the address; the token and TLS
+		// still gate trust. An explicit --hub always wins.
+		if cfg.Text("hub") == "auto" || (cfg.Toggle("discover") && cfg.Text("hub") == "") {
+			addr, err := discovery.Resolve(cfg.Text("discover-seed"), 5*time.Second)
+			if err != nil {
+				fail(fmt.Errorf("hub discovery failed (Ratatoskr): %w", err))
+			}
+			hubAddr = addr
+		}
 		dialOpts, err := clientDialOptions(token, tlsCfg)
 		if err != nil {
 			fail(err)
