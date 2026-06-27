@@ -19,15 +19,25 @@ You'll see a synthetic fleet (workstation, dgx-spark, rpi-5, …) with hosts in
 various states — `ONLINE`, `STALE`, `OFFLINE` — and live-moving gauges, so you can
 try every part of the UI.
 
+The demo fleet also carries **tags** (`env`, `role`), spans three simulated
+**origin hubs** (`home`, `remote-work-station`, `central`), and runs one host hot
+enough to **fire an alert** — so grouping, filtering, and the alert badge are all
+explorable without a hub or a rules file.
+
 ## What to try
 
 | Key | Action |
 |---|---|
 | `↑` / `↓` | move the selection |
 | `⏎` | open per-host detail — per-core CPU strip, sparklines, network, gateway, uptime |
+| `g` | cycle grouping: none → hub → os → tag (Yggdrasil) — watch the section headers |
+| `/` | filter/search by host name or tag (e.g. type `prod` or `home`); `esc` clears |
 | `r` | refresh now |
 | `?` | toggle the help overlay |
 | `q` | quit |
+
+The host running hot shows a `⚠` badge and turns red, and the header line reports
+a fleet `⚠ N alerts` count (Gjallarhorn).
 
 ## Render a single frame (no TTY)
 

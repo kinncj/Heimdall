@@ -5,6 +5,29 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-27
+
+### Added
+- **Yggdrasil — interactive dashboard grouping.** Group the fleet by origin hub,
+  OS, or any tag with `g`, and filter/search by host name or tag with `/`. Works
+  live and in `--demo`, with per-group section headers.
+- **Gjallarhorn — alerts in the dashboard.** Firing alerts now surface as a per-row
+  `⚠` badge (the host turns red) and a fleet alert count in the header — not just
+  webhook + log.
+- **Windows privileged metrics.** The helper reports CPU/zone temperature via WMI
+  (`MSAcpi_ThermalZoneTemperature`); `power.pkg` stays unavailable on Windows
+  (RAPL needs a kernel driver). Build-tagged, parser unit-tested.
+- **Richer demo mode.** The simulated fleet now carries tags, spans three origin
+  hubs (`home`, `remote-work-station`, `central`), and runs one host hot enough to
+  fire an alert — so grouping, filtering, and the badge are all explorable with no
+  setup.
+
+### Changed
+- The hub now sends dashboards registry-derived **enriched snapshots** (merged
+  labels + alert state) on every update, so live frames match the initial state —
+  the origin `hub` label and inherited tags no longer vanish between updates.
+- `Snapshot` gains an additive `alerts` field (wire-compatible; old peers ignore it).
+
 ## [1.2.2] - 2026-06-27
 
 ### Added
@@ -188,6 +211,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.3.0]: https://github.com/kinncj/Heimdall/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/kinncj/Heimdall/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/kinncj/Heimdall/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/kinncj/Heimdall/compare/v1.1.1...v1.2.0

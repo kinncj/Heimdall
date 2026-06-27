@@ -156,7 +156,9 @@ daemon.
 
 ### Dashboard keys
 
-`↑`/`↓` select · `⏎` detail · `r` refresh · `?` help · `q` quit.
+`↑`/`↓` select · `⏎` detail · `g` group (hub/os/tag) · `/` filter · `r` refresh ·
+`?` help · `q` quit. Grouping and filtering work live and in `--demo`; hosts with a
+firing alert show a `⚠` badge and a fleet alert count.
 
 ---
 

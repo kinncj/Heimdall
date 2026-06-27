@@ -82,6 +82,29 @@
       "panel",
       "heading",
       "keybinding"
+    ],
+    "group_section_header": [
+      "subheading",
+      "label",
+      "accent",
+      "border"
+    ],
+    "group_filter_status": [
+      "label",
+      "text_muted",
+      "accent"
+    ],
+    "alert_chip": [
+      "states.error",
+      "states.degraded",
+      "severity.high",
+      "severity.critical"
+    ],
+    "alert_row": [
+      "states.error",
+      "severity.critical",
+      "value",
+      "label"
     ]
   }
 }

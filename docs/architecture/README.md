@@ -47,5 +47,8 @@ docs/architecture/NNNN-short-decision-title.md
 | [0010](0010-realms-yggdrasil-tags-and-topology-grouping.md) | Realms & Yggdrasil: host/hub tags and topology-aware grouping | accepted | 2026-06-27 |
 | [0011](0011-mimir-metrics-history-and-openmetrics-export.md) | Mímir: metrics history and OpenMetrics export | accepted | 2026-06-27 |
 | [0012](0012-gjallarhorn-alerting-and-notifications.md) | Gjallarhorn: alerting and notifications | accepted | 2026-06-27 |
+| [0013](0013-yggdrasil-interactive-grouping-and-enriched-snapshots.md) | Yggdrasil: interactive dashboard grouping + enriched snapshots | accepted | 2026-06-27 |
+| [0014](0014-gjallarhorn-alert-state-on-the-wire-and-dashboard-surfacing.md) | Gjallarhorn: alert state on the wire + dashboard surfacing | accepted | 2026-06-27 |
+| [0015](0015-windows-privileged-metrics.md) | Windows privileged metrics | accepted | 2026-06-27 |
 
 <!-- Add a row for each ADR as you create them -->
