@@ -19,6 +19,10 @@ Heimdall is a lightweight, cross-platform **hardware monitoring** system with a 
 gRPC link to a central hub; a btop/mactop-class Go TUI renders the fleet live. It **sees** (metrics)
 and **hears** (opt-in logs) across every realm.
 
+<p align="center">
+  <img src="demo.gif" alt="Heimdall dashboard demo" width="900">
+</p>
+
 ## Capabilities
 
 - **Cross-platform daemon** — Windows/macOS/Linux × amd64/arm64; enrolls over TLS, auto-reconnects, low bandwidth.
