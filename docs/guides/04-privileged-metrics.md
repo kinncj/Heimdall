@@ -11,6 +11,7 @@ The daemon tries sources in order and degrades gracefully:
 | Platform | Without any helper / root | With `heimdall-helper` (root) |
 |---|---|---|
 | **Apple Silicon** | GPU power + GPU utilisation via **IOReport** (no sudo) | adds full thermal, CPU/ANE power where the SoC exposes it |
+| **Linux** | CPU/mem/disk/net/uptime (no sudo) | adds CPU package power from RAPL + package temperature from hwmon |
 | **Linux + NVIDIA** | GPU via `nvidia-smi` (unprivileged) | vendor extras |
 | **Other** | depends on the platform tool | whatever needs root |
 
@@ -34,6 +35,25 @@ IOReport energy counters:
 > IOReport requires a **CGO build**. The local `make build-tui` enables CGO by
 > default on macOS. The CGO-free release binaries fall back to `powermetrics`
 > (which needs sudo) — build locally if you want IOReport.
+
+## Linux power & thermal via the helper
+
+On Linux the helper reads two privileged sources and exposes them to the
+unprivileged daemon:
+
+- **CPU package power** from RAPL (`/sys/class/powercap/intel-rapl`), sampled as
+  an energy counter delta and reported as `power.pkg`.
+- **Package temperature** from a trusted hwmon chip — Intel `coretemp`, AMD
+  `k10temp` or `zenpower` — reported as `temp.pkg`.
+
+Either source may be absent. A host with no powercap or no recognised sensor
+reports that metric as `unavailable` (the `⚿` affordance) and keeps running —
+unsupported hardware degrades, it does not fail.
+
+```sh
+sudo ./bin/heimdall-helper &                 # serves RAPL power + hwmon temp
+./bin/heimdall-daemon --hub localhost:9090   # auto-detects the socket
+```
 
 ## Option B — the privileged helper
 

@@ -52,6 +52,53 @@ a laptop, a NOC wall display, a teammate's terminal:
 ./bin/heimdall-dashboard --hub 192.168.1.50:9090
 ```
 
+## Zero-config discovery (Ratatoskr)
+
+Skip hard-coding the station's IP on every host. Make the hub advertise itself
+over mDNS, then let daemons find it.
+
+```sh
+# On the station: advertise as _heimdall-hub._tcp on the LAN
+./bin/heimdall-hub --listen :9090 --discoverable &
+
+# On each host: discover the hub instead of naming it
+./bin/heimdall-daemon --hub auto --name "$(hostname)"   # or: --discover
+```
+
+- `--hub auto` forces discovery; `--discover` discovers only when no `--hub` is set.
+- An explicit `--hub host:port` **always wins** over discovery.
+- mDNS needs multicast. On an overlay network with none (Tailscale, etc.), give a
+  fallback address:
+
+  ```sh
+  ./bin/heimdall-daemon --discover --discover-seed 100.64.0.1:9090 --name "$(hostname)"
+  ```
+
+Discovery only finds the **address**. Trust is still gated — the enrollment token
+and TLS apply exactly as if you had typed the hub in by hand. See
+[Ratatoskr](../glossary.md) in the
+glossary.
+
+## Tag your hosts (Realms)
+
+Tags are `k=v` pairs that ride along with a host's metrics and show up as labels
+in the [metrics export](09-metrics-export.md) and as
+[alert](10-alerting.md) selectors.
+
+```sh
+./bin/heimdall-daemon --hub 192.168.1.50:9090 --name web-01 --tags env=prod,role=db
+```
+
+A hub can stamp tags onto **every** host it reports, so a whole site inherits a
+common label without touching each daemon:
+
+```sh
+./bin/heimdall-hub --listen :9090 --tags region=apac,tier=edge &
+```
+
+On a key conflict the **host's own tag wins** over the hub's. See
+[Realms](../glossary.md).
+
 ## Resilience
 
 - **Daemon restarts / network blips**: the daemon auto-reconnects with backoff and

@@ -23,6 +23,8 @@ Start here, then jump to the guide for what you want to do.
 | [Control Plane](guides/06-control-plane.md) | run read-only remote diagnostics |
 | [Log Streaming](guides/07-log-streaming.md) | tail host logs in the dashboard |
 | [Demo Mode](guides/08-demo-mode.md) | explore the UI with no setup |
+| [Metrics Export (Mímir)](guides/09-metrics-export.md) | scrape Heimdall from Prometheus / Grafana |
+| [Alerting (Gjallarhorn)](guides/10-alerting.md) | fire threshold alerts to a webhook |
 
 ## Reference
 
