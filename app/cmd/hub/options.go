@@ -33,6 +33,8 @@ func hubCatalog() options.Catalog {
 		options.Define("upstream-tls-server-name").Help("override the server name verified in the upstream certificate"),
 		options.Define("upstream-tls-insecure").Of(options.KindToggle).Default("false").Help("skip upstream certificate verification (dev only)"),
 		options.Define("relay-interval").Of(options.KindSpan).Default("2s").Help("how often to relay hosts upstream"),
+		options.Define("metrics-listen").Help("serve Prometheus/OpenMetrics on this address (e.g. :9091); empty disables (Mímir)").
+			Ask("Prometheus metrics address (blank = off, e.g. :9091)"),
 	)
 }
 

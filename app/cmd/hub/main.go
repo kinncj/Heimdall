@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/hub"
+	"heimdall/app/internal/observe"
 	"heimdall/app/internal/options"
 	"heimdall/app/internal/secure"
 	"heimdall/app/internal/selfupdate"
@@ -94,6 +96,31 @@ func main() {
 		interval := cfg.Span("relay-interval", 2*time.Second)
 		go hub.RunRelay(ctx, h, upstream, dialOpts, interval)
 		fmt.Fprintf(os.Stderr, "heimdall-hub: relaying upstream to %s every %s\n", upstream, interval)
+	}
+
+	// Mímir: serve Prometheus/OpenMetrics and keep bounded in-memory history.
+	if mAddr := cfg.Text("metrics-listen"); mAddr != "" {
+		hist := observe.NewHistory(1000)
+		go func() {
+			t := time.NewTicker(5 * time.Second)
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case now := <-t.C:
+					hist.Record(h.Registry().Hosts(), now)
+				}
+			}
+		}()
+		ms := &http.Server{Addr: mAddr, Handler: observe.Handler(h.Registry(), hist)}
+		go func() {
+			if err := ms.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				fmt.Fprintln(os.Stderr, "heimdall-hub: metrics server:", err)
+			}
+		}()
+		go func() { <-ctx.Done(); _ = ms.Close() }()
+		fmt.Fprintf(os.Stderr, "heimdall-hub: serving Prometheus metrics on %s (Mímir)\n", mAddr)
 	}
 
 	go func() {

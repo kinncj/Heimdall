@@ -44,6 +44,7 @@ dashboards. Optionally relays upstream to a parent hub (federation).
 | `--upstream-tls-server-name` | — | override the verified server name |
 | `--upstream-tls-insecure` | `false` | dev only — skip parent verification |
 | `--relay-interval` | `2s` | how often to relay hosts upstream |
+| `--metrics-listen` | — | serve Prometheus/OpenMetrics + history on this address (e.g. `:9091`); empty = off (Mímir) |
 
 ---
 
