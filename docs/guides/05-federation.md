@@ -80,6 +80,17 @@ The child re-authenticates to the parent on every reconnect.
 parent's own `--stale-after` / `--offline-after` decide how quickly a relayed host
 is marked stale or offline if a site goes dark.
 
+## Tags and the `hub` label across the tree
+
+A hub's `--tags` (Realms) are inherited by **every** host it relays, so a site
+hub can stamp a common `region=`/`tier=` onto all of its hosts at once. A host's
+own tag of the same key still wins over the hub's.
+
+Each host also carries its **origin hub** as an authoritative `hub` label, which
+the relay stamps on the way up. The central dashboard — and the
+[Mímir metrics export](09-metrics-export.md) on the parent — can therefore group
+or filter the whole federated fleet by `hub`.
+
 ## Real local example: two sites over Tailscale
 
 Four machines on one tailnet, in two sites, federated to a central hub that the
@@ -224,17 +235,6 @@ or filter the whole fleet by site — see
   tailnet still cannot enroll a daemon or subscribe a dashboard without it.
 - Only the hubs listen (`:9090`, reachable over the tailnet). Daemons and
   dashboards dial out and need no inbound ports.
-
-## Tags and the `hub` label across the tree
-
-A hub's `--tags` (Realms) are inherited by **every** host it relays, so a site
-hub can stamp a common `region=`/`tier=` onto all of its hosts at once. A host's
-own tag of the same key still wins over the hub's.
-
-Each host also carries its **origin hub** as an authoritative `hub` label, which
-the relay stamps on the way up. The central dashboard — and the
-[Mímir metrics export](09-metrics-export.md) on the parent — can therefore group
-or filter the whole federated fleet by `hub`.
 
 ## Background
 
