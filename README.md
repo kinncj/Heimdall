@@ -133,3 +133,7 @@ make test-acceptance  # behave acceptance suite (drives the real binaries)
 ## License
 
 [AGPL-3.0-or-later](LICENSE) © Kinn Coelho Juliao &lt;kinncj@gmail.com&gt;
+
+---
+
+<p align="center"><sub>Built with ♥ and <a href="https://github.com/kinncj/MAPLE">Maple</a>.</sub></p>
