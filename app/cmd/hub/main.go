@@ -19,6 +19,7 @@ import (
 
 	"heimdall/app/internal/hub"
 	"heimdall/app/internal/secure"
+	"heimdall/app/internal/selfupdate"
 	v1 "heimdall/common/proto/monitoring/v1"
 )
 
@@ -26,6 +27,13 @@ import (
 var version = "dev"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		if err := selfupdate.Run("hub", version); err != nil {
+			fmt.Fprintln(os.Stderr, "heimdall-hub:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	listen := flag.String("listen", ":9090", "gRPC listen address")
 	staleAfter := flag.Duration("stale-after", 10*time.Second, "mark a host stale after no updates for this long")
 	offlineAfter := flag.Duration("offline-after", 30*time.Second, "mark a host offline after no updates for this long")

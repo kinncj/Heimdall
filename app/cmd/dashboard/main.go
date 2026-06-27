@@ -24,6 +24,7 @@ import (
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/fake"
 	"heimdall/app/internal/secure"
+	"heimdall/app/internal/selfupdate"
 	"heimdall/app/internal/transport"
 	"heimdall/app/internal/tui/dashboard"
 	"heimdall/app/internal/tui/splash"
@@ -35,6 +36,13 @@ import (
 var version = "dev"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		if err := selfupdate.Run("dashboard", version); err != nil {
+			fmt.Fprintln(os.Stderr, "heimdall-dashboard:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	snapshot := flag.Bool("snapshot", false, "render one grid frame to stdout and exit")
 	splashFlag := flag.Bool("splash", false, "render the splash frame to stdout and exit")
 	demoMode := flag.Bool("demo", false, "render a simulated multi-host fleet (no hub needed; for trying the UI)")

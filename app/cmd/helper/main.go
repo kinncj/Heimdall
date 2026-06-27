@@ -16,12 +16,20 @@ import (
 
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/helper"
+	"heimdall/app/internal/selfupdate"
 )
 
 // version is the Heimdall build version, set via -ldflags "-X main.version=…".
 var version = "dev"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		if err := selfupdate.Run("helper", version); err != nil {
+			fmt.Fprintln(os.Stderr, "heimdall-helper:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	sock := flag.String("socket", helper.DefaultSocketPath(), "unix socket to listen on")
 	demo := flag.Bool("demo", false, "serve canned sample metrics (no root needed; for trying the needs-helper UI)")
 	showVersion := flag.Bool("version", false, "print version and exit")

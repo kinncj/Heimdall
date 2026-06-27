@@ -29,6 +29,7 @@ import (
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/logs"
 	"heimdall/app/internal/secure"
+	"heimdall/app/internal/selfupdate"
 	"heimdall/app/internal/transport"
 	v1 "heimdall/common/proto/monitoring/v1"
 )
@@ -42,6 +43,13 @@ var version = "dev"
 var logger = slog.New(slog.NewJSONHandler(os.Stderr, nil)).With("component", "heimdall-daemon")
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		if err := selfupdate.Run("daemon", version); err != nil {
+			fmt.Fprintln(os.Stderr, "heimdall-daemon:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	hubAddr := flag.String("hub", "", "hub address to stream to (e.g. localhost:9090); empty prints locally")
 	name := flag.String("name", "", "host display name (default: hostname)")
 	interval := flag.Duration("interval", 2*time.Second, "sample interval")
