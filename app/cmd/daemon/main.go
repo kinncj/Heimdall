@@ -368,40 +368,48 @@ func emit(w io.Writer, host string, ms []domain.Metric, asJSON bool) {
 	fmt.Fprintln(w, line)
 }
 
-// formatMetric renders one metric for the human-readable print line, handling
-// per-core metrics and unit-appropriate precision.
+// unitValue renders the value part (no name) of an OK gauge metric, keyed by
+// unit. A unit with no entry falls back to defaultValue. Per-core and non-OK
+// metrics never reach this table — their value does not come from Gauge.
+var unitValue = map[string]func(domain.Metric) string{
+	"info":    func(m domain.Metric) string { return m.Detail },
+	"percent": func(m domain.Metric) string { return fmt.Sprintf("%.0f%%", m.Gauge) },
+	"watts":   func(m domain.Metric) string { return fmt.Sprintf("%.2fW", m.Gauge) },
+	"celsius": func(m domain.Metric) string { return fmt.Sprintf("%.0f°C", m.Gauge) },
+	"ms":      func(m domain.Metric) string { return fmt.Sprintf("%.0fms", m.Gauge) },
+	"MB/s":    func(m domain.Metric) string { return fmt.Sprintf("%.2fMB/s", m.Gauge) },
+	"s":       func(m domain.Metric) string { return shortDuration(m.Gauge) },
+}
+
+func defaultValue(m domain.Metric) string { return fmt.Sprintf("%g", m.Gauge) }
+
+// formatMetric renders one metric for the human-readable print line as
+// "name=value". Non-OK metrics show their status; per-core metrics show an
+// avg/max summary; everything else delegates the value to a per-unit formatter.
 func formatMetric(m domain.Metric) string {
 	if m.Status != domain.StatusOK {
 		return fmt.Sprintf("%s=%s", m.Name, m.Status)
 	}
 	if m.Kind == domain.KindPerCore && len(m.PerCore) > 0 {
-		max, sum := m.PerCore[0], 0.0
-		for _, v := range m.PerCore {
-			if v > max {
-				max = v
-			}
-			sum += v
+		return fmt.Sprintf("%s=%s", m.Name, perCoreValue(m))
+	}
+	value, ok := unitValue[m.Unit]
+	if !ok {
+		value = defaultValue
+	}
+	return fmt.Sprintf("%s=%s", m.Name, value(m))
+}
+
+// perCoreValue summarises per-core readings as "Nc(avgX%,maxY%)".
+func perCoreValue(m domain.Metric) string {
+	max, sum := m.PerCore[0], 0.0
+	for _, v := range m.PerCore {
+		if v > max {
+			max = v
 		}
-		return fmt.Sprintf("%s=%dc(avg%.0f%%,max%.0f%%)", m.Name, len(m.PerCore), sum/float64(len(m.PerCore)), max)
+		sum += v
 	}
-	switch m.Unit {
-	case "info":
-		return fmt.Sprintf("%s=%s", m.Name, m.Detail)
-	case "percent":
-		return fmt.Sprintf("%s=%.0f%%", m.Name, m.Gauge)
-	case "watts":
-		return fmt.Sprintf("%s=%.2fW", m.Name, m.Gauge)
-	case "celsius":
-		return fmt.Sprintf("%s=%.0f°C", m.Name, m.Gauge)
-	case "ms":
-		return fmt.Sprintf("%s=%.0fms", m.Name, m.Gauge)
-	case "MB/s":
-		return fmt.Sprintf("%s=%.2fMB/s", m.Name, m.Gauge)
-	case "s":
-		return fmt.Sprintf("%s=%s", m.Name, shortDuration(m.Gauge))
-	default:
-		return fmt.Sprintf("%s=%g", m.Name, m.Gauge)
-	}
+	return fmt.Sprintf("%dc(avg%.0f%%,max%.0f%%)", len(m.PerCore), sum/float64(len(m.PerCore)), max)
 }
 
 func shortDuration(secs float64) string {
