@@ -1,7 +1,7 @@
 ---
 adr: "0010"
 title: "Realms & Yggdrasil: host/hub tags and topology-aware grouping"
-status: proposed
+status: accepted
 date: "2026-06-27"
 supersedes: null
 superseded_by: null
@@ -131,7 +131,7 @@ dashboard groups by a `Dimension` (`HostView -> string`) so `origin-hub`, `os`, 
 `tag:<key>` are all uniform dimensions with no special-casing. All proto changes are
 additive per ADR-0001.
 
-Status: **proposed**
+Status: **accepted**
 
 ## 8. Next Steps
 

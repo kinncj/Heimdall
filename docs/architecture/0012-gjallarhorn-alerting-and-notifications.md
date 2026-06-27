@@ -1,7 +1,7 @@
 ---
 adr: "0012"
 title: "Gjallarhorn: alerting and notifications"
-status: proposed
+status: accepted
 date: "2026-06-27"
 supersedes: null
 superseded_by: null
@@ -142,7 +142,7 @@ Slack/PagerDuty-compatible webhook on both fire and clear, routed and scoped by 
 (ADR-0010). Webhook is the first `Notifier`; SSRF is mitigated by scheme validation
 and optional egress allowlisting, and payloads carry no secrets.
 
-Status: **proposed**
+Status: **accepted**
 
 ## 8. Next Steps
 

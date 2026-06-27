@@ -5,6 +5,48 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-06-27
+
+The *Watch Over All Realms* release — discovery, tags, alerting, export, and
+cross-platform power/thermal. Feature codenames are Norse; see the
+[glossary](docs/glossary.md) for what they mean and how to say them.
+
+### Added
+- **Ratatoskr — zeroconf discovery.** The hub advertises over mDNS
+  (`--discoverable`) and a daemon finds it with `--hub auto` or `--discover`
+  (`--discover-seed` covers overlay networks with no multicast). Discovery only
+  resolves the address — the enrollment token and TLS still gate trust, and an
+  explicit `--hub` always wins.
+- **Realms — host & hub tags.** `heimdall-daemon --tags env=prod,role=db` and
+  `heimdall-hub --tags region=apac`. Tags ride the stream and inherit across the
+  Bifröst relay; a host's own tag wins over an inherited hub tag.
+- **Mímir — Prometheus/OpenMetrics export + history.** `heimdall-hub
+  --metrics-listen :9091` serves `/metrics` (the whole fleet, labeled by host,
+  origin hub, and tags) and `/history`, backed by a bounded in-memory ring
+  (lost on restart, by design).
+- **Gjallarhorn — alerting.** `heimdall-hub --alert-rules rules.json` evaluates
+  threshold rules (e.g. `cpu.util > 90 for 5m`) with for-duration hysteresis so
+  spikes don't flap, scoped by tag, and POSTs to `--alert-webhook` on fire and
+  clear.
+- **Yggdrasil — topology grouping.** Each host's Bifröst origin hub is surfaced
+  as a `hub` label and the hub stores enrolled OS/arch context, so the fleet is
+  groupable by origin hub, OS, and tags in Prometheus/Grafana.
+- **Cross-platform helper parity.** The privileged helper reads CPU package
+  power from RAPL and temperatures from hwmon on Linux, so non-Mac hosts get
+  `power.pkg`/`temp.pkg` like Apple Silicon.
+
+### Changed
+- `Snapshot` gains an additive `labels` field so tags inherit across the relay
+  (wire-compatible — old peers ignore it).
+
+### Docs
+- ADRs 0009–0012 (Ratatoskr, Realms & Yggdrasil, Mímir, Gjallarhorn), v1.2.0
+  Gherkin stories 0012–0017, and a codename pronunciation glossary.
+
+### Notes
+- Interactive in-dashboard grouping/filtering (the TUI side of Yggdrasil) is a
+  follow-up; the grouping data is available via labels and export today.
+
 ## [1.1.1] - 2026-06-27
 
 ### Fixed
@@ -123,6 +165,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.2.0]: https://github.com/kinncj/Heimdall/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/kinncj/Heimdall/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/kinncj/Heimdall/compare/v1.0.7...v1.1.0
 [1.0.7]: https://github.com/kinncj/Heimdall/compare/v1.0.6...v1.0.7

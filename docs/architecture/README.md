@@ -43,9 +43,9 @@ docs/architecture/NNNN-short-decision-title.md
 | [0006](0006-dashboard-federation-via-pubsub-relay.md) | Dashboard federation via pub/sub relay | proposed | 2026-06-26 |
 | [0007](0007-unprivileged-remote-control-plane.md) | Unprivileged remote control plane | proposed | 2026-06-26 |
 | [0008](0008-in-memory-ring-buffers-vs-tsdb.md) | In-memory ring buffers vs TSDB | proposed | 2026-06-26 |
-| [0009](0009-ratatoskr-zeroconf-service-discovery.md) | Ratatoskr: zeroconf service discovery | proposed | 2026-06-27 |
-| [0010](0010-realms-yggdrasil-tags-and-topology-grouping.md) | Realms & Yggdrasil: host/hub tags and topology-aware grouping | proposed | 2026-06-27 |
-| [0011](0011-mimir-metrics-history-and-openmetrics-export.md) | Mímir: metrics history and OpenMetrics export | proposed | 2026-06-27 |
-| [0012](0012-gjallarhorn-alerting-and-notifications.md) | Gjallarhorn: alerting and notifications | proposed | 2026-06-27 |
+| [0009](0009-ratatoskr-zeroconf-service-discovery.md) | Ratatoskr: zeroconf service discovery | accepted | 2026-06-27 |
+| [0010](0010-realms-yggdrasil-tags-and-topology-grouping.md) | Realms & Yggdrasil: host/hub tags and topology-aware grouping | accepted | 2026-06-27 |
+| [0011](0011-mimir-metrics-history-and-openmetrics-export.md) | Mímir: metrics history and OpenMetrics export | accepted | 2026-06-27 |
+| [0012](0012-gjallarhorn-alerting-and-notifications.md) | Gjallarhorn: alerting and notifications | accepted | 2026-06-27 |
 
 <!-- Add a row for each ADR as you create them -->

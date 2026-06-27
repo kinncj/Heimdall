@@ -1,7 +1,7 @@
 ---
 adr: "0009"
 title: "Ratatoskr: zeroconf service discovery"
-status: proposed
+status: accepted
 date: "2026-06-27"
 supersedes: null
 superseded_by: null
@@ -135,7 +135,7 @@ explicit `--hub`. The hub never dials daemons; optional `_heimdall-daemon._tcp`
 advertisement is visibility-only. Token + TLS enrollment trust is never bypassed by
 auto-connect. The one new dependency is a pure-Go mDNS library.
 
-Status: **proposed**
+Status: **accepted**
 
 ## 8. Next Steps
 

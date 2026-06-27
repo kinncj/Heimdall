@@ -1,7 +1,7 @@
 ---
 adr: "0011"
 title: "Mímir: metrics history and OpenMetrics export"
-status: proposed
+status: accepted
 date: "2026-06-27"
 supersedes: null
 superseded_by: null
@@ -122,7 +122,7 @@ origin hub, and effective tags. No TSDB dependency is introduced; in-memory hist
 is lost on restart by design and recovers via keyframe. Durable long-term storage
 stays a v2 concern served by adding a TSDB sink as another bus subscriber.
 
-Status: **proposed**
+Status: **accepted**
 
 ## 8. Next Steps
 
