@@ -5,6 +5,14 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-06-27
+
+### Added
+- The dashboard can auto-discover its hub over mDNS: `heimdall-dashboard --hub auto`
+  (or `--discover`, with `--discover-seed` for overlay networks) — the same Ratatoskr
+  discovery the daemon uses. Discovery only resolves the address; the enrollment token
+  and TLS still gate the connection.
+
 ## [1.2.1] - 2026-06-27
 
 ### Fixed
@@ -180,6 +188,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.2.2]: https://github.com/kinncj/Heimdall/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/kinncj/Heimdall/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/kinncj/Heimdall/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/kinncj/Heimdall/compare/v1.1.0...v1.1.1
