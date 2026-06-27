@@ -19,6 +19,7 @@ type spec struct {
 	gpu, pwr             float64
 	hasGPU, hasPower     bool
 	lastSeenAgo          time.Duration // offset from now -> drives intended state
+	hub, env, role       string        // Realms/Yggdrasil: origin hub + tags
 }
 
 // Source is a live fake fleet. Tick re-observes every host (with jitter) at its
@@ -33,19 +34,21 @@ func New(now time.Time) *Source {
 	s := &Source{
 		reg: domain.NewHostRegistry(10*time.Second, 30*time.Second),
 		specs: []spec{
-			{"workstation", "linux", "amd64", "tower", 42, 68, 55, 61, 0, 0, false, false, 0},
-			{"dgx-spark", "linux", "arm64", "dgx-spark", 91, 74, 40, 71, 91, 142, true, true, 0},
-			{"strix-halo", "linux", "amd64", "hp", 55, 50, 33, 58, 0, 0, false, true, 0},
-			{"mac-mini", "darwin", "arm64", "mac", 38, 45, 60, 49, 38, 22, true, false, 12 * time.Second},
-			{"rpi-5", "linux", "arm64", "pi", 22, 30, 70, 55, 0, 0, false, false, 0},
-			{"alienware", "windows", "amd64", "alien", 77, 80, 48, 68, 77, 96, true, true, 0},
-			{"edge-cloud", "linux", "amd64", "cloud", 30, 41, 52, 60, 0, 0, false, false, 45 * time.Second},
+			{"workstation", "linux", "amd64", "tower", 42, 68, 55, 61, 0, 0, false, false, 0, "home", "prod", "server"},
+			{"dgx-spark", "linux", "arm64", "dgx-spark", 91, 74, 40, 71, 91, 142, true, true, 0, "home", "prod", "gpu"},
+			{"strix-halo", "linux", "amd64", "hp", 55, 50, 33, 58, 0, 0, false, true, 0, "home", "dev", "server"},
+			{"mac-mini", "darwin", "arm64", "mac", 38, 45, 60, 49, 38, 22, true, false, 12 * time.Second, "remote-work-station", "dev", "workstation"},
+			{"rpi-5", "linux", "arm64", "pi", 22, 30, 70, 55, 0, 0, false, false, 0, "home", "dev", "edge"},
+			{"alienware", "windows", "amd64", "alien", 77, 80, 48, 68, 77, 96, true, true, 0, "remote-work-station", "prod", "workstation"},
+			{"edge-cloud", "linux", "amd64", "cloud", 30, 41, 52, 60, 0, 0, false, false, 45 * time.Second, "central", "prod", "edge"},
 		},
 	}
 	for _, h := range s.specs {
 		s.reg.Enroll(domain.Host{
 			ID: domain.HostID(h.id), Hostname: h.id, DisplayName: h.id,
-			Context: domain.HostContext{OS: h.os, Arch: h.arch, Labels: map[string]string{"class": h.class}},
+			Context: domain.HostContext{OS: h.os, Arch: h.arch, Labels: map[string]string{
+				"class": h.class, "hub": h.hub, "env": h.env, "role": h.role,
+			}},
 		}, now.Add(-time.Minute))
 	}
 	s.Tick(now)
@@ -66,6 +69,13 @@ func (s *Source) Tick(now time.Time) {
 		}
 		h.mem = walk(h.mem, 2)
 		s.reg.Observe(domain.HostID(h.id), metricsFor(h), nil, now.Add(-h.lastSeenAgo))
+		// Simulate Gjallarhorn: a host running hot raises an alert, so the badge
+		// and alert count are visible in --demo without a hub or rules file.
+		var alerts []string
+		if h.cpu > 85 {
+			alerts = []string{"cpu.util>85"}
+		}
+		s.reg.SetAlerts(domain.HostID(h.id), alerts)
 	}
 	s.reg.Evaluate(now)
 }
