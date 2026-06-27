@@ -51,6 +51,8 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	}
 	// Linux privileged sources (RAPL power, hwmon temps); no-op off Linux.
 	out = mergeByName(out, linuxPrivileged(ctx))
+	// Windows privileged sources (WMI thermal zones); no-op off Windows.
+	out = mergeByName(out, windowsPrivileged(ctx))
 	if text, err := runNvidiaSMI(ctx); err == nil {
 		out = mergeByName(out, parseNvidiaSMI(text))
 	}
