@@ -57,6 +57,22 @@ func TestFilterNarrowsByTagAndName(t *testing.T) {
 	}
 }
 
+func TestOSGroupingReadsHostOSMetric(t *testing.T) {
+	// The dashboard gets OS only as the host.os metric (Context.OS is empty over
+	// the wire), so grouping must read the metric, not Context.
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	now := time.Unix(1_700_000_000, 0)
+	reg.Enroll(domain.Host{ID: "m", DisplayName: "m"}, now)
+	reg.Observe("m", []domain.Metric{
+		{Name: "host.os", Unit: "info", Status: domain.StatusOK, Detail: "darwin 27.0"},
+		{Name: "cpu.util", Status: domain.StatusOK, Gauge: 5},
+	}, nil, now)
+	m := Model{reg: reg, groupBy: 2} // dim 2 == os
+	if _, groups := m.orderedHosts(); len(groups) != 1 || groups[0] != "darwin" {
+		t.Fatalf("os group = %v, want [darwin]", groups)
+	}
+}
+
 func TestAlertCount(t *testing.T) {
 	if n := alertCount(seed(t).Hosts()); n != 1 {
 		t.Fatalf("alertCount = %d, want 1", n)

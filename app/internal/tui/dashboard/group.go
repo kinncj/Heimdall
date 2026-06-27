@@ -22,12 +22,7 @@ type groupDim struct {
 func (m Model) dimensions(hosts []domain.HostView) []groupDim {
 	dims := []groupDim{
 		{"hub", func(h domain.HostView) string { return labelOr(h, "hub", "(no hub)") }},
-		{"os", func(h domain.HostView) string {
-			if h.Host.Context.OS != "" {
-				return h.Host.Context.OS
-			}
-			return "(unknown)"
-		}},
+		{"os", osOf},
 	}
 	seen := map[string]bool{"hub": true}
 	var keys []string
@@ -45,6 +40,24 @@ func (m Model) dimensions(hosts []domain.HostView) []groupDim {
 		dims = append(dims, groupDim{k, func(h domain.HostView) string { return labelOr(h, k, "(no "+k+")") }})
 	}
 	return dims
+}
+
+// osOf derives a host's OS family for grouping. The dashboard receives OS only
+// as the host.os inventory metric (e.g. "darwin 27.0") — Context.OS is empty
+// over the wire — so read the metric first (family = first token) and fall back
+// to Context.OS (set in --demo) before "(unknown)".
+func osOf(h domain.HostView) string {
+	for _, m := range h.LastSnapshot {
+		if m.Name == "host.os" && m.Detail != "" {
+			if f := strings.Fields(m.Detail); len(f) > 0 {
+				return f[0]
+			}
+		}
+	}
+	if h.Host.Context.OS != "" {
+		return h.Host.Context.OS
+	}
+	return "(unknown)"
 }
 
 func labelOr(h domain.HostView, key, fallback string) string {

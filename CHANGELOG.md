@@ -5,6 +5,14 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-06-27
+
+### Fixed
+- Dashboard *group by OS* showed every host as `(unknown)` on real data. The
+  dashboard only receives OS as the `host.os` metric (not in `Context`, which
+  never crosses the wire), so grouping now reads the metric's OS family and falls
+  back to `Context.OS` (how `--demo` carries it).
+
 ## [1.3.0] - 2026-06-27
 
 ### Added
@@ -211,6 +219,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.3.1]: https://github.com/kinncj/Heimdall/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/kinncj/Heimdall/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/kinncj/Heimdall/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/kinncj/Heimdall/compare/v1.2.0...v1.2.1
