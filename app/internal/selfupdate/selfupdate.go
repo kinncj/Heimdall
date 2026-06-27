@@ -10,15 +10,22 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 )
+
+// elevatedEnv marks a re-run that already holds elevated privileges, so the
+// elevation path never recurses into itself.
+const elevatedEnv = "HEIMDALL_SELFUPDATE_ELEVATED"
 
 // Repo is the owner/name queried for releases; override with $HEIMDALL_REPO.
 func repo() string {
@@ -84,10 +91,60 @@ func Run(binary, current string) error {
 		return fmt.Errorf("checksum mismatch for %s: got %s want %s", asset, got, want)
 	}
 	if err := replaceSelf(bin); err != nil {
+		// A read-only install dir (e.g. /usr/local/bin) needs elevation. Re-run
+		// the update with privileges once; the elevated process has write access.
+		if needsElevation(err) && os.Getenv(elevatedEnv) != "1" {
+			fmt.Printf("heimdall-%s: %s is not writable; elevating to update...\n", binary, filepath.Dir(mustExe()))
+			return reexecElevated()
+		}
 		return err
 	}
 	fmt.Printf("heimdall-%s updated to %s\n", binary, tag)
 	return nil
+}
+
+// needsElevation reports whether err is a permission error that re-running with
+// elevated privileges could resolve.
+func needsElevation(err error) bool { return errors.Is(err, fs.ErrPermission) }
+
+// elevationCommand re-runs "<this binary> update" with elevated privileges for
+// the current OS: sudo on Linux/macOS, a UAC prompt on Windows.
+func elevationCommand() (*exec.Cmd, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	switch runtime.GOOS {
+	case "windows":
+		ps := fmt.Sprintf("Start-Process -FilePath %q -ArgumentList 'update' -Verb RunAs -Wait", exe)
+		return exec.Command("powershell", "-NoProfile", "-Command", ps), nil
+	default:
+		sudo, err := exec.LookPath("sudo")
+		if err != nil {
+			return nil, fmt.Errorf("updating %s needs elevated privileges, but sudo was not found", exe)
+		}
+		return exec.Command(sudo, exe, "update"), nil
+	}
+}
+
+// reexecElevated runs the elevation command wired to the terminal so sudo/UAC can
+// prompt, marking the child so it does not try to elevate again.
+func reexecElevated() error {
+	cmd, err := elevationCommand()
+	if err != nil {
+		return err
+	}
+	cmd.Env = append(os.Environ(), elevatedEnv+"=1")
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	return cmd.Run()
+}
+
+func mustExe() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return "the install directory"
+	}
+	return exe
 }
 
 func latestTag() (string, error) {

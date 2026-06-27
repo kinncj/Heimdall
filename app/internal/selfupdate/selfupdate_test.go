@@ -4,9 +4,38 @@
 package selfupdate
 
 import (
+	"errors"
+	"fmt"
+	"io/fs"
 	"runtime"
+	"strings"
 	"testing"
 )
+
+func TestNeedsElevationDetectsPermission(t *testing.T) {
+	if !needsElevation(fmt.Errorf("cannot write: %w", fs.ErrPermission)) {
+		t.Error("a wrapped permission error should need elevation")
+	}
+	if needsElevation(errors.New("network down")) {
+		t.Error("a non-permission error should not need elevation")
+	}
+}
+
+func TestElevationCommandUsesSudoOnUnix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix only")
+	}
+	cmd, err := elevationCommand()
+	if err != nil {
+		t.Skipf("sudo not available in this environment: %v", err)
+	}
+	if !strings.Contains(cmd.Path, "sudo") {
+		t.Errorf("elevation should go through sudo, got %q", cmd.Path)
+	}
+	if !strings.Contains(strings.Join(cmd.Args, " "), "update") {
+		t.Errorf("elevation should re-run the update subcommand, got %v", cmd.Args)
+	}
+}
 
 func TestAssetNameMatchesReleaseNaming(t *testing.T) {
 	got := assetName("daemon")
