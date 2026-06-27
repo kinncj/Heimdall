@@ -98,8 +98,9 @@ Full docs live in **[`docs/`](docs/README.md)**.
 ## Install
 
 Prebuilt binaries are published to [GitHub Releases](https://github.com/kinncj/Heimdall/releases)
-for Linux/macOS × amd64/arm64 (Windows assets too). Install only what each machine needs —
-`heimdall-hub` + `heimdall-dashboard` on the station, `heimdall-daemon` on each host:
+for Linux/macOS/Windows × amd64/arm64. Install only what each machine needs —
+`heimdall-hub` + `heimdall-dashboard` on the station, `heimdall-daemon` on each host. Binaries go
+to the system bin dir (`/usr/local/bin`) by default; pass `--install-location <dir>` to change it.
 
 ```sh
 # Dashboard (on the monitoring station)
@@ -107,10 +108,16 @@ curl -fsSL https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/instal
 
 # Daemon (on each host)
 curl -fsSL https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/install.sh | sh -s -- daemon
+
+# A user-local dir instead of /usr/local/bin
+curl -fsSL .../scripts/install.sh | sh -s -- --install-location ~/.local/bin daemon
 ```
 
-Or build from source (`make build-tui`). See **[Installation](docs/installation.md)** for
-version pinning, install dirs, `go install`, and Windows.
+On Windows, use [`install.ps1`](scripts/install.ps1): `irm https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/install.ps1 | iex`.
+
+Already installed? Each binary self-updates: `heimdall-dashboard update`. Check a build with
+`heimdall-<binary> --version`. Or build from source (`make build-tui`). See
+**[Installation](docs/installation.md)** for version pinning, `go install`, and more.
 
 ## Build & test from source
 

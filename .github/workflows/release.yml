@@ -82,3 +82,5 @@ jobs:
           files: |
             dist/heimdall-*
             dist/SHA256SUMS
+            scripts/install.sh
+            scripts/install.ps1
