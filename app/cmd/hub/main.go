@@ -101,7 +101,17 @@ func main() {
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 		<-sig
 		fmt.Fprintln(os.Stderr, "heimdall-hub: shutting down")
-		srv.GracefulStop()
+		// The metric-stream and subscribe RPCs are long-lived and never return on
+		// their own, so GracefulStop blocks for as long as any daemon or dashboard
+		// stays connected. Give in-flight work a brief grace period, then force
+		// every stream closed so the hub always exits — connected or not.
+		stopped := make(chan struct{})
+		go func() { srv.GracefulStop(); close(stopped) }()
+		select {
+		case <-stopped:
+		case <-time.After(2 * time.Second):
+			srv.Stop()
+		}
 	}()
 
 	fmt.Fprintf(os.Stderr, "heimdall-hub: id=%s listening on %s (tls=%t, auth=%t)\n",
