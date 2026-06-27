@@ -4,6 +4,17 @@
 # Usage: a11y-gate.sh <story_file1> [story_file2 ...]
 set -euo pipefail
 
+# Web a11y audits (axe-core/pa11y) target a rendered DOM. For terminal UIs
+# (design.target: tui) there is no DOM to audit — terminal accessibility is a
+# manual checklist — so the web a11y JSON requirement is not enforced here.
+TARGET=$(grep -A4 '^design:' project.config.yaml 2>/dev/null \
+  | grep -E '^[[:space:]]*target:' | head -1 \
+  | sed -E 's/.*target:[[:space:]]*//; s/[[:space:]]*#.*//; s/[[:space:]]*$//')
+if [ "${TARGET:-}" = "tui" ]; then
+  echo "[a11y-gate] SKIP  design.target=tui — web a11y audit not applicable to a terminal UI"
+  exit 0
+fi
+
 FAIL=0
 
 for file in "$@"; do
