@@ -53,6 +53,20 @@ func orDash(s string) string {
 	return s
 }
 
+// pickMetric returns the first OK metric among keys; if none are OK it returns
+// the first key's metric (possibly absent/non-OK) for the affordance. This lets
+// a row fall back from a package-level signal to a device-level one — e.g. POWER
+// from power.pkg to power.gpu, or TEMP from temp.pkg to gpu.temp — on a host
+// that only exposes the GPU's figures.
+func pickMetric(byName map[string]domain.Metric, keys ...string) domain.Metric {
+	for _, k := range keys {
+		if mm, ok := byName[k]; ok && mm.Status == domain.StatusOK {
+			return mm
+		}
+	}
+	return byName[keys[0]]
+}
+
 // DetailView renders the per-host drilldown: identity, context, and each metric
 // as a wide gauge + value + trend sparkline.
 func (m Model) DetailView() string {
@@ -106,13 +120,21 @@ func (m Model) DetailView() string {
 		sparkW = 12
 	}
 
-	for _, d := range []struct{ key, lab, unit string }{
-		{"cpu.util", "CPU", "%"}, {"mem.used", "MEM", "%"}, {"disk.used", "DISK", "%"},
-		{"gpu.util", "GPU", "%"}, {"power.pkg", "POWER", "W"}, {"temp.pkg", "TEMP", "°C"},
+	for _, d := range []struct {
+		keys      []string
+		lab, unit string
+	}{
+		{[]string{"cpu.util"}, "CPU", "%"},
+		{[]string{"mem.used"}, "MEM", "%"},
+		{[]string{"disk.used"}, "DISK", "%"},
+		{[]string{"gpu.util"}, "GPU", "%"},
+		{[]string{"gpu.vram"}, "VRAM", "%"},
+		{[]string{"power.pkg", "power.gpu"}, "POWER", "W"},
+		{[]string{"temp.pkg", "gpu.temp"}, "TEMP", "°C"},
 	} {
 		lab := label.Style().Render(fmt.Sprintf("  %-6s", d.lab))
-		mm, ok := byName[d.key]
-		if !ok || mm.Status != domain.StatusOK {
+		mm := pickMetric(byName, d.keys...)
+		if mm.Status != domain.StatusOK {
 			b.WriteString(lab + "  " + m.nonOK(mm) + "\n")
 			continue
 		}
@@ -120,7 +142,7 @@ func (m Model) DetailView() string {
 		value := val.Style().Render(fmt.Sprintf("%5.0f%s", mm.Gauge, d.unit))
 		spark := ""
 		if hist != nil {
-			spark = render.Sparkline(m.mode, hist[d.key], sparkW)
+			spark = render.Sparkline(m.mode, hist[mm.Name], sparkW)
 		}
 		b.WriteString(lab + "  " + gauge + " " + value + "   " + spark + "\n")
 	}

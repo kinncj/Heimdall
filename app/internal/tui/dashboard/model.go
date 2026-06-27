@@ -198,9 +198,9 @@ func (m Model) row(h domain.HostView, selected bool) string {
 		" " + m.pct(byName["cpu.util"]) +
 		" " + m.pct(byName["mem.used"]) +
 		" " + m.pct(byName["disk.used"]) +
-		" " + m.temp(byName["temp.pkg"]) +
+		" " + m.temp(pickMetric(byName, "temp.pkg", "gpu.temp")) +
 		" " + m.plain(byName["gpu.util"], "%") +
-		" " + m.plain(byName["power.pkg"], "W")
+		" " + m.plain(pickMetric(byName, "power.pkg", "power.gpu"), "W")
 
 	if selected {
 		sel, _ := m.mode.Role("selection")
