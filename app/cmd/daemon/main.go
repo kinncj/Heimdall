@@ -50,24 +50,11 @@ func main() {
 		}
 		return
 	}
-	hubAddr := flag.String("hub", "", "hub address to stream to (e.g. localhost:9090); empty prints locally")
-	name := flag.String("name", "", "host display name (default: hostname)")
-	interval := flag.Duration("interval", 2*time.Second, "sample interval")
-	once := flag.Bool("once", false, "collect a single sample and exit (print mode)")
-	asJSON := flag.Bool("json", false, "emit one JSON object per metric (print mode)")
-	token := flag.String("token", os.Getenv("HEIMDALL_TOKEN"), "enrollment token presented to the hub (env HEIMDALL_TOKEN)")
-	useTLS := flag.Bool("tls", false, "connect to the hub over TLS")
-	tlsCA := flag.String("tls-ca", "", "PEM CA bundle to trust (default: system roots)")
-	tlsServerName := flag.String("tls-server-name", "", "override the server name verified in the hub certificate")
-	tlsInsecure := flag.Bool("tls-insecure", false, "skip hub certificate verification (dev only)")
-	controlListen := flag.String("control-listen", "", "serve the read-only control plane on this address (e.g. :9100)")
-	controlToken := flag.String("control-token", os.Getenv("HEIMDALL_CONTROL_TOKEN"), "token required to invoke control commands (env HEIMDALL_CONTROL_TOKEN)")
-	controlTLSCert := flag.String("control-tls-cert", "", "PEM server cert for the control plane (enables TLS with --control-tls-key)")
-	controlTLSKey := flag.String("control-tls-key", "", "PEM server key for the control plane")
-	logSource := flag.String("log-source", "", "opt-in log sources alias=path,alias2=path2 (served on --control-listen; empty = logs off)")
-	logFile := flag.String("log-file", "", "operational log destination: unset = stderr (TTY); 'false' = disabled; a path = JSON logs appended to that file")
-	pingTarget := flag.String("ping-target", "1.1.1.1", "internet host pinged for reachability/latency (net.latency)")
 	showVersion := flag.Bool("version", false, "print version and exit")
+	once := flag.Bool("once", false, "collect a single sample and exit (print mode; not saved)")
+	printLocal := flag.Bool("print", false, "print samples locally instead of streaming (not saved)")
+	cat := daemonCatalog()
+	cat.Register(flag.CommandLine)
 	flag.Usage = usage
 	flag.Parse()
 	if *showVersion {
@@ -75,7 +62,9 @@ func main() {
 		return
 	}
 
-	lg, metricsW, metricsJSON, closeLog, err := resolveOutput(*logFile, *asJSON)
+	cfg := resolveDaemon(cat)
+
+	lg, metricsW, metricsJSON, closeLog, err := resolveOutput(cfg.Text("log-file"), cfg.Toggle("json"))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "heimdall-daemon:", err)
 		os.Exit(1)
@@ -83,7 +72,7 @@ func main() {
 	defer closeLog()
 	logger = lg
 
-	host := *name
+	host := cfg.Text("name")
 	if host == "" {
 		if h, err := os.Hostname(); err == nil && h != "" {
 			host = h
@@ -92,32 +81,36 @@ func main() {
 		}
 	}
 
-	reg := domain.NewRegistry(*interval)
-	for _, a := range adapters.Build(adapters.Options{PingTarget: *pingTarget, Version: version}) {
+	interval := cfg.Span("interval", 2*time.Second)
+	reg := domain.NewRegistry(interval)
+	for _, a := range adapters.Build(adapters.Options{PingTarget: cfg.Text("ping-target"), Version: version}) {
 		reg.Register(a)
 	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
-	if *controlListen != "" {
-		sources, err := logs.ParseSources(*logSource)
+	if controlAddr := cfg.Text("control-listen"); controlAddr != "" {
+		sources, err := logs.ParseSources(cfg.Text("log-source"))
 		if err != nil {
 			fatal("invalid --log-source", err)
 		}
-		if err := startControlServer(*controlListen, *controlToken, *controlTLSCert, *controlTLSKey, host, sources); err != nil {
+		if err := startControlServer(controlAddr, cfg.Secret("control-token").Reveal(),
+			cfg.Text("control-tls-cert"), cfg.Text("control-tls-key"), host, sources); err != nil {
 			fatal("control plane failed to start", err)
 		}
 	}
 
-	if *hubAddr != "" {
-		dialOpts, err := clientDialOptions(*token, secure.ClientConfig{
-			Enabled: *useTLS, CAFile: *tlsCA, ServerName: *tlsServerName, SkipVerify: *tlsInsecure,
+	hubAddr := cfg.Address("hub")
+	if !*printLocal && !*once && !hubAddr.IsEmpty() {
+		dialOpts, err := clientDialOptions(cfg.Secret("token").Reveal(), secure.ClientConfig{
+			Enabled: cfg.Toggle("tls"), CAFile: cfg.Text("tls-ca"),
+			ServerName: cfg.Text("tls-server-name"), SkipVerify: cfg.Toggle("tls-insecure"),
 		})
 		if err != nil {
 			fatal("invalid client TLS configuration", err)
 		}
-		streamToHub(*hubAddr, host, *interval, reg, sig, dialOpts)
+		streamToHub(hubAddr.String(), host, interval, reg, sig, dialOpts)
 		return
 	}
 
@@ -128,7 +121,7 @@ func main() {
 	}
 	logger.Info("daemon started",
 		"host", host, "os", runtime.GOOS, "arch", runtime.GOARCH, "interval", interval.String())
-	t := time.NewTicker(*interval)
+	t := time.NewTicker(interval)
 	defer t.Stop()
 	sample()
 	for {

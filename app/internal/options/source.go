@@ -60,3 +60,17 @@ func FromFlags(catalog Catalog, set *flag.FlagSet) Source {
 
 // AnyProvided reports whether the user set at least one flag.
 func AnyProvided(set *flag.FlagSet) bool { return set.NFlag() > 0 }
+
+// Provided reports whether the user explicitly set any flag backed by the
+// catalog — i.e. a real setting, ignoring action flags like --once or --version.
+func Provided(catalog Catalog, set *flag.FlagSet) bool {
+	provided := make(map[string]bool)
+	set.Visit(func(f *flag.Flag) { provided[f.Name] = true })
+	got := false
+	catalog.Each(func(o Option) {
+		if provided[o.FlagName()] {
+			got = true
+		}
+	})
+	return got
+}
