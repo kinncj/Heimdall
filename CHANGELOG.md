@@ -5,6 +5,17 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-27
+
+### Added
+- **Arch Linux packages on the AUR.** The release workflow now publishes each
+  binary as a prebuilt (`-bin`) AUR package, so Arch users install with
+  `paru -S heimdall-dashboard-bin` (and `heimdall-hub-bin`, `heimdall-daemon-bin`,
+  `heimdall-helper-bin`). PKGBUILDs are generated per release from the published
+  checksums (`packaging/aur/gen-pkgbuild.sh`); the publish step is gated behind the
+  `ENABLE_AUR` repo variable. Packages cover `x86_64` and `aarch64`, and the daemon
+  declares the helper as an optional dependency.
+
 ## [1.4.0] - 2026-06-27
 
 ### Added
@@ -234,6 +245,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.5.0]: https://github.com/kinncj/Heimdall/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/kinncj/Heimdall/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/kinncj/Heimdall/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/kinncj/Heimdall/compare/v1.2.2...v1.3.0

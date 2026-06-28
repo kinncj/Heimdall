@@ -84,3 +84,35 @@ jobs:
             dist/SHA256SUMS
             scripts/install.sh
             scripts/install.ps1
+
+  aur:
+    name: Publish ${{ matrix.component }}-bin to AUR
+    runs-on: ubuntu-latest
+    needs: [publish]
+    # Inert until you opt in: set repo variable ENABLE_AUR=true and add the
+    # AUR_SSH_PRIVATE_KEY secret. See packaging/aur/README.md for the one-time setup.
+    if: vars.ENABLE_AUR == 'true' && !github.event.release.prerelease
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [hub, dashboard, daemon, helper]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Generate ${{ matrix.component }}-bin PKGBUILD
+        env:
+          VERSION: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          curl -fsSL "https://github.com/${REPO}/releases/download/${VERSION}/SHA256SUMS" -o SHA256SUMS
+          SUMS=SHA256SUMS OUT=aur-out COMPONENTS="${{ matrix.component }}" \
+            bash packaging/aur/gen-pkgbuild.sh
+      - name: Publish to the AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
+        with:
+          pkgname: heimdall-${{ matrix.component }}-bin
+          pkgbuild: aur-out/heimdall-${{ matrix.component }}-bin/PKGBUILD
+          commit_username: ${{ github.actor }}
+          commit_email: kinncj@gmail.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update heimdall-${{ matrix.component }}-bin to ${{ github.ref_name }}"
+          ssh_keyscan_types: rsa,ed25519
