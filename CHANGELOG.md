@@ -7,6 +7,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Documentation
+- **Run-as-a-service guide** — the Privileged Metrics guide now has a complete
+  systemd setup (helper as root, daemon as your user) using a shared `heimdall`
+  group and a `/run/heimdall` socket, matching the v2 `0660` helper socket. The
+  fleet guide cross-links it.
+
 ### Added
 - **`--no-save` / `--ephemeral`** on every binary — run with the given flags but
   leave the config file untouched, so a one-off (e.g. `heimdall-hub --listen

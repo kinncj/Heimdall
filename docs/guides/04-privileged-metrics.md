@@ -58,21 +58,110 @@ sudo ./bin/heimdall-helper &                 # serves RAPL power + hwmon temp
 ## Option B — the privileged helper
 
 Run `heimdall-helper` as root on a host; it serves privileged readings to the
-**unprivileged** daemon over a local unix socket. The daemon auto-detects the
-socket — no daemon flag needed.
+**unprivileged** daemon over a local unix socket. To try it in a shell, run both as
+the **same user** (e.g. both under `sudo`, or both as you) and the daemon
+auto-detects the socket — no daemon flag needed:
 
 ```sh
 sudo ./bin/heimdall-helper &                 # serves privileged metrics locally
-./bin/heimdall-daemon --hub localhost:9090   # auto-detects the socket
+./bin/heimdall-daemon --hub localhost:9090   # auto-detects /tmp/heimdall-helper.sock
 ```
+
+The helper's socket is `0660` (owner + group only — never world-readable, since it
+also runs delegated privileged commands). So when the **helper runs as root and the
+daemon as your user** — the normal service layout — they must share a group and a
+socket path. That's the setup below.
 
 ### Why a helper instead of `sudo heimdall-daemon`?
 
 Privilege isolation. The daemon — which talks to the network — stays unprivileged.
 Only the small, local, **read-only** helper holds root. The daemon sends the helper
-nothing and cannot influence what it collects, so there is no argument-injection or
-command-execution surface. Power is presented read-only; the dashboard offers no
-control to change a power profile.
+nothing it can't validate, and the helper enforces its **own** allow-list — so there
+is no argument-injection surface, and a delegated command runs only if the helper
+itself permits it. Power is presented read-only; the dashboard offers no control to
+change a power profile.
+
+### Run both as systemd services (helper root, daemon as you)
+
+The robust layout for an always-on host: the **helper as root**, the **daemon as
+your user**, talking over a socket in `/run/heimdall` that a shared `heimdall` group
+gates. Tested on CachyOS (Arch); works on any systemd distro.
+
+**1. Shared group** so your user can reach the root helper's `0660` socket:
+
+```sh
+sudo groupadd -f heimdall
+sudo usermod -aG heimdall "$USER"      # log out/in (or `newgrp heimdall`) to pick it up
+```
+
+**2. Helper unit** — `/etc/systemd/system/heimdall-helper.service`:
+
+```ini
+[Unit]
+Description=Heimdall privileged helper (power/GPU/thermal + delegated privileged commands)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=heimdall
+# systemd creates /run/heimdall as root:heimdall; 0710 lets the group traverse it.
+RuntimeDirectory=heimdall
+RuntimeDirectoryMode=0710
+ExecStart=/usr/bin/heimdall-helper --socket /run/heimdall/helper.sock
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`Group=heimdall` is the key line: it makes the socket the helper creates land as
+`root:heimdall 0660`, so the group — not the world — can talk to it.
+
+**3. Daemon unit** — `/etc/systemd/system/heimdall-daemon.service` (set `User=` and
+`--hub`):
+
+```ini
+[Unit]
+Description=Heimdall daemon (per-host metrics -> hub)
+Wants=network-online.target heimdall-helper.service
+After=network-online.target heimdall-helper.service
+
+[Service]
+Type=simple
+User=YOUR_USER
+SupplementaryGroups=heimdall
+Environment=HEIMDALL_HELPER_SOCKET=/run/heimdall/helper.sock
+ExecStart=/usr/bin/heimdall-daemon --hub YOUR_HUB:9090 --name %H --allow-commands --process-interval 5s
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`Wants=` (not `Requires=`) the helper, so the daemon still runs and reports
+unprivileged metrics if the helper is down. Drop `--allow-commands` if you don't
+want the on-demand command plane.
+
+**4. Enable & start** — helper first:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now heimdall-helper.service
+sudo systemctl enable --now heimdall-daemon.service
+
+ls -l /run/heimdall/helper.sock          # expect:  srw-rw---- root heimdall
+heimdall-cli --hub YOUR_HUB:9090 host "$(hostname)" \
+  | jq '{state, power: .metrics["power.pkg"], gpu: .metrics["gpu.util"]}'
+```
+
+If `power`/`gpu` show `needs-helper`, the daemon isn't reaching the socket — check
+that your user is in `heimdall` and that both units use the same socket path.
+
+> **Install via the AUR** on Arch/CachyOS: `paru -S heimdall-helper-bin
+> heimdall-daemon-bin heimdall-cli-bin` (binaries land in `/usr/bin`, with manpages).
 
 ## Option C — preview without root
 
@@ -91,10 +180,11 @@ without it.
 
 ## Helper flags
 
-| Flag | Meaning |
+| Flag / env | Meaning |
 |---|---|
-| `--socket <path>` | unix socket to serve on (daemon uses the same default) |
+| `--socket <path>` | unix socket the helper serves on (default `/tmp/heimdall-helper.sock`) |
 | `--demo` | serve canned sample metrics (no root needed; for trying the UI) |
+| `HEIMDALL_HELPER_SOCKET` | env the **daemon** reads to find the helper socket — set it to the helper's `--socket` path when they differ (e.g. the service layout above) |
 
 ## Next steps
 

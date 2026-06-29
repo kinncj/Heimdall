@@ -132,6 +132,13 @@ WantedBy=multi-user.target
 sudo systemctl enable --now heimdall-daemon
 ```
 
+**Pairing with the root helper** (power/GPU/full thermal): run the daemon as your
+user and the helper as root, sharing a `heimdall` group and a `/run/heimdall`
+socket. Add `SupplementaryGroups=heimdall` and
+`Environment=HEIMDALL_HELPER_SOCKET=/run/heimdall/helper.sock` to the daemon unit —
+the complete two-service setup is in
+[Privileged Metrics → Run both as systemd services](04-privileged-metrics.md#run-both-as-systemd-services-helper-root-daemon-as-you).
+
 **launchd (macOS)**: wrap the same command in a LaunchDaemon plist with
 `KeepAlive=true`.
 
