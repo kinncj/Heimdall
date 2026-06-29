@@ -21,6 +21,7 @@ const (
 	modalLogList           // pick a log source
 	modalLogView           // stream the chosen source
 	modalTop               // live process table
+	modalTopSort           // pick the top sort column (v2, ADR 0019)
 )
 
 // Reserved capability labels the hub/daemon set; never shown as user tags.
@@ -64,6 +65,10 @@ func hasProc(h domain.HostView) bool {
 // the universal back button, unwinding one level at a time.
 func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	h, ok := m.selectedHost()
+	// The log search input owns every key while open (so typing "q" searches).
+	if m.modal == modalLogView && m.logSearching {
+		return m.updateLogSearch(msg.String(), msg.Runes), nil
+	}
 	// Clamp a scroll offset that may be a "pin to tail" sentinel or stale after the
 	// buffer shrank, so up/down respond immediately.
 	if m.modal == modalLogView || m.modal == modalTop {
@@ -120,8 +125,14 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			m.logSearching = true
 		case "esc":
-			m.modal = modalLogList // back to the source list
+			if m.logQuery != "" {
+				m.logQuery = "" // first esc clears an active search
+			} else {
+				m.modal = modalLogList // then steps back to the source list
+			}
 		case "up", "k":
 			if m.modalScroll > 0 {
 				m.modalScroll--
@@ -137,6 +148,8 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "esc":
 			m.modal = modalNone
+		case "s":
+			m.modal, m.topSortSel = modalTopSort, m.activeTopSortIndex()
 		case "up", "k":
 			if m.modalScroll > 0 {
 				m.modalScroll--
@@ -145,6 +158,30 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.modalScroll < m.modalMaxScroll() {
 				m.modalScroll++
 			}
+		}
+	case modalTopSort:
+		opts := topSortOptions()
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.modal = modalTop
+		case "up", "k":
+			if m.topSortSel > 0 {
+				m.topSortSel--
+			}
+		case "down", "j":
+			if m.topSortSel < len(opts)-1 {
+				m.topSortSel++
+			}
+		case "enter":
+			if m.topSortSel < len(opts) {
+				m.topSort = opts[m.topSortSel].key
+				if m.persistSort != nil {
+					m.persistSort(m.topSort)
+				}
+			}
+			m.modal = modalTop
 		}
 	}
 	return m, nil
@@ -164,6 +201,7 @@ func (m Model) ModalView() string {
 	heading, _ := m.mode.Role("heading")
 	muted, _ := m.mode.Role("text_muted")
 	keys, _ := m.mode.Role("keybinding")
+	val, _ := m.mode.Role("value")
 
 	dn := h.Host.DisplayName
 	if dn == "" {
@@ -181,18 +219,34 @@ func (m Model) ModalView() string {
 			keys.Style().Render("esc") + muted.Style().Render(" back")
 	case modalLogView:
 		title = heading.Style().Render("  LOG — "+dn+" / ") + keys.Style().Render(m.logSource)
+		if q := m.logQuery; q != "" || m.logSearching {
+			if m.logSearching {
+				q += "▏"
+			}
+			title += muted.Style().Render("   search: ") + val.Style().Render(q)
+		}
 		body = m.logViewBody(h, w)
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" scroll  ") +
-			keys.Style().Render("esc") + muted.Style().Render(" sources")
+			keys.Style().Render("/") + muted.Style().Render(" search  ") +
+			keys.Style().Render("esc") + muted.Style().Render(" back")
 	case modalTop:
 		when := "—"
 		if !h.ProcessesAt.IsZero() {
 			when = h.ProcessesAt.Format("15:04:05")
 		}
-		title = heading.Style().Render("  TOP — "+dn) + muted.Style().Render("   updated "+when)
+		title = heading.Style().Render("  TOP — "+dn) +
+			muted.Style().Render("   sort ") + val.Style().Render(m.activeTopSort().key) +
+			muted.Style().Render("   updated "+when)
 		body = m.topBody(h, w)
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" scroll  ") +
+			keys.Style().Render("s") + muted.Style().Render(" sort  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" back")
+	case modalTopSort:
+		title = heading.Style().Render("  SORT — top processes")
+		body = m.topSortBody()
+		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" pick  ") +
+			keys.Style().Render("⏎") + muted.Style().Render(" apply  ") +
+			keys.Style().Render("esc") + muted.Style().Render(" cancel")
 	default:
 		return m.DetailView()
 	}
@@ -230,7 +284,7 @@ func (m Model) logViewBody(h domain.HostView, w int) []string {
 	al, _ := m.mode.State("error")
 	var out []string
 	for _, l := range h.Logs {
-		if l.Source != m.logSource {
+		if l.Source != m.logSource || !m.matchesLogQuery(l) {
 			continue
 		}
 		ts := muted.Style().Render(l.At.Format("15:04:05"))
@@ -241,7 +295,11 @@ func (m Model) logViewBody(h domain.HostView, w int) []string {
 		out = append(out, "  "+ts+"  "+val.Style().Render(clip(line, w-13)))
 	}
 	if len(out) == 0 {
-		out = append(out, muted.Style().Render("  waiting for lines…"))
+		msg := "  waiting for lines…"
+		if strings.TrimSpace(m.logQuery) != "" {
+			msg = "  no lines match the search"
+		}
+		out = append(out, muted.Style().Render(msg))
 	}
 	return out
 }
@@ -254,7 +312,7 @@ func (m Model) topBody(h domain.HostView, w int) []string {
 	if len(h.Processes) == 0 {
 		return append(out, muted.Style().Render("  waiting for a process table…"))
 	}
-	for _, p := range h.Processes {
+	for _, p := range m.sortedProcesses(h) {
 		out = append(out, val.Style().Render(fmt.Sprintf("  %7d %7d %5.1f%% %5.1f%%  %s",
 			p.PID, p.PPID, p.CPUPct, p.MemPct, clip(p.Command, w-38))))
 	}
@@ -272,7 +330,7 @@ func (m Model) modalMaxScroll() int {
 	switch m.modal {
 	case modalLogView:
 		for _, l := range h.Logs {
-			if l.Source == m.logSource {
+			if l.Source == m.logSource && m.matchesLogQuery(l) {
 				bodyLen++
 			}
 		}

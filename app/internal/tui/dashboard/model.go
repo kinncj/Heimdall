@@ -36,10 +36,29 @@ type Model struct {
 	filter        string // active filter query
 	filtering     bool   // true while the filter input is open
 	// Heimdallr's sight (ADR 0017): host-detail observability overlays.
-	modal       modalKind // active overlay (none / log list / log view / top)
+	modal       modalKind // active overlay (none / log list / log view / top / sort)
 	modalSel    int       // selection index in the log-source list
 	modalScroll int       // scroll offset in the log/top view
 	logSource   string    // chosen log source in the log view
+	// v2 (ADR 0019): log search + top sorting.
+	topSort      string       // active top sort key ("" = cpu default)
+	topSortSel   int          // selection index in the sort picker
+	logQuery     string       // log-view search query
+	logSearching bool         // true while the log search input is open
+	persistSort  func(string) // persist the chosen top sort to config (injected)
+}
+
+// WithTopSort sets the initial top-modal sort key (the persisted default).
+func (m Model) WithTopSort(key string) Model {
+	m.topSort = key
+	return m
+}
+
+// WithPersistSort injects the callback that persists a chosen top sort to the
+// dashboard config, so the choice becomes the default on next launch.
+func (m Model) WithPersistSort(fn func(string)) Model {
+	m.persistSort = fn
+	return m
 }
 
 type tickMsg time.Time

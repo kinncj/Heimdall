@@ -121,7 +121,8 @@ func main() {
 		}
 	}
 
-	model := dashboard.New(md, reg, now).WithStatus(source, live)
+	model := dashboard.New(md, reg, now).WithStatus(source, live).
+		WithTopSort(cfg.Text("top-sort")).WithPersistSort(saveTopSort)
 	if tickFn != nil {
 		model = model.WithTick(tickFn)
 	}
