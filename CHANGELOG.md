@@ -5,6 +5,20 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-06-29
+
+### Fixed
+- **Dashboard grid clipped on narrow terminals.** The fleet grid forced content
+  to ≥ 88 columns and rendered fixed-width columns, so on a narrow screen
+  (portrait tablet/phone over SSH) rows were clipped at the right edge and the
+  chrome borders fell off-screen. The grid is responsive now: it renders at the
+  actual terminal width, drops metric columns right-to-left as it narrows
+  (power → gpu → temp → disk → mem, keeping host, state, and CPU longest),
+  condenses the state badge to a glyph when very narrow, and falls back to a
+  glyph-only footer. No rendered line exceeds the terminal width. Columns are a
+  registry (mirroring the grouping dimensions), so adding one is registering a
+  column, not editing a width conditional.
+
 ## [1.5.1] - 2026-06-28
 
 ### Fixed
@@ -266,6 +280,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.5.2]: https://github.com/kinncj/Heimdall/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/kinncj/Heimdall/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/kinncj/Heimdall/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/kinncj/Heimdall/compare/v1.3.1...v1.4.0

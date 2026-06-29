@@ -175,26 +175,17 @@ func (m Model) GridView() string {
 		}
 	}
 	w := m.width
-	if w < 88 {
-		w = 88
+	if w < 24 {
+		w = 24
 	}
 	clock := m.now.Format("15:04:05")
 
 	header := brand.SkinnyHeader(m.mode, w, online, len(all), clock)
-	legend, _ := m.mode.Role("label")
-	cols := legend.Style().Render(fmt.Sprintf("  %-16s %-13s %-14s %-14s %-14s %-7s %-6s %-6s",
-		"HOST", "STATE", "CPU", "MEM", "DISK", "TEMP", "GPU", "PWR"))
+	lay := m.layout(w)
+	cols := m.colsHeader(lay)
 
 	status := brand.StatusBar(m.mode, w, m.live != nil && m.live(), m.source, clock)
-	foot, _ := m.mode.Role("text_muted")
-	keys, _ := m.mode.Role("keybinding")
-	footer := foot.Style().Render("  ") + keys.Style().Render("↑/↓") + foot.Style().Render(" nav  ") +
-		keys.Style().Render("⏎") + foot.Style().Render(" detail  ") +
-		keys.Style().Render("g") + foot.Style().Render(" group  ") +
-		keys.Style().Render("/") + foot.Style().Render(" filter  ") +
-		keys.Style().Render("r") + foot.Style().Render(" refresh  ") +
-		keys.Style().Render("q") + foot.Style().Render(" quit  ") +
-		keys.Style().Render("?") + foot.Style().Render(" help")
+	footer := m.footerBar(w)
 
 	hosts, groups := m.orderedHosts()
 	body := make([]string, 0, len(hosts)+4)
@@ -208,7 +199,7 @@ func (m Model) GridView() string {
 		if i == m.cursor {
 			cursorLine = len(body)
 		}
-		body = append(body, m.row(h, i == m.cursor))
+		body = append(body, m.row(h, i == m.cursor, lay))
 	}
 	if len(hosts) == 0 {
 		muted, _ := m.mode.Role("text_muted")
@@ -231,6 +222,120 @@ func (m Model) GridView() string {
 
 // lineCount returns how many terminal lines a rendered block occupies.
 func lineCount(s string) int { return strings.Count(s, "\n") + 1 }
+
+// Identity-block widths (marker + name + state), shared by header and rows.
+const (
+	markerW = 2  // selection/alert marker
+	badgeW  = 13 // full state badge ("● ONLINE")
+	glyphW  = 2  // compact state glyph
+)
+
+// gridColumn is one metric column of the fleet grid — a title, a fixed cell
+// width, and a renderer over a host's metrics. Columns are an ordered registry
+// (most → least essential); the grid drops them right-to-left as the terminal
+// narrows. Adding a column means registering one here, mirroring groupDim and
+// fieldMatcher — no width switch.
+type gridColumn struct {
+	title string
+	width int
+	of    func(m Model, byName map[string]domain.Metric) string
+}
+
+func gridColumns() []gridColumn {
+	return []gridColumn{
+		{"CPU", 14, func(m Model, b map[string]domain.Metric) string { return m.pct(b["cpu.util"]) }},
+		{"MEM", 14, func(m Model, b map[string]domain.Metric) string { return m.pct(b["mem.used"]) }},
+		{"DISK", 14, func(m Model, b map[string]domain.Metric) string { return m.pct(b["disk.used"]) }},
+		{"TEMP", 7, func(m Model, b map[string]domain.Metric) string { return m.temp(pickMetric(b, "temp.pkg", "gpu.temp")) }},
+		{"GPU", 6, func(m Model, b map[string]domain.Metric) string { return m.plain(b["gpu.util"], "%") }},
+		{"PWR", 6, func(m Model, b map[string]domain.Metric) string {
+			return m.plain(pickMetric(b, "power.pkg", "power.gpu"), "W")
+		}},
+	}
+}
+
+// gridLayout is the responsive column plan for a terminal width: the host-name
+// cell width, whether state shows the full badge or a compact glyph, and which
+// metric columns fit. Computed once per frame and shared by the column header and
+// every row so they stay aligned.
+type gridLayout struct {
+	nameW   int
+	badge   bool
+	columns []gridColumn
+}
+
+// layout chooses the densest column plan that fits width. It keeps the full state
+// badge while name + badge + CPU fit; below that it switches to a compact glyph
+// and shrinks the name as needed so at least CPU stays visible.
+func (m Model) layout(width int) gridLayout {
+	first := gridColumns()[0].width
+	full := markerW + 16 + 1 + badgeW
+	if full+1+first <= width {
+		return gridLayout{16, true, fitColumns(full, width)}
+	}
+	nameW := 16
+	for nameW > 8 && markerW+nameW+1+glyphW+1+first > width {
+		nameW -= 2
+	}
+	return gridLayout{nameW, false, fitColumns(markerW+nameW+1+glyphW, width)}
+}
+
+// fitColumns returns the leading run of columns that fit in width after the
+// identity block (used cells). Stopping at the first column that overflows drops
+// it and every lower-priority column after it.
+func fitColumns(used, width int) []gridColumn {
+	out := []gridColumn{}
+	for _, c := range gridColumns() {
+		if used+1+c.width > width {
+			break
+		}
+		used += 1 + c.width
+		out = append(out, c)
+	}
+	return out
+}
+
+// colsHeader renders the column-title row for the active layout.
+func (m Model) colsHeader(lay gridLayout) string {
+	legend, _ := m.mode.Role("label")
+	stateW, stateTitle := badgeW, "STATE"
+	if !lay.badge {
+		stateW, stateTitle = glyphW, "ST"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "  %-*s %-*s", lay.nameW, "HOST", stateW, stateTitle)
+	for _, c := range lay.columns {
+		fmt.Fprintf(&b, " %-*s", c.width, c.title)
+	}
+	return legend.Style().Render(b.String())
+}
+
+// footerBar renders the keybinding footer, falling back to a glyph-only form when
+// the labelled form would not fit the terminal width.
+func (m Model) footerBar(width int) string {
+	foot, _ := m.mode.Role("text_muted")
+	keys, _ := m.mode.Role("keybinding")
+	full := foot.Style().Render("  ") + keys.Style().Render("↑/↓") + foot.Style().Render(" nav  ") +
+		keys.Style().Render("⏎") + foot.Style().Render(" detail  ") +
+		keys.Style().Render("g") + foot.Style().Render(" group  ") +
+		keys.Style().Render("/") + foot.Style().Render(" filter  ") +
+		keys.Style().Render("r") + foot.Style().Render(" refresh  ") +
+		keys.Style().Render("q") + foot.Style().Render(" quit  ") +
+		keys.Style().Render("?") + foot.Style().Render(" help")
+	if lipgloss.Width(full) <= width {
+		return full
+	}
+	sep := foot.Style().Render(" ")
+	parts := []string{"↑↓", "⏎", "g", "/", "r", "q", "?"}
+	out := foot.Style().Render("  ")
+	for i, p := range parts {
+		if i > 0 {
+			out += sep
+		}
+		out += keys.Style().Render(p)
+	}
+	return out
+}
 
 // window clamps body lines to at most max, keeping the cursor line in view. When
 // the list overflows, the edge lines become "↑/↓ N more" indicators so the
@@ -348,7 +453,7 @@ func stateName(s domain.HostState) string {
 	}
 }
 
-func (m Model) row(h domain.HostView, selected bool) string {
+func (m Model) row(h domain.HostView, selected bool, lay gridLayout) string {
 	byName := make(map[string]domain.Metric, len(h.LastSnapshot))
 	for _, mm := range h.LastSnapshot {
 		byName[mm.Name] = mm
@@ -365,7 +470,10 @@ func (m Model) row(h domain.HostView, selected bool) string {
 	}
 
 	st, _ := m.mode.State(stateName(h.State))
-	badge := lipgloss.NewStyle().Width(13).Render(st.Badge())
+	stateCell := lipgloss.NewStyle().Width(badgeW).Render(st.Badge())
+	if !lay.badge {
+		stateCell = cell(st.Style().Render(st.Glyph), glyphW)
+	}
 
 	name, _ := m.mode.Role("value")
 	nameStyle := name.Style()
@@ -377,15 +485,12 @@ func (m Model) row(h domain.HostView, selected bool) string {
 	if dn == "" {
 		dn = string(h.Host.ID)
 	}
-	nameCell := nameStyle.Render(fmt.Sprintf("%-16s", clipName(dn, 16)))
+	nameCell := nameStyle.Render(fmt.Sprintf("%-*s", lay.nameW, clipName(dn, lay.nameW)))
 
-	line := marker + nameCell + " " + badge +
-		" " + m.pct(byName["cpu.util"]) +
-		" " + m.pct(byName["mem.used"]) +
-		" " + m.pct(byName["disk.used"]) +
-		" " + m.temp(pickMetric(byName, "temp.pkg", "gpu.temp")) +
-		" " + m.plain(byName["gpu.util"], "%") +
-		" " + m.plain(pickMetric(byName, "power.pkg", "power.gpu"), "W")
+	line := marker + nameCell + " " + stateCell
+	for _, c := range lay.columns {
+		line += " " + c.of(m, byName)
+	}
 
 	if selected {
 		sel, _ := m.mode.Role("selection")

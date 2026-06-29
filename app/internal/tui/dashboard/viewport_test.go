@@ -9,9 +9,67 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/tui/theme"
 )
+
+func colTitles(lay gridLayout) []string {
+	out := make([]string, len(lay.columns))
+	for i, c := range lay.columns {
+		out[i] = c.title
+	}
+	return out
+}
+
+func TestLayoutRespondsToWidth(t *testing.T) {
+	var m Model // layout is pure arithmetic — no theme needed
+	cases := []struct {
+		width int
+		nameW int
+		badge bool
+		cols  []string
+	}{
+		{110, 16, true, []string{"CPU", "MEM", "DISK", "TEMP", "GPU", "PWR"}},
+		{64, 16, true, []string{"CPU", "MEM"}},
+		{46, 16, false, []string{"CPU"}},
+		{28, 8, false, []string{"CPU"}},
+		{20, 8, false, []string{}},
+	}
+	for _, tc := range cases {
+		lay := m.layout(tc.width)
+		if lay.nameW != tc.nameW || lay.badge != tc.badge || !equalStrings(colTitles(lay), tc.cols) {
+			t.Errorf("layout(%d) = name=%d badge=%v cols=%v, want name=%d badge=%v cols=%v",
+				tc.width, lay.nameW, lay.badge, colTitles(lay), tc.nameW, tc.badge, tc.cols)
+		}
+	}
+}
+
+// The horizontal half of the small-screen fix: nothing the grid renders may be
+// wider than the terminal (else it clips off the right edge / wraps).
+func TestGridViewFitsTerminalWidth(t *testing.T) {
+	for _, w := range []int{50, 64, 88} {
+		m := smallModel(t, bigFleet(t, 8), 30)
+		m.width = w
+		for i, line := range strings.Split(m.GridView(), "\n") {
+			if lw := lipgloss.Width(line); lw > w {
+				t.Errorf("width %d: line %d is %d cells wide:\n%q", w, i, lw, line)
+			}
+		}
+	}
+}
+
+func TestGridViewWideShowsEveryColumn(t *testing.T) {
+	m := smallModel(t, bigFleet(t, 4), 30)
+	m.width = 120
+	out := m.GridView()
+	for _, col := range []string{"HOST", "STATE", "CPU", "MEM", "DISK", "TEMP", "GPU", "PWR"} {
+		if !strings.Contains(out, col) {
+			t.Errorf("wide grid missing column %q", col)
+		}
+	}
+}
 
 func bigFleet(t *testing.T, n int) *domain.HostRegistry {
 	t.Helper()
