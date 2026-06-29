@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Kinn Coelho Juliao <kinncj@gmail.com>
+
+// Package proc collects a host's process table with an OS-appropriate command,
+// for the dashboard's top modal (Heimdallr's sight, ADR 0017). It is read-only
+// and unprivileged; a privileged helper-backed Source can enrich it later.
+package proc
+
+import (
+	"context"
+	"os/exec"
+	"runtime"
+	"strconv"
+	"strings"
+
+	"heimdall/app/internal/domain"
+)
+
+// Source yields a host's process table. The default Local source shells out to an
+// OS command; a future helper-backed source (privileged) can satisfy the same
+// contract to show fuller detail on hosts that run heimdall-helper (DIP).
+type Source interface {
+	Collect(ctx context.Context) ([]domain.ProcessRow, error)
+}
+
+// Local collects the process table on the daemon's own host.
+type Local struct{}
+
+// Collect runs the OS-appropriate process command and parses its output.
+func (Local) Collect(ctx context.Context) ([]domain.ProcessRow, error) {
+	argv := argvFor(runtime.GOOS)
+	out, err := exec.CommandContext(ctx, argv[0], argv[1:]...).Output()
+	if err != nil {
+		return nil, err
+	}
+	return Parse(runtime.GOOS, out), nil
+}
+
+// argvFor returns the per-OS process-listing command. Unix uses ps with a fixed
+// column set; Windows uses tasklist in headerless CSV. Selection is a lookup, not
+// a call-site branch.
+func argvFor(goos string) []string {
+	switch goos {
+	case "windows":
+		return []string{"tasklist", "/FO", "CSV", "/NH"}
+	default: // linux, darwin, *bsd
+		return []string{"ps", "-eo", "pid,ppid,pcpu,pmem,comm"}
+	}
+}
+
+// Parse turns process-command output into rows. It is total: unparseable lines
+// are skipped rather than failing the whole collection.
+func Parse(goos string, out []byte) []domain.ProcessRow {
+	if goos == "windows" {
+		return parseTasklist(out)
+	}
+	return parsePS(out)
+}
+
+// parsePS reads `ps -eo pid,ppid,pcpu,pmem,comm` output: a header line then rows
+// of five whitespace-separated columns (the command may itself contain spaces).
+func parsePS(out []byte) []domain.ProcessRow {
+	lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
+	rows := make([]domain.ProcessRow, 0, len(lines))
+	for i, ln := range lines {
+		if i == 0 || strings.TrimSpace(ln) == "" {
+			continue // header / blank
+		}
+		f := strings.Fields(ln)
+		if len(f) < 5 {
+			continue
+		}
+		rows = append(rows, domain.ProcessRow{
+			PID:     atou(f[0]),
+			PPID:    atou(f[1]),
+			CPUPct:  atof(f[2]),
+			MemPct:  atof(f[3]),
+			Command: strings.Join(f[4:], " "),
+		})
+	}
+	return rows
+}
+
+// parseTasklist reads `tasklist /FO CSV /NH` rows:
+// "image","pid","session","sess#","mem usage". CPU% and ppid are unavailable.
+func parseTasklist(out []byte) []domain.ProcessRow {
+	lines := strings.Split(strings.TrimRight(string(out), "\r\n"), "\n")
+	rows := make([]domain.ProcessRow, 0, len(lines))
+	for _, ln := range lines {
+		cols := splitCSV(strings.TrimRight(ln, "\r"))
+		if len(cols) < 2 {
+			continue
+		}
+		rows = append(rows, domain.ProcessRow{
+			PID:     atou(cols[1]),
+			Command: cols[0],
+		})
+	}
+	return rows
+}
+
+// splitCSV splits a simple quoted CSV line (no embedded quotes), as tasklist emits.
+func splitCSV(s string) []string {
+	parts := strings.Split(s, ",")
+	for i, p := range parts {
+		parts[i] = strings.Trim(p, `"`)
+	}
+	return parts
+}
+
+func atou(s string) uint32 {
+	n, _ := strconv.ParseUint(strings.TrimSpace(s), 10, 32)
+	return uint32(n)
+}
+
+func atof(s string) float64 {
+	f, _ := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	return f
+}

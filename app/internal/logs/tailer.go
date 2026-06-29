@@ -12,6 +12,14 @@ import (
 	"time"
 )
 
+// Tail follows a file from its current end, invoking emit for each new complete
+// line until ctx is cancelled (Heimdallr's sight push tail). It polls, so it
+// behaves the same on macOS, Linux, and Windows. Only lines appended after the
+// tail starts are emitted.
+func Tail(ctx context.Context, path string, emit func(string)) error {
+	return tailFile(ctx, path, emit)
+}
+
 // tailFile follows a file from its current end, invoking emit for each new
 // complete line until ctx is cancelled. It polls rather than using a
 // platform-specific notification API, so it behaves the same on macOS, Linux,

@@ -13,7 +13,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net"
 	"os"
 	"os/signal"
 	"runtime"
@@ -25,11 +24,11 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/adapters"
-	"heimdall/app/internal/control"
 	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/logs"
 	"heimdall/app/internal/options"
+	"heimdall/app/internal/proc"
 	"heimdall/app/internal/secure"
 	"heimdall/app/internal/selfupdate"
 	"heimdall/app/internal/transport"
@@ -93,17 +92,6 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
-	if controlAddr := cfg.Text("control-listen"); controlAddr != "" {
-		sources, err := logs.ParseSources(cfg.Text("log-source"))
-		if err != nil {
-			fatal("invalid --log-source", err)
-		}
-		if err := startControlServer(controlAddr, cfg.Secret("control-token").Reveal(),
-			cfg.Text("control-tls-cert"), cfg.Text("control-tls-key"), host, sources); err != nil {
-			fatal("control plane failed to start", err)
-		}
-	}
-
 	hubAddr := cfg.Address("hub")
 	hubTarget := hubAddr.String()
 	// Ratatoskr: discover the hub when --hub is "auto", or when --discover is set
@@ -126,7 +114,18 @@ func main() {
 		if err != nil {
 			fatal("invalid client TLS configuration", err)
 		}
-		streamToHub(hubTarget, host, interval, tags, reg, sig, dialOpts)
+		// Heimdallr's sight (ADR 0017): tail log sources and collect a periodic
+		// process table, pushed to the hub on the existing stream. The reserved
+		// labels advertise the capability. The daemon never listens.
+		sources, err := logs.ParseSources(cfg.Text("log-source"))
+		if err != nil {
+			fatal("invalid --log-source", err)
+		}
+		push, pushLabels := startPush(context.Background(), sources, cfg.Span("process-interval", 0), proc.Local{})
+		for k, v := range pushLabels {
+			tags[k] = v
+		}
+		streamToHub(hubTarget, host, interval, tags, reg, sig, dialOpts, push)
 		return
 	}
 
@@ -218,30 +217,13 @@ Examples:
   heimdall-daemon --once --json                   one sample as JSON, then exit
   heimdall-daemon --hub localhost:9090 --name web stream to a hub
   heimdall-daemon --ping-target 8.8.8.8           use a different reachability target
-  heimdall-daemon --control-listen :9100 --control-token "$T" --log-source app=/var/log/app.log
+  heimdall-daemon --hub h:9090 --log-source app=/var/log/app.log   push logs to the hub
+  heimdall-daemon --hub h:9090 --process-interval 5s               push a process table for top
   heimdall-daemon --log-file /var/log/heimdall/daemon.json
 
 Flags:
 `)
 	flag.PrintDefaults()
-}
-
-// auditLogger adapts the control-plane audit trail onto the structured logger so
-// every invocation is one JSON event alongside the daemon's other logs.
-type auditLogger struct{ log *slog.Logger }
-
-func (a auditLogger) Record(e control.AuditEntry) {
-	decision := "allow"
-	if !e.Allowed {
-		decision = "refuse"
-	}
-	a.log.Info("control audit",
-		"actor", e.Actor,
-		"command", e.Command,
-		"args", e.Args,
-		"decision", decision,
-		"exit_code", e.ExitCode,
-	)
 }
 
 // clientDialOptions assembles the transport security and per-RPC enrollment
@@ -258,37 +240,6 @@ func clientDialOptions(token string, tlsCfg secure.ClientConfig) ([]grpc.DialOpt
 	return opts, nil
 }
 
-// startControlServer serves the read-only control plane and (when sources are
-// configured) the opt-in log stream on addr, optionally over TLS and behind a
-// token. Both run as this unprivileged daemon user, on distinct gRPC services.
-func startControlServer(addr, token, tlsCert, tlsKey, host string, sources logs.Sources) error {
-	creds, err := secure.ServerOption(tlsCert, tlsKey)
-	if err != nil {
-		return err
-	}
-	lis, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
-	auth := secure.NewAuthenticator(token)
-	srv := grpc.NewServer(
-		creds,
-		grpc.UnaryInterceptor(secure.UnaryServerInterceptor(auth)),
-		grpc.StreamInterceptor(secure.StreamServerInterceptor(auth)),
-	)
-	exec := control.NewExecutor(auditLogger{log: logger})
-	v1.RegisterControlPlaneServiceServer(srv, control.NewServer(exec, host))
-	v1.RegisterLogStreamServiceServer(srv, logs.NewServer(sources, host))
-	logger.Info("control plane serving",
-		"addr", addr, "tls", tlsCert != "", "auth", token != "", "log_sources", sources.Aliases())
-	go func() {
-		if err := srv.Serve(lis); err != nil {
-			logger.Error("control server stopped", "error", err.Error())
-		}
-	}()
-	return nil
-}
-
 // discoverHub resolves a hub address via mDNS (Ratatoskr), falling back to a
 // static seed for overlay networks where multicast does not reach.
 func discoverHub(seed string) (string, error) {
@@ -296,10 +247,10 @@ func discoverHub(seed string) (string, error) {
 }
 
 // streamToHub streams snapshots to the hub, reconnecting with backoff on error.
-func streamToHub(addr, host string, interval time.Duration, labels map[string]string, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption) {
+func streamToHub(addr, host string, interval time.Duration, labels map[string]string, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption, push *pusher) {
 	backoff := time.Second
 	for {
-		connected, err := streamOnce(addr, host, interval, labels, reg, sig, dialOpts)
+		connected, err := streamOnce(addr, host, interval, labels, reg, sig, dialOpts, push)
 		if err == nil {
 			return // clean shutdown
 		}
@@ -319,7 +270,7 @@ func streamToHub(addr, host string, interval time.Duration, labels map[string]st
 	}
 }
 
-func streamOnce(addr, host string, interval time.Duration, labels map[string]string, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption) (bool, error) {
+func streamOnce(addr, host string, interval time.Duration, labels map[string]string, reg *domain.Registry, sig chan os.Signal, dialOpts []grpc.DialOption, push *pusher) (bool, error) {
 	conn, err := grpc.NewClient(addr, dialOpts...)
 	if err != nil {
 		return false, fmt.Errorf("dial %s: %w", addr, err)
@@ -343,7 +294,12 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 	var seq uint64
 	send := func() error {
 		seq++
-		return stream.Send(transport.ToSnapshot(host, reg.Collect(ctx), labels, seq, time.Now()))
+		snap := transport.ToSnapshot(host, reg.Collect(ctx), labels, seq, time.Now())
+		if push != nil {
+			procs, procsAt, lines := push.drain()
+			transport.AttachObservability(snap, procs, procsAt, host, lines)
+		}
+		return stream.Send(snap)
 	}
 	if err := send(); err != nil {
 		return true, fmt.Errorf("send: %w", err)

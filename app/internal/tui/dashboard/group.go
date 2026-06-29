@@ -28,6 +28,9 @@ func (m Model) dimensions(hosts []domain.HostView) []groupDim {
 	var keys []string
 	for _, h := range hosts {
 		for k := range h.Host.Context.Labels {
+			if reservedLabel(k) {
+				continue // hub/daemon-managed (_logs, _proc, …); not a user tag
+			}
 			if !seen[k] {
 				seen[k] = true
 				keys = append(keys, k)
@@ -108,6 +111,9 @@ func (m Model) matchers() []fieldMatcher {
 	var keys []string
 	for _, h := range m.reg.Hosts() {
 		for k := range h.Host.Context.Labels {
+			if reservedLabel(k) {
+				continue // hub/daemon-managed (_logs, _proc, …); not a searchable tag
+			}
 			if !seen[k] {
 				seen[k] = true
 				keys = append(keys, k)

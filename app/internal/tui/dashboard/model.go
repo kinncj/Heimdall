@@ -35,6 +35,11 @@ type Model struct {
 	groupBy       int    // 0 = no grouping; 1..N index dimensions()+1 (Yggdrasil)
 	filter        string // active filter query
 	filtering     bool   // true while the filter input is open
+	// Heimdallr's sight (ADR 0017): host-detail observability overlays.
+	modal       modalKind // active overlay (none / log list / log view / top)
+	modalSel    int       // selection index in the log-source list
+	modalScroll int       // scroll offset in the log/top view
+	logSource   string    // chosen log source in the log view
 }
 
 type tickMsg time.Time
@@ -74,6 +79,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.filtering {
 			return m.updateFilter(msg)
+		}
+		if m.detail {
+			return m.updateDetail(msg)
 		}
 		switch msg.String() {
 		case "q", "ctrl+c":
@@ -160,6 +168,9 @@ func (m Model) View() string {
 		return m.HelpView()
 	}
 	if m.detail {
+		if m.modal != modalNone {
+			return m.ModalView()
+		}
 		return m.DetailView()
 	}
 	return m.GridView()

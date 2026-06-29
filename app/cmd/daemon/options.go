@@ -38,12 +38,10 @@ func daemonCatalog() options.Catalog {
 		options.Define("tls-server-name").Help("override the server name verified in the hub certificate"),
 		options.Define("tls-insecure").Of(options.KindToggle).Default("false").
 			Help("skip hub certificate verification (dev only)"),
-		options.Define("control-listen").Help("serve the read-only control plane on this address (e.g. :9100)"),
-		options.Define("control-token").Of(options.KindSecret).Env("HEIMDALL_CONTROL_TOKEN").
-			Help("token required to invoke control commands (env HEIMDALL_CONTROL_TOKEN)"),
-		options.Define("control-tls-cert").Help("PEM server cert for the control plane"),
-		options.Define("control-tls-key").Help("PEM server key for the control plane"),
-		options.Define("log-source").Help("opt-in log sources alias=path,alias2=path2 (served on --control-listen)"),
+		options.Define("log-source").
+			Help("opt-in log sources alias=path,alias2=path2 to tail and push to the hub (Heimdallr's sight)"),
+		options.Define("process-interval").Of(options.KindSpan).Default("0s").
+			Help("push a process table to the hub at this interval (Heimdallr's sight); 0 = off"),
 		options.Define("log-file").Help("operational log destination: unset = stderr; 'false' = disabled; a path = JSON"),
 	)
 }

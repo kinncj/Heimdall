@@ -10,17 +10,13 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/signal"
-	"strings"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
 	"google.golang.org/grpc"
 
-	"heimdall/app/internal/control"
 	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/fake"
@@ -48,9 +44,6 @@ func main() {
 	splashFlag := flag.Bool("splash", false, "render the splash frame to stdout and exit")
 	demoMode := flag.Bool("demo", false, "render a simulated multi-host fleet (no hub needed; for trying the UI)")
 	detailFlag := flag.Bool("detail", false, "render the host-detail frame (with --snapshot)")
-	controlAddr := flag.String("control", "", "daemon control-plane address for --run")
-	controlRun := flag.String("run", "", "allow-listed control command to run against --control, e.g. \"process.list\" or \"dir.list /var/log\"")
-	tailAlias := flag.String("tail", "", "tail an opt-in log source alias from --control (e.g. app); streams until ctrl-c")
 	showVersion := flag.Bool("version", false, "print version and exit")
 	cat := dashboardCatalog()
 	cat.Register(flag.CommandLine)
@@ -68,22 +61,6 @@ func main() {
 		ServerName: cfg.Text("tls-server-name"), SkipVerify: cfg.Toggle("tls-insecure"),
 	}
 	hubAddr := cfg.Address("hub").String()
-
-	if *controlRun != "" || *tailAlias != "" {
-		if *controlAddr == "" {
-			fail(fmt.Errorf("--run/--tail require --control <addr>"))
-		}
-		dialOpts, err := clientDialOptions(token, tlsCfg)
-		if err != nil {
-			fail(err)
-		}
-		if *controlRun != "" {
-			runControl(*controlAddr, *controlRun, dialOpts)
-		} else {
-			runTail(*controlAddr, *tailAlias, dialOpts)
-		}
-		return
-	}
 
 	th, err := theme.Load()
 	if err != nil {
@@ -196,8 +173,7 @@ Usage:
 Common:
   heimdall-dashboard --hub localhost:9090         subscribe to a hub (default)
   heimdall-dashboard --demo                       explore the UI with a synthetic fleet
-  heimdall-dashboard --control HOST:PORT --run process.list
-  heimdall-dashboard --control HOST:PORT --tail app
+  heimdall-dashboard --hub HOST:9090              logs (l) and top (t) live in the host detail view
 
 Flags:
 `)
@@ -216,77 +192,6 @@ func clientDialOptions(token string, tlsCfg secure.ClientConfig) ([]grpc.DialOpt
 		opts = append(opts, grpc.WithPerRPCCredentials(secure.TokenCredentials{Token: token}))
 	}
 	return opts, nil
-}
-
-// runControl invokes one allow-listed control command against a daemon's
-// control endpoint and prints the result (the "shown in the dashboard" path).
-func runControl(addr, runSpec string, dialOpts []grpc.DialOption) {
-	fields := strings.Fields(runSpec)
-	if len(fields) == 0 {
-		fail(fmt.Errorf("empty --run command"))
-	}
-	cmd, args := fields[0], fields[1:]
-
-	conn, err := grpc.NewClient(addr, dialOpts...)
-	if err != nil {
-		fail(err)
-	}
-	defer conn.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	actor := os.Getenv("USER")
-	if actor == "" {
-		actor = "dashboard"
-	}
-	resp, err := (control.Client{Conn: conn}).Run(ctx, "", cmd, args, actor)
-	if err != nil {
-		fail(err)
-	}
-	if resp.GetStatus() != v1.MetricStatus_METRIC_STATUS_OK {
-		fmt.Fprintf(os.Stderr, "heimdall-dashboard: refused (%s): %s\n", resp.GetStatus(), resp.GetStderr())
-		os.Exit(1)
-	}
-	fmt.Print(resp.GetStdout())
-	if resp.GetTruncated() {
-		fmt.Fprintln(os.Stderr, "[output truncated]")
-	}
-}
-
-// runTail streams an opt-in log source from a daemon's log endpoint to stdout
-// until interrupted (the "logs pane" path, in line form).
-func runTail(addr, alias string, dialOpts []grpc.DialOption) {
-	conn, err := grpc.NewClient(addr, dialOpts...)
-	if err != nil {
-		fail(err)
-	}
-	defer conn.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go func() {
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-		<-sig
-		cancel()
-	}()
-
-	stream, err := v1.NewLogStreamServiceClient(conn).Tail(ctx, &v1.LogTailRequest{Sources: []string{alias}})
-	if err != nil {
-		fail(err)
-	}
-	for {
-		line, err := stream.Recv()
-		if err != nil {
-			return
-		}
-		ts := time.UnixMilli(line.GetTsUnixMillis()).Format("15:04:05")
-		marker := ""
-		if line.GetRateLimited() {
-			marker = " [rate-limited]"
-		}
-		fmt.Printf("%s %s%s  %s\n", ts, line.GetSource(), marker, line.GetLine())
-	}
 }
 
 // subscribeHub keeps a live subscription to the hub, folding incoming snapshots
@@ -334,4 +239,8 @@ func foldSnapshot(reg *domain.HostRegistry, snap *v1.Snapshot) {
 	reg.Enroll(domain.Host{ID: hid, Hostname: id, DisplayName: id}, seen)
 	reg.Observe(hid, ms, labels, seen)
 	reg.SetAlerts(hid, snap.GetAlerts())
+	// Heimdallr's sight (ADR 0017): fold the host's pushed process table and any
+	// tailed log lines into the registry for the detail-view modals.
+	procs, procsAt, logLines := transport.ObservabilityFromSnapshot(snap)
+	reg.RecordPush(hid, procs, procsAt, logLines)
 }

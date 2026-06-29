@@ -193,8 +193,15 @@ func (m Model) DetailView() string {
 	b.WriteString(m.nicsSection(byName))
 
 	b.WriteString("\n  " + keys.Style().Render("esc") + muted.Style().Render(" back   ") +
-		keys.Style().Render("↑/↓") + muted.Style().Render(" host   ") +
-		keys.Style().Render("q") + muted.Style().Render(" quit"))
+		keys.Style().Render("↑/↓") + muted.Style().Render(" host   "))
+	// Heimdallr's sight: offer logs/top only when the host advertises them.
+	if len(logSourcesOf(h)) > 0 {
+		b.WriteString(keys.Style().Render("l") + muted.Style().Render(" logs   "))
+	}
+	if hasProc(h) {
+		b.WriteString(keys.Style().Render("t") + muted.Style().Render(" top   "))
+	}
+	b.WriteString(keys.Style().Render("q") + muted.Style().Render(" quit"))
 	return b.String()
 }
 
