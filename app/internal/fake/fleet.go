@@ -31,6 +31,10 @@ var demoLogs = map[string]string{
 // demoProc reports whether a demo host pushes a process table — all of them do.
 func demoProc(id string) bool { return true }
 
+// demoCmd marks demo hosts that expose on-demand commands (the dashboard command
+// modal only appears for these), so the capability gating is explorable in --demo.
+var demoCmd = map[string]bool{"workstation": true, "dgx-spark": true, "strix-halo": true, "alienware": true}
+
 type spec struct {
 	id, os, arch, class  string
 	cpu, mem, disk, temp float64
@@ -68,6 +72,9 @@ func New(now time.Time) *Source {
 		}
 		if demoProc(h.id) {
 			labels["_proc"] = "1"
+		}
+		if demoCmd[h.id] {
+			labels["_cmd"] = "1"
 		}
 		s.reg.Enroll(domain.Host{
 			ID: domain.HostID(h.id), Hostname: h.id, DisplayName: h.id,

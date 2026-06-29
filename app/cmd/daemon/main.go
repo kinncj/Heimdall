@@ -122,7 +122,7 @@ func main() {
 		if err != nil {
 			fatal("invalid --log-source", err)
 		}
-		push, pushLabels := startPush(context.Background(), sources, cfg.Span("process-interval", 0), proc.Local{})
+		push, pushLabels := startPush(context.Background(), sources, cfg.Span("process-interval", 0), proc.Local{}, cfg.Toggle("allow-commands"))
 		if len(pushLabels) > 0 && tags == nil {
 			tags = map[string]string{} // ParseTags returns nil when no --tags were given
 		}
@@ -248,6 +248,20 @@ func clientDialOptions(token string, tlsCfg secure.ClientConfig) ([]grpc.DialOpt
 // ADR 0018), audits it, stages the result for the next snapshot, and triggers an
 // immediate send. Commands run as this unprivileged daemon user.
 func runCommand(req *v1.ControlRequest, push *pusher, trigger chan struct{}) {
+	if !push.allowCommands {
+		logger.Warn("control command refused: commands disabled", "cmd", req.GetAllowlistedCmd(), "actor", req.GetActor())
+		push.setResult(&v1.ControlResponse{
+			RequestId: req.GetRequestId(),
+			ExitCode:  -1,
+			Stderr:    "on-demand commands are disabled on this host (start the daemon with --allow-commands)",
+			Status:    v1.MetricStatus_METRIC_STATUS_INSUFFICIENT_PERMISSION,
+		})
+		select {
+		case trigger <- struct{}{}:
+		default:
+		}
+		return
+	}
 	res := command.Run(context.Background(), req.GetAllowlistedCmd(), req.GetArgs())
 	logger.Info("control command",
 		"cmd", req.GetAllowlistedCmd(), "args", req.GetArgs(),

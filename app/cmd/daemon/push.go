@@ -32,7 +32,9 @@ type pusher struct {
 	// Default open so an old hub (which sends no directive) keeps v1 behaviour.
 	wantLogs  bool
 	wantProcs bool
-	// On-demand command result awaiting delivery on the next snapshot (v2 Phase 2).
+	// allowCommands opts this host into on-demand command execution (v2 Phase 2).
+	allowCommands bool
+	// On-demand command result awaiting delivery on the next snapshot.
 	result *v1.ControlResponse
 }
 
@@ -105,14 +107,17 @@ func (p *pusher) drain() ([]domain.ProcessRow, time.Time, []domain.LogLine) {
 // configured sources/interval. It returns the pusher (nil when nothing is
 // configured) and the reserved labels that advertise the capability to the hub
 // and dashboard (`_logs`, `_proc`). Reserved keys are filtered from user tags.
-func startPush(ctx context.Context, sources logs.Sources, procInterval time.Duration, src proc.Source) (*pusher, map[string]string) {
+func startPush(ctx context.Context, sources logs.Sources, procInterval time.Duration, src proc.Source, allowCommands bool) (*pusher, map[string]string) {
 	// Always return a pusher when streaming: even a daemon that pushes neither logs
-	// nor a process table must be able to receive and answer on-demand commands
-	// (v2 Phase 2). Observability collection below is gated on its own config.
+	// nor a process table must be able to receive directives (v2 Phase 2).
+	// Observability collection below is gated on its own config.
 	// Open by default: a v1 hub never sends a window directive, so the daemon keeps
 	// pushing per its config until a v2 hub tells it otherwise.
-	p := &pusher{wantLogs: true, wantProcs: true}
+	p := &pusher{wantLogs: true, wantProcs: true, allowCommands: allowCommands}
 	labels := map[string]string{}
+	if allowCommands {
+		labels["_cmd"] = "1" // advertise the on-demand command capability (gates the UI)
+	}
 
 	for alias, path := range sources {
 		alias, path := alias, path
