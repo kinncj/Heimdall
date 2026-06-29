@@ -302,6 +302,104 @@ That's the whole loop: a human pipes JSON through `jq`, CI gates on a host's sta
 a log shipper consumes `logs`, and an agent — Claude, Copilot, Hermes, or your own —
 answers fleet questions, all from the same read-only binary.
 
+## What it looks like in practice
+
+Once the files above are in place, you talk to your fleet in plain English. These
+are real, unedited sessions — the agent runs `heimdall-cli`, parses the JSON, and
+answers. Note what it does *not* do: it never invents a number, it names host ids
+and states explicitly, it surfaces observability gaps (a host with no logs or no
+process table), and it flags the wrong default hub when it finds the real one.
+
+### Free-form question → `heimdall-cli hosts`
+
+```console
+$ claude -p "check my fleet"
+```
+
+> ## Fleet Brief — hub `my.fancy.hub:9090`
+>
+> **4 hosts, all online.** No alerts. (Note: the skill's default `localhost:9090` was wrong — the real hub came from the running daemon's env.)
+>
+> | Host | State | CPU | Mem | Disk | GPU | Temp |
+> |------|-------|-----|-----|------|-----|------|
+> | **CaptainCanuck** (this box, strix-halo) | online | 8.2% | 19.6% | 45.4% | — | 61.9°C |
+> | **Kinns-MacBook-Pro.local** | online | 27.5% | **71.8%** | **91.4%** | 9.9% | 51.9°C |
+> | **Kinns-Mac-mini.local** | online | 8.9% | 69.0% | 66.7% | 21.7% | 51.8°C |
+> | **promaxgb10** (hub) | online | 0.2% | 2.4% | 21.5% | 0% | 33°C |
+>
+> **Worth watching:**
+> - **Kinns-MacBook-Pro.local** — disk at **91.4% used**, the only host near a real threshold. Mem also high at 71.8%. Worth freeing disk space soon.
+> - **Kinns-Mac-mini.local** — mem 69%, fine but the next-highest.
+> - CaptainCanuck and promaxgb10 are both relaxed. promaxgb10 is essentially idle.
+>
+> Only CaptainCanuck reports per-process data (`has_processes: true`); none have logs enabled. Want me to pull top processes on CaptainCanuck or dig into the MacBook's disk usage?
+
+### The `/fleet` slash command
+
+The COMMAND file turns the whole brief into one keystroke:
+
+```console
+$ claude -p "/fleet"
+```
+
+> Fleet is healthy — all 4 hosts online, none stale or offline.
+>
+> ## Fleet snapshot (hub `promaxgb10-bdd9`)
+>
+> | Host | State | CPU | Mem | Disk | GPU | Temp | Uptime |
+> |------|-------|-----|-----|------|-----|------|--------|
+> | **CaptainCanuck** (strix-halo, AI powerhouse) | 🟢 online | 1.3% | 19.7% | 45.4% | — | 51.4°C | ~4.7d |
+> | **Kinns-MacBook-Pro.local** | 🟢 online | 16.4% | 70.6% | 91.4% ⚠️ | 11.2% | 51.9°C | ~21d |
+> | **Kinns-Mac-mini.local** | 🟢 online | 8.2% | 68.5% | 66.7% | 23.0% | 51.8°C | ~12.7d |
+> | **promaxgb10** (hub) | 🟢 online | 0.2% | 2.4% | 21.5% | 0% | 33°C (GPU) | ~11.3d |
+>
+> **Notable:**
+> - **All green** — 4/4 online, last seen within ~1s of the snapshot.
+> - ⚠️ **Kinns-MacBook-Pro** disk is at **91.4%** — the only metric worth watching. It's also the busiest node (CPU 16%, mem 71%, ~21 days uptime).
+> - **CaptainCanuck** (the Strix Halo AI box) is idle and cool — plenty of headroom. Only host exposing process data (`has_processes: true`).
+> - **promaxgb10** (the hub itself) is nearly idle — 0.2% CPU, 2.4% mem.
+> - Network latency is low everywhere (4.9–15.8 ms); power draw is modest (CaptainCanuck pulls the most at ~17.4 W package).
+>
+> Want me to drill into CaptainCanuck's top processes, or keep an eye on that MacBook disk?
+
+### A targeted risk question → `host` + `top`
+
+The agent pulls the full host record and process table only for the hosts you ask
+about, then reasons over what's there *and* what's missing.
+
+```console
+$ claude -p "any risks for CaptainCanuck or Kinns Macbook Pro on my fleet?"
+```
+
+> Both hosts are online and reachable. Here's the risk assessment:
+>
+> ## CaptainCanuck — ✅ Healthy, no significant risks
+> - **Online**, seen seconds ago. Uptime ~4.7 days.
+> - CPU **1%**, memory **20%**, disk **45%**, temp 49°C — all healthy.
+> - Only notable consumer is a Firefox content process (`Isolated Web Co`, 14.6% CPU / 8.1% mem) — normal for an interactive workstation, not a leak or crash loop.
+>
+> ## Kinns MacBook Pro (`Kinns-MacBook-Pro.local`) — ⚠️ Needs attention
+> - **Online**, seen seconds ago. Uptime ~21 days.
+> - 🔴 **HIGH — Disk 91.4% full.** The main actionable risk. Nearing capacity risks write failures, swap pressure, and app instability. Free space soon.
+> - 🟡 **MEDIUM — Memory 73.7%.** Elevated; combined with the near-full disk, swap headroom is thin.
+> - 🟢 LOW — CPU 28.8%, GPU 10%, temp 52°C — fine.
+> - **Observability gap:** this host reports **no process table and no logs** (`has_processes`/`has_logs` both false), so the disk/memory usage can't be attributed and log-based crash detection is blind here. Worth enabling process + log collection on this agent.
+>
+> **Bottom line:** CaptainCanuck is clean. The one real risk on your fleet is the MacBook Pro's nearly-full disk — clear space there, and consider turning on process/log telemetry so it's not a blind spot.
+>
+> Two side notes: load average isn't exposed in the metrics for either host, and the hub is only reachable via mDNS (`--hub auto`) — the configured `$HEIMDALL_HUB` env var and `localhost:9090` are both dead/blocked in this sandbox, which is why the first lookup attempt stalled.
+
+A few things to read out of these transcripts:
+
+- **Hub discovery matters.** The agent uses `${HEIMDALL_HUB:-localhost:9090}`; when
+  the default is wrong it says so and falls back to what it finds (here, mDNS via
+  `--hub auto`). Set `HEIMDALL_HUB` in the agent's environment to skip the guesswork.
+- **It reports capability gaps, not just metrics.** `has_processes` / `has_logs`
+  drive the "blind spot" callouts — enable [process view](06-control-plane.md) and
+  [log streaming](07-log-streaming.md) on a host to close them.
+- **It stays read-only.** Every answer above came from `hosts` / `host` / `top` —
+  no mutation, nothing run on a host beyond the allow-listed diagnostics.
+
 ## Notes
 
 - `--wait` (default 800ms) bounds how long the CLI gathers before printing; raise

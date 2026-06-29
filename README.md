@@ -46,6 +46,10 @@ memory, disk, network, temperature, GPU, and power from every machine in one ter
 - **Unprivileged by default** — hosts need no inbound ports and no root. Power, GPU, and thermal
   come from no-sudo paths where they exist, and an optional helper where they don't.
 - **Built for distance** — compact gRPC over a low-bandwidth link; happy across a VPN or Tailscale.
+- **Scriptable & agent-friendly** — `heimdall-cli` emits typed JSON, so scripts, CI/CD, and AI agents
+  read the fleet without screen-scraping. Drop in the copy-paste agent/skill/command files and ask
+  *"check my fleet"* in plain English — same lightweight binary, no extra service.
+  See [real agent sessions](docs/guides/11-hub-cli.md#what-it-looks-like-in-practice).
 - **Zero-config when you want it** — daemons can discover their hub over mDNS; tag hosts to organize
   a growing fleet; alert on thresholds; scrape it all into your existing Grafana.
 
