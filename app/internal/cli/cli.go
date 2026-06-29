@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/command"
+	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/secure"
 	"heimdall/app/internal/transport"
@@ -54,17 +55,35 @@ func Run(args []string) {
 		Enabled: *tls, CAFile: *caFile, ServerName: *serverName, SkipVerify: *skipVerify,
 	}
 
+	// --hub auto browses the LAN (Ratatoskr). One hub → use it; several → report
+	// them and tell the operator to pick with --hub, exactly as asked; none → error.
+	hub := *hubAddr
+	if hub == "auto" {
+		hubs, err := discovery.BrowseAll(3 * time.Second)
+		if err != nil {
+			cliFail(err)
+		}
+		switch len(hubs) {
+		case 0:
+			cliFail(fmt.Errorf("no hub discovered on the LAN; set --hub <addr>"))
+		case 1:
+			hub = hubs[0].Addr
+		default:
+			cliReportHubs(hubs) // prints the list + instruction, exits non-zero
+		}
+	}
+
 	// `run` issues an on-demand command and waits for its result; it does not fit
 	// the gather-then-print model the read-only commands use.
 	if cmd == "run" {
-		if err := cliRun(*hubAddr, *token, tlsCfg, fs.Args()[1:], *wait); err != nil {
+		if err := cliRun(hub, *token, tlsCfg, fs.Args()[1:], *wait); err != nil {
 			cliFail(err)
 		}
 		return
 	}
 
 	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
-	if err := cliGather(reg, *hubAddr, *token, tlsCfg, *wait); err != nil {
+	if err := cliGather(reg, hub, *token, tlsCfg, *wait); err != nil {
 		cliFail(err)
 	}
 	if err := cliDispatch(reg, cmd, fs.Args()[1:]); err != nil {
@@ -76,7 +95,10 @@ func cliUsage() {
 	fmt.Fprint(os.Stderr, `heimdall-cli — machine-readable fleet queries (JSON)
 
 Usage:
-  heimdall-cli [--hub addr] [--token t] [--tls …] <command> [args]
+  heimdall-cli [--hub addr|auto] [--token t] [--tls …] <command> [args]
+
+  --hub auto discovers the hub over mDNS (Ratatoskr). If several hubs are found it
+  lists them and asks you to pick one with --hub <addr>.
 
 Commands:
   fleet                 fleet summary: host counts by state
@@ -99,6 +121,26 @@ Examples:
 
 func cliFail(err error) {
 	b, _ := json.Marshal(map[string]string{"error": err.Error()})
+	fmt.Fprintln(os.Stderr, string(b))
+	os.Exit(1)
+}
+
+// cliReportHubs prints the discovered hubs and tells the operator to pick one,
+// then exits non-zero. Only reached when --hub auto finds more than one (per the
+// requirement to report-and-instruct only on multiple zeroconf hubs).
+func cliReportHubs(hubs []discovery.Found) {
+	type jHub struct {
+		Name string `json:"name"`
+		Addr string `json:"addr"`
+	}
+	list := make([]jHub, len(hubs))
+	for i, h := range hubs {
+		list[i] = jHub{Name: h.Name, Addr: h.Addr}
+	}
+	b, _ := json.MarshalIndent(map[string]any{
+		"error": "multiple hubs discovered — choose one with --hub <addr>",
+		"hubs":  list,
+	}, "", "  ")
 	fmt.Fprintln(os.Stderr, string(b))
 	os.Exit(1)
 }
