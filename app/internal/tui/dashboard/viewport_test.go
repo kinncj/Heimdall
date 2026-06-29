@@ -60,6 +60,21 @@ func TestGridViewFitsTerminalWidth(t *testing.T) {
 	}
 }
 
+// Regression: a detail-view modal's header must show the real online/total count,
+// not 0/0 (the modal header was hardcoded to 0,0).
+func TestModalHeaderShowsHostCount(t *testing.T) {
+	m := smallModel(t, obsReg(t), 30) // obsReg has one online host
+	m.detail = true
+	for _, modal := range []modalKind{modalTop, modalLogList, modalCmdList} {
+		m.modal = modal
+		out := m.ModalView()
+		if !strings.Contains(out, "1/1") {
+			t.Fatalf("modal %d header should show 1/1 online, got header:\n%s",
+				modal, strings.SplitN(out, "\n", 4)[1])
+		}
+	}
+}
+
 func TestGridViewWideShowsEveryColumn(t *testing.T) {
 	m := smallModel(t, bigFleet(t, 4), 30)
 	m.width = 120
