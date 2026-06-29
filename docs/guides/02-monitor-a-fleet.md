@@ -107,11 +107,13 @@ On a key conflict the **host's own tag wins** over the hub's. See
   keeping its last-known values (tune with the hub's `--stale-after` /
   `--offline-after`).
 
-## Running daemons as a service
+## Running as a service
 
-For always-on hosts, run the daemon under your init system so it survives reboots.
+For always-on hosts, run Heimdall under your init system so it survives reboots.
 
-**systemd (Linux)** — `/etc/systemd/system/heimdall-daemon.service`:
+### Daemon — systemd (Linux)
+
+`/etc/systemd/system/heimdall-daemon.service`:
 
 ```ini
 [Unit]
@@ -139,8 +141,94 @@ socket. Add `SupplementaryGroups=heimdall` and
 the complete two-service setup is in
 [Privileged Metrics → Run both as systemd services](04-privileged-metrics.md#run-both-as-systemd-services-helper-root-daemon-as-you).
 
-**launchd (macOS)**: wrap the same command in a LaunchDaemon plist with
-`KeepAlive=true`.
+### Hub — systemd (Linux)
+
+The hub is the same pattern with the hub binary. It needs no socket and no shared
+group — it talks to nothing local — so a plain system user is enough. Pass the
+enrollment token through the environment so it stays out of `ps` and shell history.
+
+```sh
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin heimdall
+```
+
+`/etc/systemd/system/heimdall-hub.service`:
+
+```ini
+[Unit]
+Description=Heimdall hub (receives daemon streams, fans out to dashboards)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=heimdall
+# token via env keeps it out of `ps`; see Secure Deployment
+Environment=HEIMDALL_TOKEN=<your-token>
+ExecStart=/usr/local/bin/heimdall-hub --listen :9090 --id station
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now heimdall-hub
+journalctl -u heimdall-hub -f          # watch it come up
+ss -ltnp 'sport = :9090'               # expect heimdall-hub LISTEN
+```
+
+Set `--id` to the host's name so the hub label reads cleanly in the dashboard. Add
+`--tls-cert/--tls-key` ([Secure Deployment](03-secure-deployment.md)) when the hub
+leaves a trusted network. To put the hub box itself in the grid, run a daemon on it
+too, pointed at `--hub localhost:9090` (pair it with the helper as in
+[Privileged Metrics](04-privileged-metrics.md#run-both-as-systemd-services-helper-root-daemon-as-you)).
+
+### Daemon — launchd (macOS)
+
+To start the daemon at **boot** — before anyone logs in — install a
+**LaunchDaemon**. (A LaunchAgent in `~/Library/LaunchAgents` starts only at *your*
+login; use a LaunchDaemon when you want boot.) The daemon stays unprivileged via
+`UserName`.
+
+`/Library/LaunchDaemons/com.heimdall.daemon.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.heimdall.daemon</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/local/bin/heimdall-daemon</string>
+    <string>--hub</string><string>station:9090</string>
+    <string>--name</string><string>my-mac</string>
+  </array>
+  <!-- runs as you, not root -->
+  <key>UserName</key><string>YOUR_USER</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>HEIMDALL_TOKEN</key><string>YOUR_TOKEN</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/var/log/heimdall-daemon.log</string>
+</dict></plist>
+```
+
+LaunchDaemon plists must be owned `root:wheel`; this one holds the token, so lock it
+to `0600` before loading:
+
+```sh
+sudo chown root:wheel /Library/LaunchDaemons/com.heimdall.daemon.plist
+sudo chmod 600 /Library/LaunchDaemons/com.heimdall.daemon.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.heimdall.daemon.plist
+sudo launchctl print system/com.heimdall.daemon | grep -E 'state|pid'
+```
+
+Reload after editing the plist with
+`sudo launchctl bootout system/com.heimdall.daemon`, then `bootstrap` again. For
+power/GPU/full thermal on Apple Silicon, pair the daemon with the root helper — see
+[Privileged Metrics → Run both as launchd services](04-privileged-metrics.md#run-both-as-launchd-services-macos-helper-root-daemon-as-you).
 
 ## Next steps
 

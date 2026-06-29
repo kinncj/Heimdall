@@ -163,6 +163,100 @@ that your user is in `heimdall` and that both units use the same socket path.
 > **Install via the AUR** on Arch/CachyOS: `paru -S heimdall-helper-bin
 > heimdall-daemon-bin heimdall-cli-bin` (binaries land in `/usr/bin`, with manpages).
 
+### Run both as launchd services (macOS, helper root, daemon as you)
+
+The macOS equivalent of the layout above: the **helper as a root LaunchDaemon**, the
+**daemon as an unprivileged LaunchDaemon** running as you, sharing a `heimdall` group
+and a socket under `/usr/local/var/heimdall`. Both start at **boot** (a LaunchDaemon,
+not a per-login LaunchAgent).
+
+> **Apple Silicon build note**: GPU power/util come from **IOReport**, which needs a
+> **CGO build** (`make build-tui` locally). The CGO-free release binary falls back to
+> `powermetrics` (root). Full thermal and CPU/ANE power come only from the helper.
+> Some M-series SoCs expose no CPU package-power counter at all — `power.pkg` reads
+> `unavailable` there. That is a hardware limit, not a misconfiguration.
+
+**1. Shared group** and a stable socket dir the group can traverse:
+
+```sh
+sudo dseditgroup -o create heimdall
+sudo dseditgroup -o edit -a "$(whoami)" -t user heimdall
+sudo mkdir -p /usr/local/var/heimdall
+sudo chgrp heimdall /usr/local/var/heimdall
+sudo chmod 0710 /usr/local/var/heimdall
+```
+
+**2. Helper LaunchDaemon** — `/Library/LaunchDaemons/com.heimdall.helper.plist`. It
+runs as root; `GroupName` makes the socket land `root:heimdall 0660`, so the group —
+not the world — can reach it:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.heimdall.helper</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/local/bin/heimdall-helper</string>
+    <string>--socket</string><string>/usr/local/var/heimdall/helper.sock</string>
+  </array>
+  <key>GroupName</key><string>heimdall</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/var/log/heimdall-helper.log</string>
+</dict></plist>
+```
+
+**3. Daemon LaunchDaemon** — `/Library/LaunchDaemons/com.heimdall.daemon.plist`. It
+stays unprivileged via `UserName`, joins `heimdall` to reach the socket, and points
+`HEIMDALL_HELPER_SOCKET` at the helper:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.heimdall.daemon</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/local/bin/heimdall-daemon</string>
+    <string>--hub</string><string>HUB:9090</string>
+    <string>--name</string><string>my-mac</string>
+  </array>
+  <key>UserName</key><string>YOUR_USER</string>
+  <key>GroupName</key><string>heimdall</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>HEIMDALL_TOKEN</key><string>YOUR_TOKEN</string>
+    <key>HEIMDALL_HELPER_SOCKET</key><string>/usr/local/var/heimdall/helper.sock</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardErrorPath</key><string>/var/log/heimdall-daemon.log</string>
+</dict></plist>
+```
+
+**4. Own them `root:wheel`, lock the token file, load helper first:**
+
+```sh
+sudo chown root:wheel /Library/LaunchDaemons/com.heimdall.{helper,daemon}.plist
+sudo chmod 644 /Library/LaunchDaemons/com.heimdall.helper.plist
+sudo chmod 600 /Library/LaunchDaemons/com.heimdall.daemon.plist   # token inside
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.heimdall.helper.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.heimdall.daemon.plist
+```
+
+**5. Verify:**
+
+```sh
+ls -l /usr/local/var/heimdall/helper.sock        # expect: srw-rw---- root heimdall
+sudo launchctl print system/com.heimdall.daemon | grep -E 'state|pid'
+heimdall-cli --hub HUB:9090 host my-mac \
+  | jq '{state, power: .metrics["power.pkg"], gpu: .metrics["gpu.util"]}'
+```
+
+If `power`/`gpu` show `⚿` (`needs-helper`), either the daemon isn't reaching the
+socket — check your user is in `heimdall` and both plists use the same socket path —
+or you're on a CGO-free release binary (install a local `make build-tui` daemon for
+IOReport). Reload after editing a plist with
+`sudo launchctl bootout system/com.heimdall.daemon`, then `bootstrap` again.
+
 ## Option C — preview without root
 
 To see the populated values without elevation (useful for screenshots/testing):
