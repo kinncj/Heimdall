@@ -21,8 +21,9 @@ _ADDR = re.compile(r"^\[?[0-9A-Fa-f.:]+\]?:\d+$")  # ip:port (v4/v6)
 
 
 def _ss(*args):
-    return subprocess.run(["ss", "-H", "-n", "-p", *args],
-                          capture_output=True, text=True).stdout.splitlines()
+    r = subprocess.run(["ss", "-H", "-n", "-p", *args], capture_output=True, text=True)
+    assert r.returncode == 0, f"ss {' '.join(args)} failed ({r.returncode}): {r.stderr.strip()}"
+    return r.stdout.splitlines()
 
 
 def _for_pid(lines, pid):

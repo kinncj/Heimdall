@@ -8,7 +8,32 @@ import (
 	"time"
 
 	"heimdall/app/internal/domain"
+	v1 "heimdall/common/proto/monitoring/v1"
 )
+
+// Multiple command results that finish before the next send must all be
+// delivered — one per snapshot — not collapsed onto a single slot (the wire
+// carries one result per snapshot).
+func TestPusherQueuesMultipleResults(t *testing.T) {
+	p := &pusher{}
+	p.setResult(&v1.ControlResponse{RequestId: "a"})
+	p.setResult(&v1.ControlResponse{RequestId: "b"})
+
+	first := p.drainResult()
+	if first == nil || first.GetRequestId() != "a" {
+		t.Fatalf("want FIFO order a first, got %v", first)
+	}
+	if !p.hasResults() {
+		t.Fatal("the second result must still be queued")
+	}
+	second := p.drainResult()
+	if second == nil || second.GetRequestId() != "b" {
+		t.Fatalf("want b second, got %v", second)
+	}
+	if p.hasResults() || p.drainResult() != nil {
+		t.Fatal("queue must be empty after draining both")
+	}
+}
 
 func TestPusherGatesOnDemandWindow(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)

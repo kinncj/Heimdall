@@ -6,6 +6,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -14,6 +15,8 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"heimdall/app/internal/command"
 	"heimdall/app/internal/discovery"
@@ -108,6 +111,7 @@ Commands:
   logs <id> [source]    the host's buffered log lines (optionally one source)
   run <id> <cmd> [args] run an allow-listed read-only command on a host (v2)
                         cmd: process.list | disk.df | uptime | os.info | dir.list <dir>
+                        privileged (need the root helper): dmesg | journal.tail
 
 All output is JSON on stdout; errors are JSON on stderr with a non-zero exit.
 
@@ -207,7 +211,12 @@ func cliRun(addr, token string, tlsCfg secure.ClientConfig, args []string, wait 
 	for {
 		snap, err := stream.Recv()
 		if err != nil {
-			return fmt.Errorf("timed out waiting for the result of %q on %q", cmdKey, host)
+			// Only a deadline is really a timeout; surface anything else (permission
+			// denied, connection reset, hub shutdown) as itself rather than masking it.
+			if errors.Is(err, context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
+				return fmt.Errorf("timed out waiting for the result of %q on %q", cmdKey, host)
+			}
+			return fmt.Errorf("stream error waiting for the result of %q on %q: %w", cmdKey, host, err)
 		}
 		if cr := snap.GetCommandResult(); cr != nil && cr.GetRequestId() == reqID {
 			return cliEmit(newJCommand(host, cmdKey, cr))

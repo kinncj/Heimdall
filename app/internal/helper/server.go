@@ -29,8 +29,10 @@ type Server struct {
 }
 
 // Serve listens until ctx is cancelled. It removes any stale socket first and
-// loosens the socket permissions so the unprivileged daemon can connect to the
-// root-owned helper (the payload is low-sensitivity, read-only telemetry).
+// restricts the socket to owner+group (0660). The helper now runs privileged
+// allow-listed commands, so a world-writable socket would let ANY local user ask
+// root to run them — a local privilege-escalation vector. The daemon reaches the
+// root-owned helper via a shared group (see DefaultSocketPath / --socket).
 func (s *Server) Serve(ctx context.Context) error {
 	if s.SockPath == "" {
 		s.SockPath = DefaultSocketPath()
@@ -40,7 +42,7 @@ func (s *Server) Serve(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_ = os.Chmod(s.SockPath, 0o666)
+	_ = os.Chmod(s.SockPath, 0o660)
 
 	go func() {
 		<-ctx.Done()
@@ -66,7 +68,9 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 	to := s.Timeout
 	if to == 0 {
-		to = 3 * time.Second
+		// Match the client's Exec timeout (10s) so a privileged command that runs
+		// longer than a few seconds isn't cut off server-side while the client waits.
+		to = 10 * time.Second
 	}
 	// Read the request first. An old (silent) client sends nothing, so a short read
 	// deadline falls back to "collect" — preserving the metric path.

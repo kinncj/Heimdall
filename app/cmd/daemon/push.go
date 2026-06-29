@@ -34,24 +34,38 @@ type pusher struct {
 	wantProcs bool
 	// allowCommands opts this host into on-demand command execution (v2 Phase 2).
 	allowCommands bool
-	// On-demand command result awaiting delivery on the next snapshot.
-	result *v1.ControlResponse
+	// On-demand command results awaiting delivery. A FIFO queue (not a single
+	// slot): the wire carries one result per snapshot, so if several commands
+	// finish before the next send, each result is delivered on its own snapshot
+	// rather than overwriting the previous one.
+	results []*v1.ControlResponse
 }
 
-// setResult stores a finished on-demand command result for the next send.
+// setResult enqueues a finished on-demand command result for delivery.
 func (p *pusher) setResult(r *v1.ControlResponse) {
 	p.mu.Lock()
-	p.result = r
+	p.results = append(p.results, r)
 	p.mu.Unlock()
 }
 
-// drainResult returns and clears a pending command result, if any.
+// drainResult dequeues the oldest pending command result, or nil if none.
 func (p *pusher) drainResult() *v1.ControlResponse {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	r := p.result
-	p.result = nil
+	if len(p.results) == 0 {
+		return nil
+	}
+	r := p.results[0]
+	p.results = p.results[1:]
 	return r
+}
+
+// hasResults reports whether any command results are still queued, so the send
+// loop can flush them all (one snapshot each) instead of one per tick.
+func (p *pusher) hasResults() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.results) > 0
 }
 
 // setWindow applies a demand directive from the hub: push logs / processes only
@@ -104,9 +118,11 @@ func (p *pusher) drain() ([]domain.ProcessRow, time.Time, []domain.LogLine) {
 }
 
 // startPush launches the tail and process-collection goroutines for the
-// configured sources/interval. It returns the pusher (nil when nothing is
-// configured) and the reserved labels that advertise the capability to the hub
-// and dashboard (`_logs`, `_proc`). Reserved keys are filtered from user tags.
+// configured sources/interval. It always returns a non-nil pusher — even a daemon
+// that pushes neither logs nor a process table needs one to receive directives
+// (v2 Phase 2) — along with the reserved labels that advertise the capabilities to
+// the hub and dashboard (`_logs`, `_proc`, `_cmd`). Reserved keys are filtered
+// from user tags.
 func startPush(ctx context.Context, sources logs.Sources, procInterval time.Duration, src proc.Source, allowCommands bool) (*pusher, map[string]string) {
 	// Always return a pusher when streaming: even a daemon that pushes neither logs
 	// nor a process table must be able to receive directives (v2 Phase 2).

@@ -11,8 +11,8 @@ deciders:
 
 # 0018 — v2: persistent socket mediation (daemon ⇄ hub ⇄ dashboard)
 
-> Status: **proposed** — work happens on `feature/sockets` and ships as **v2.0.0**.
-> This ADR seeds the design; it is not implemented yet. It builds on
+> Status: **accepted** — implemented on `feature/sockets` (Phases 1, 2, and 2b
+> done; see §below) and ships as **v2.0.0**. It builds on
 > [ADR 0017](0017-heimdallr-sight-in-dashboard-observability.md) §3.9.
 
 ## 1. Context

@@ -38,6 +38,32 @@ func TestDirListIsBounded(t *testing.T) {
 	if _, err := Resolve("linux", "dir.list", []string{"relative"}); err == nil {
 		t.Fatal("a relative path must be rejected")
 	}
+	// dir.list is Unix-only: its allow-list bounds the path to Unix roots, so a
+	// Windows argv would never get a valid argument. It must report unavailable on
+	// Windows rather than advertise a broken command.
+	if _, err := Resolve("windows", "dir.list", []string{"/var/log"}); err == nil {
+		t.Fatal("dir.list must be unavailable on Windows")
+	}
+}
+
+// A command that floods its output must be bounded at the source — the daemon's
+// memory can't balloon to the full output before truncation.
+func TestRunBoundsOutput(t *testing.T) {
+	w := &cappedBuffer{cap: 1024}
+	huge := make([]byte, 5000)
+	for i := range huge {
+		huge[i] = 'x'
+	}
+	n, _ := w.Write(huge)
+	if n != len(huge) {
+		t.Fatalf("Write must report the full length (no blocked pipe), got %d", n)
+	}
+	if got := len(w.String()); got != 1024 {
+		t.Fatalf("buffer must retain exactly cap bytes, got %d", got)
+	}
+	if !w.truncated {
+		t.Fatal("overflow must set truncated")
+	}
 }
 
 func TestRunRejectsUnknown(t *testing.T) {

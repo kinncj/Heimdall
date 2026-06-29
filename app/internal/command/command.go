@@ -90,9 +90,12 @@ func allowlist() map[string]spec {
 			return []string{"uname", "-a"}
 		}},
 		"dir.list": {
+			// Unix-only: allowedDirArg bounds the path to Unix roots (/var/log, /tmp),
+			// so a Windows argv would never receive a valid argument. Report it
+			// unavailable on Windows (nil argv) rather than advertise a broken command.
 			argv: func(os string) []string {
 				if os == "windows" {
-					return []string{"cmd", "/c", "dir"}
+					return nil
 				}
 				return []string{"ls", "-la"}
 			},
@@ -152,8 +155,9 @@ func Run(ctx context.Context, key string, args []string) Result {
 	defer cancel()
 
 	cmd := exec.CommandContext(cctx, argv[0], argv[1:]...)
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	stdout := &cappedBuffer{cap: defaultOutputCap}
+	stderr := &cappedBuffer{cap: defaultOutputCap}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
 	runErr := cmd.Run()
 
 	exit := 0
@@ -165,23 +169,40 @@ func Run(ctx context.Context, key string, args []string) Result {
 			return Result{Status: domain.StatusError, Stderr: runErr.Error(), ExitCode: -1}
 		}
 	}
-	out, t1 := capString(stdout.String())
-	errOut, t2 := capString(stderr.String())
 	return Result{
 		ExitCode:  exit,
-		Stdout:    out,
-		Stderr:    errOut,
-		Truncated: t1 || t2,
+		Stdout:    stdout.String(),
+		Stderr:    stderr.String(),
+		Truncated: stdout.truncated || stderr.truncated,
 		Status:    domain.StatusOK,
 	}
 }
 
-func capString(s string) (string, bool) {
-	if len(s) <= defaultOutputCap {
-		return s, false
-	}
-	return s[:defaultOutputCap], true
+// cappedBuffer is an io.Writer that retains at most cap bytes and discards the
+// rest, so a command that floods stdout/stderr can never balloon the daemon's
+// memory — the buffer is bounded at the source, not trimmed after the fact. It
+// keeps reporting full writes so the child process is never blocked on a full pipe.
+type cappedBuffer struct {
+	buf       bytes.Buffer
+	cap       int
+	truncated bool
 }
+
+func (c *cappedBuffer) Write(p []byte) (int, error) {
+	if room := c.cap - c.buf.Len(); room > 0 {
+		if len(p) > room {
+			c.buf.Write(p[:room])
+			c.truncated = true
+		} else {
+			c.buf.Write(p)
+		}
+	} else if len(p) > 0 {
+		c.truncated = true
+	}
+	return len(p), nil
+}
+
+func (c *cappedBuffer) String() string { return c.buf.String() }
 
 // allowedDirRoots bounds dir.list to non-sensitive, operator-relevant trees.
 var allowedDirRoots = []string{"/var/log", "/tmp"}

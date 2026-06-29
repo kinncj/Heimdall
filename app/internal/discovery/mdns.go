@@ -7,7 +7,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -114,13 +116,16 @@ func BrowseAll(timeout time.Duration) ([]Found, error) {
 			switch {
 			case len(e.AddrIPv4) > 0:
 				host = e.AddrIPv4[0].String()
+			case len(e.AddrIPv6) > 0:
+				host = e.AddrIPv6[0].String() // IPv6-only networks: don't fall straight to HostName
 			case e.HostName != "":
 				host = strings.TrimSuffix(e.HostName, ".")
 			}
 			if host == "" {
 				continue
 			}
-			addr := fmt.Sprintf("%s:%d", host, e.Port)
+			// JoinHostPort brackets IPv6 literals ([::1]:9090) so the addr stays dialable.
+			addr := net.JoinHostPort(host, strconv.Itoa(int(e.Port)))
 			byAddr[addr] = Found{Name: e.Instance, Addr: addr}
 		case <-ctx.Done():
 			return sortedFound(byAddr), nil

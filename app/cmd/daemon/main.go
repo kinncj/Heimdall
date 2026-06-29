@@ -397,8 +397,16 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 				return true, fmt.Errorf("send: %w", err)
 			}
 		case <-trigger:
-			if err := send(); err != nil {
-				return true, fmt.Errorf("send: %w", err)
+			// Flush every queued command result — one snapshot each, since the wire
+			// carries a single result per snapshot — so concurrent commands don't
+			// wait a tick apiece (or, before the queue, overwrite each other).
+			for {
+				if err := send(); err != nil {
+					return true, fmt.Errorf("send: %w", err)
+				}
+				if push == nil || !push.hasResults() {
+					break
+				}
 			}
 		case <-sig:
 			_ = stream.CloseSend()
