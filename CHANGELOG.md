@@ -5,6 +5,38 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-06-29
+
+The *Heimdallr's sight* release — host logs and a live process view, inside the
+dashboard, with no inbound port on any daemon.
+
+### Added
+- **In-dashboard logs (`l`) and top (`t`).** From a host's detail view, press `l`
+  to pick a log source and stream it live (scrollable), or `t` for a scrollable,
+  refreshing process table. `esc` is the universal back button, unwinding one
+  level at a time. The affordances appear only for hosts that expose the
+  capability. Explorable in `--demo`.
+- **Push-based, hub-mediated observability (ADR 0017).** The daemon — a pure
+  outbound producer — tails `--log-source` files and collects a process table on
+  `--process-interval`, pushing both to the hub on its existing stream. The hub
+  buffers them per host and serves them to dashboards. Nothing connects to a
+  daemon; the dashboard talks only to the hub. Cross-platform process collection
+  (`ps` on Linux/macOS, `tasklist` on Windows).
+- Wire: additive `Snapshot.{processes, processes_at, log_lines}` and a `ProcessRow`
+  message. Old daemons/hubs ignore them — no lockstep upgrade.
+
+### Removed
+- **BREAKING — the daemon no longer acts as a server.** Daemons are outbound-only
+  and must not listen (only hubs do), so the direct daemon-served control plane is
+  removed:
+  - daemon flags `--control-listen`, `--control-token`, `--control-tls-cert`,
+    `--control-tls-key` (use `--process-interval` / `--log-source` to push);
+  - dashboard flags `--control`, `--run`, `--tail` (use `l` / `t` in the TUI).
+  - `--log-source` is kept, but now configures what the daemon **pushes** rather
+    than a served stream.
+  On-demand command execution returns with the v2 socket model
+  (`feature/sockets`); see ADR 0017 §3.9.
+
 ## [1.5.2] - 2026-06-29
 
 ### Fixed
@@ -280,6 +312,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.6.0]: https://github.com/kinncj/Heimdall/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/kinncj/Heimdall/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/kinncj/Heimdall/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/kinncj/Heimdall/compare/v1.4.0...v1.5.0

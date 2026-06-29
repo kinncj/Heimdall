@@ -1,70 +1,70 @@
-# Remote Control Plane — Read-Only, Allow-Listed
+# Process View (top) — Pushed, In-Dashboard
 
-A daemon can expose a small, **read-only** control plane: a fixed allow-list of
-safe diagnostic commands an operator can run remotely. Everything is audited, runs
-as the unprivileged daemon user, and nothing off the list is ever executed.
+Heimdall surfaces a host's process table inside the dashboard, under the detail
+view's **`t`** key. It is push-based: the daemon collects the table locally and
+pushes it to the hub on its existing stream, and the dashboard reads it from the
+hub. The daemon never listens and never runs a command on request.
 
-## Safety model
-
-- **Allow-list only**: logical command keys map to fixed argument vectors. There is
-  no shell, no `sudo`, and no way to run an arbitrary binary.
-- **Unprivileged**: commands run as the daemon's user.
-- **Audited**: every invocation — allowed or refused — is logged with the actor,
-  command, arguments, and decision.
-- **Bounded**: output is size-capped and time-limited.
-
-## Built-in commands
-
-| Key | Runs | Notes |
-|---|---|---|
-| `process.list` | process list | pid, ppid, cpu%, mem%, command |
-| `disk.df` | disk usage | human-readable |
-| `uptime` | load average + uptime | |
-| `dir.list <path>` | directory listing | only under allow-listed roots (e.g. `/var/log`, `/tmp`) |
+See [ADR 0017](../architecture/0017-heimdallr-sight-in-dashboard-observability.md).
 
 ## Enable it on a host
 
-The control plane shares the daemon's `--control-listen` endpoint and is protected
-by a token:
+The daemon collects and pushes a process table when you set a non-zero interval:
 
 ```sh
-export HEIMDALL_CONTROL_TOKEN=$(openssl rand -hex 16)
-
 heimdall-daemon --hub station:9090 --name "$(hostname)" \
-  --control-listen :9100 \
-  --control-token "$HEIMDALL_CONTROL_TOKEN"
+  --process-interval 5s
 ```
 
-For TLS on the control endpoint, add `--control-tls-cert` / `--control-tls-key`.
+The table rides the same outbound stream as metrics. No inbound port is opened.
 
-## Run a command from the dashboard
+## View it in the dashboard
 
-```sh
-heimdall-dashboard --control HOST:9100 --token "$HEIMDALL_CONTROL_TOKEN" --run process.list
-heimdall-dashboard --control HOST:9100 --token "$HEIMDALL_CONTROL_TOKEN" --run "dir.list /var/log"
-```
-
-## What refusal looks like
-
-Anything off the allow-list — `sudo`, an unknown binary, a path outside the
-allow-listed roots, or a missing/invalid token — is refused with
-`insufficient_permission` and **never executed**:
+Connect the dashboard to the hub as usual, select a host with `↑/↓` and `⏎`, then
+press **`t`**:
 
 ```text
-heimdall-dashboard: refused (METRIC_STATUS_INSUFFICIENT_PERMISSION): command "sudo" is not allow-listed
+  TOP — dgx-spark   updated 15:04:33
+
+      PID    PPID   CPU%   MEM%  COMMAND
+      100       1  49.3%   5.5%  heimdall-daemon
+      107       1  33.1%   8.5%  systemd
+      ...
+  ↑/↓ scroll  esc back
 ```
 
-The daemon records a structured audit line for it either way:
+`t` only appears for hosts that push a table. `↑/↓` scrolls; `esc` closes.
 
-```json
-{"level":"INFO","msg":"control audit","actor":"alice","command":"sudo","args":["reboot"],"decision":"refuse","exit_code":-1}
-```
+## Cross-platform
 
-## Background
+| OS | Source command |
+|---|---|
+| Linux / macOS | `ps -eo pid,ppid,pcpu,pmem,comm` |
+| Windows | `tasklist /FO CSV /NH` (pid + command; cpu/ppid unavailable) |
 
-See [ADR 0007 — Unprivileged remote control plane](../architecture/0007-unprivileged-remote-control-plane.md).
+Collection is read-only and unprivileged. A privileged `heimdall-helper`-backed
+source for fuller detail is a planned enrichment (the collector is an interface).
+
+## Bandwidth
+
+The table is pushed only at `--process-interval` (default **off**), independent of
+the faster metric tick, and the hub forwards it to dashboards only when fresh. Pick
+an interval that matches how closely you watch a host.
+
+## Migration from the removed control plane
+
+The direct daemon-served control plane was **removed in v1.6.0** — daemons are
+outbound-only and must not listen (only hubs do). These flags no longer exist:
+
+| Removed | Replacement |
+|---|---|
+| `heimdall-daemon --control-listen / --control-token / --control-tls-*` | `--process-interval` (push) |
+| `heimdall-dashboard --control HOST --run process.list` | press `t` in the host detail view |
+
+On-demand, arbitrary allow-listed commands return with the v2 socket model
+(`feature/sockets`); v1 ships the push-only process view. See ADR 0017 §3.9.
 
 ## Next steps
 
-- Stream logs from the same endpoint → [Log Streaming](07-log-streaming.md)
+- Stream logs the same way → [Log Streaming](07-log-streaming.md)
 - Full flag reference → [Configuration](../configuration.md)
