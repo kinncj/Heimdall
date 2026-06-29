@@ -48,6 +48,7 @@ def _start_hub(context):
         stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, cwd=str(context.root),
     )
     context.procs.append(proc)
+    context.hub_proc = proc
     context.hub_port = port
     assert _wait_port(port), "hub did not open its port"
 
@@ -71,6 +72,7 @@ def _start_daemon(context, process=False, allow_commands=False):
     )
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, cwd=str(context.root), env=env)
     context.procs.append(proc)
+    context.daemon_proc = proc
     deadline = time.time() + 10
     while time.time() < deadline:
         out = _cli(context, "hosts")

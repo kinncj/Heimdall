@@ -52,6 +52,12 @@ listener and mediates every directive over the daemon's existing stream.
   with a single hub, both connect transparently.
 - **Manpages** for every binary (roff `.1` + plain text), generated from each
   binary's `--help`.
+- **Socket-hygiene verification.** A `socket-hygiene.feature` acceptance suite
+  proves the model against the *running processes'* real sockets (via `ss`): a
+  daemon listens on nothing (no inbound surface), the hub is the sole listener,
+  the daemon holds exactly one outbound connection — to the hub — and an on-demand
+  command opens **no new socket** (it rides the existing stream). `scripts/
+  verify-sockets.sh` runs the same audit on a live host.
 - **Documentation screenshot tooling** (`make screenshots`). The `--snapshot`
   path now honours `COLUMNS`/`LINES`, so the generator captures the dashboard at a
   matrix of sizes/views/themes headlessly — including the wide vs. narrow grid
