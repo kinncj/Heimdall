@@ -201,6 +201,9 @@ func (m Model) DetailView() string {
 	if hasProc(h) {
 		b.WriteString(keys.Style().Render("t") + muted.Style().Render(" top   "))
 	}
+	if hasCmd(h) && m.runCmd != nil {
+		b.WriteString(keys.Style().Render("c") + muted.Style().Render(" cmd   "))
+	}
 	b.WriteString(keys.Style().Render("q") + muted.Style().Render(" quit"))
 	return b.String()
 }

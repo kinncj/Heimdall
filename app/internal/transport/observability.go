@@ -66,6 +66,23 @@ func AttachObservability(s *v1.Snapshot, procs []domain.ProcessRow, procsAt time
 	}
 }
 
+// CommandResultFromSnapshot extracts an on-demand command result (v2 Phase 2), or
+// nil when the snapshot carries none.
+func CommandResultFromSnapshot(s *v1.Snapshot) *domain.CommandResult {
+	cr := s.GetCommandResult()
+	if cr == nil {
+		return nil
+	}
+	return &domain.CommandResult{
+		RequestID: cr.GetRequestId(),
+		ExitCode:  int(cr.GetExitCode()),
+		Stdout:    cr.GetStdout(),
+		Stderr:    cr.GetStderr(),
+		Truncated: cr.GetTruncated(),
+		Status:    statusFromProto(cr.GetStatus()),
+	}
+}
+
 // ObservabilityFromSnapshot extracts the pushed process table (with its collection
 // time) and log lines from a wire snapshot.
 func ObservabilityFromSnapshot(s *v1.Snapshot) ([]domain.ProcessRow, time.Time, []domain.LogLine) {

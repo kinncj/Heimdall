@@ -85,6 +85,7 @@ func main() {
 	var tickFn func(time.Time)
 	var source string
 	var live func() bool
+	var runCmd func(host, cmd string, args []string, reqID string) // v2 Phase 2; nil in demo
 	switch {
 	case *demoMode:
 		src := fake.New(now)
@@ -92,6 +93,13 @@ func main() {
 		tickFn = src.Tick
 		source = "demo"
 		live = func() bool { return true }
+		// Fake command execution so the command modal is explorable in --demo.
+		runCmd = func(host, cmd string, args []string, reqID string) {
+			reg.RecordCommandResult(domain.HostID(host), &domain.CommandResult{
+				RequestID: reqID, Status: domain.StatusOK,
+				Stdout: fmt.Sprintf("(demo) %s on %s\nconnect to a real hub to run live commands\n", cmd, host),
+			})
+		}
 	default:
 		reg = domain.NewHostRegistry(10*time.Second, 30*time.Second)
 		reg.SetPurgeAfter(cfg.Span("purge-after", 15*time.Minute))
@@ -111,6 +119,25 @@ func main() {
 		}
 		lastRecv := new(atomic.Int64)
 		go subscribeHub(hubAddr, reg, dialOpts, lastRecv)
+		// v2 Phase 2: issue on-demand commands to the hub. Fire-and-forget — the
+		// result returns on the subscription and lands in the registry; the modal
+		// shows it. A dedicated connection keeps it off the subscription stream.
+		if cmdConn, err := grpc.NewClient(hubAddr, dialOpts...); err == nil {
+			fed := v1.NewFederationServiceClient(cmdConn)
+			actor := os.Getenv("USER")
+			if actor == "" {
+				actor = "dashboard"
+			}
+			runCmd = func(host, cmd string, args []string, reqID string) {
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					_, _ = fed.RunCommand(ctx, &v1.ControlRequest{
+						RequestId: reqID, HostId: host, AllowlistedCmd: cmd, Args: args, Actor: actor,
+					})
+				}()
+			}
+		}
 		source = hubAddr
 		live = func() bool {
 			ms := lastRecv.Load()
@@ -123,6 +150,9 @@ func main() {
 
 	model := dashboard.New(md, reg, now).WithStatus(source, live).
 		WithTopSort(cfg.Text("top-sort")).WithPersistSort(saveTopSort)
+	if runCmd != nil {
+		model = model.WithRunCommand(runCmd)
+	}
 	if tickFn != nil {
 		model = model.WithTick(tickFn)
 	}
@@ -244,4 +274,5 @@ func foldSnapshot(reg *domain.HostRegistry, snap *v1.Snapshot) {
 	// tailed log lines into the registry for the detail-view modals.
 	procs, procsAt, logLines := transport.ObservabilityFromSnapshot(snap)
 	reg.RecordPush(hid, procs, procsAt, logLines)
+	reg.RecordCommandResult(hid, transport.CommandResultFromSnapshot(snap)) // v2 Phase 2
 }

@@ -17,11 +17,13 @@ import (
 type modalKind int
 
 const (
-	modalNone    modalKind = iota
-	modalLogList           // pick a log source
-	modalLogView           // stream the chosen source
-	modalTop               // live process table
-	modalTopSort           // pick the top sort column (v2, ADR 0019)
+	modalNone      modalKind = iota
+	modalLogList             // pick a log source
+	modalLogView             // stream the chosen source
+	modalTop                 // live process table
+	modalTopSort             // pick the top sort column (v2, ADR 0019)
+	modalCmdList             // pick an on-demand command (v2 Phase 2)
+	modalCmdResult           // show an on-demand command's result
 )
 
 // Reserved capability labels the hub/daemon set; never shown as user tags.
@@ -71,7 +73,7 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	// Clamp a scroll offset that may be a "pin to tail" sentinel or stale after the
 	// buffer shrank, so up/down respond immediately.
-	if m.modal == modalLogView || m.modal == modalTop {
+	if m.modal == modalLogView || m.modal == modalTop || m.modal == modalCmdResult {
 		if mx := m.modalMaxScroll(); m.modalScroll > mx {
 			m.modalScroll = mx
 		}
@@ -98,6 +100,10 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "t":
 			if ok && hasProc(h) {
 				m.modal, m.modalScroll = modalTop, 0
+			}
+		case "c":
+			if ok && hasCmd(h) && m.runCmd != nil {
+				m.modal, m.cmdSel = modalCmdList, 0
 			}
 		}
 	case modalLogList:
@@ -183,6 +189,43 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.modal = modalTop
 		}
+	case modalCmdList:
+		keys := cmdModalKeys()
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.modal = modalNone
+		case "up", "k":
+			if m.cmdSel > 0 {
+				m.cmdSel--
+			}
+		case "down", "j":
+			if m.cmdSel < len(keys)-1 {
+				m.cmdSel++
+			}
+		case "enter":
+			if m.cmdSel < len(keys) && m.runCmd != nil && ok {
+				m.cmdReqID = fmt.Sprintf("dash-%d", m.now.UnixNano())
+				m.runCmd(string(h.Host.ID), keys[m.cmdSel], nil, m.cmdReqID)
+				m.modal, m.modalScroll = modalCmdResult, 0
+			}
+		}
+	case modalCmdResult:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.modal = modalCmdList // back to the command list
+		case "up", "k":
+			if m.modalScroll > 0 {
+				m.modalScroll--
+			}
+		case "down", "j":
+			if m.modalScroll < m.modalMaxScroll() {
+				m.modalScroll++
+			}
+		}
 	}
 	return m, nil
 }
@@ -247,6 +290,17 @@ func (m Model) ModalView() string {
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" pick  ") +
 			keys.Style().Render("⏎") + muted.Style().Render(" apply  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" cancel")
+	case modalCmdList:
+		title = heading.Style().Render("  COMMAND — " + dn)
+		body = m.cmdListBody()
+		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" pick  ") +
+			keys.Style().Render("⏎") + muted.Style().Render(" run  ") +
+			keys.Style().Render("esc") + muted.Style().Render(" back")
+	case modalCmdResult:
+		title = heading.Style().Render("  COMMAND — "+dn+" / ") + keys.Style().Render(m.cmdResultName())
+		body = m.cmdResultBody(h, w)
+		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" scroll  ") +
+			keys.Style().Render("esc") + muted.Style().Render(" commands")
 	default:
 		return m.DetailView()
 	}
@@ -336,6 +390,8 @@ func (m Model) modalMaxScroll() int {
 		}
 	case modalTop:
 		bodyLen = len(h.Processes) + 1 // header row
+	case modalCmdResult:
+		bodyLen = len(m.cmdResultBody(h, m.width))
 	default:
 		return 0
 	}

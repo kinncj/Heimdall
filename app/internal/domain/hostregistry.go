@@ -33,6 +33,7 @@ type hostEntry struct {
 	processes   []ProcessRow
 	processesAt time.Time
 	logRing     []LogLine
+	lastCommand *CommandResult
 }
 
 // LogRingCap bounds the per-host log ring retained for the dashboard's log modal.
@@ -109,6 +110,22 @@ func (r *HostRegistry) RecordPush(id HostID, processes []ProcessRow, processesAt
 			e.logRing = e.logRing[len(e.logRing)-LogRingCap:]
 		}
 	}
+}
+
+// RecordCommandResult stores a host's most recent on-demand command result (v2
+// Phase 2), creating the host if unseen. It does not change liveness.
+func (r *HostRegistry) RecordCommandResult(id HostID, res *CommandResult) {
+	if res == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	e, ok := r.hosts[id]
+	if !ok {
+		e = &hostEntry{host: Host{ID: id}}
+		r.hosts[id] = e
+	}
+	e.lastCommand = res
 }
 
 // Observe records a fresh metric snapshot, marking the host Online and storing
@@ -211,7 +228,7 @@ func (e *hostEntry) view(hubLabels map[string]string) HostView {
 	}
 	return HostView{
 		Host: host, State: e.state, LastSeen: e.lastSeen, LastSnapshot: snap, Alerts: alerts,
-		Processes: procs, ProcessesAt: e.processesAt, Logs: logs,
+		Processes: procs, ProcessesAt: e.processesAt, Logs: logs, LastCommand: e.lastCommand,
 	}
 }
 

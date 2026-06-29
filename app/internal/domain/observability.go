@@ -25,3 +25,14 @@ type LogLine struct {
 	Level       string
 	RateLimited bool
 }
+
+// CommandResult is the outcome of an on-demand command (v2 Phase 2), carried to
+// the dashboard. RequestID correlates it with the request that issued it.
+type CommandResult struct {
+	RequestID string
+	ExitCode  int
+	Stdout    string
+	Stderr    string
+	Truncated bool
+	Status    MetricStatus
+}

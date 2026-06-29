@@ -46,6 +46,18 @@ type Model struct {
 	logQuery     string       // log-view search query
 	logSearching bool         // true while the log search input is open
 	persistSort  func(string) // persist the chosen top sort to config (injected)
+	// On-demand commands (v2 Phase 2): issue via the injected callback, read the
+	// result back from the registry, matched by the in-flight request id.
+	runCmd   func(host, cmd string, args []string, reqID string)
+	cmdSel   int    // selection in the command picker
+	cmdReqID string // request id of the in-flight command
+}
+
+// WithRunCommand injects the callback that issues an on-demand command to the hub
+// (v2 Phase 2). When nil, the command modal reports that commands are unavailable.
+func (m Model) WithRunCommand(fn func(host, cmd string, args []string, reqID string)) Model {
+	m.runCmd = fn
+	return m
 }
 
 // WithTopSort sets the initial top-modal sort key (the persisted default).
