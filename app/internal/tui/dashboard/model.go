@@ -185,25 +185,6 @@ func (m Model) GridView() string {
 	cols := legend.Style().Render(fmt.Sprintf("  %-16s %-13s %-14s %-14s %-14s %-7s %-6s %-6s",
 		"HOST", "STATE", "CPU", "MEM", "DISK", "TEMP", "GPU", "PWR"))
 
-	hosts, groups := m.orderedHosts()
-	rows := make([]string, 0, len(hosts)+4)
-	lastGroup := "\x00"
-	for i, h := range hosts {
-		if groups != nil && groups[i] != lastGroup {
-			lastGroup = groups[i]
-			rows = append(rows, m.sectionHeader(groups[i], countGroup(groups, groups[i])))
-		}
-		rows = append(rows, m.row(h, i == m.cursor))
-	}
-	if len(hosts) == 0 {
-		muted, _ := m.mode.Role("text_muted")
-		msg := "no hosts yet"
-		if m.filter != "" {
-			msg = fmt.Sprintf("no hosts match %q", m.filter)
-		}
-		rows = append(rows, muted.Style().Render("  "+msg))
-	}
-
 	status := brand.StatusBar(m.mode, w, m.live != nil && m.live(), m.source, clock)
 	foot, _ := m.mode.Role("text_muted")
 	keys, _ := m.mode.Role("keybinding")
@@ -215,7 +196,91 @@ func (m Model) GridView() string {
 		keys.Style().Render("q") + foot.Style().Render(" quit  ") +
 		keys.Style().Render("?") + foot.Style().Render(" help")
 
-	return strings.Join([]string{header, m.metaLine(all), cols, strings.Join(rows, "\n"), "", status, footer}, "\n")
+	hosts, groups := m.orderedHosts()
+	body := make([]string, 0, len(hosts)+4)
+	cursorLine := 0
+	lastGroup := "\x00"
+	for i, h := range hosts {
+		if groups != nil && groups[i] != lastGroup {
+			lastGroup = groups[i]
+			body = append(body, m.sectionHeader(groups[i], countGroup(groups, groups[i])))
+		}
+		if i == m.cursor {
+			cursorLine = len(body)
+		}
+		body = append(body, m.row(h, i == m.cursor))
+	}
+	if len(hosts) == 0 {
+		muted, _ := m.mode.Role("text_muted")
+		msg := "no hosts yet"
+		if m.filter != "" {
+			msg = fmt.Sprintf("no hosts match %q", m.filter)
+		}
+		body = append(body, muted.Style().Render("  "+msg))
+	}
+
+	// Clamp the host rows so the whole frame fits the terminal height. Without
+	// this the frame overruns short screens (SSH from a tablet/phone), scrolling
+	// the header off and making ungrouped filtering look inert. The fixed chrome
+	// is header + meta + cols + blank + status + footer.
+	chrome := lineCount(header) + 3 + lineCount(status) + 1
+	body = m.windowBody(window(body, cursorLine, m.height-chrome))
+
+	return strings.Join([]string{header, m.metaLine(all), cols, strings.Join(body, "\n"), "", status, footer}, "\n")
+}
+
+// lineCount returns how many terminal lines a rendered block occupies.
+func lineCount(s string) int { return strings.Count(s, "\n") + 1 }
+
+// window clamps body lines to at most max, keeping the cursor line in view. When
+// the list overflows, the edge lines become "↑/↓ N more" indicators so the
+// rendered height stays exactly max. max < 1 is treated as 1.
+func window(lines []string, cursor, max int) []string {
+	if max < 1 {
+		max = 1
+	}
+	if len(lines) <= max {
+		return lines
+	}
+	start := cursor - max/2
+	if start < 0 {
+		start = 0
+	}
+	if start > len(lines)-max {
+		start = len(lines) - max
+	}
+	end := start + max
+	out := append([]string(nil), lines[start:end]...)
+	if start > 0 {
+		out[0] = moreIndicator(start, true)
+	}
+	if end < len(lines) {
+		out[len(out)-1] = moreIndicator(len(lines)-end, false)
+	}
+	return out
+}
+
+func moreIndicator(n int, up bool) string {
+	arrow := "↓"
+	if up {
+		arrow = "↑"
+	}
+	return fmt.Sprintf("  %s %d more", arrow, n)
+}
+
+// windowBody themes the "N more" overflow indicators produced by window. Kept
+// separate so window stays a pure, testable function with no theme dependency.
+func (m Model) windowBody(lines []string) []string {
+	muted, ok := m.mode.Role("text_muted")
+	if !ok {
+		return lines
+	}
+	for i, l := range lines {
+		if strings.Contains(l, " more") && (strings.Contains(l, "↑") || strings.Contains(l, "↓")) {
+			lines[i] = muted.Style().Render(l)
+		}
+	}
+	return lines
 }
 
 // metaLine shows the active grouping dimension, the filter query (with a cursor

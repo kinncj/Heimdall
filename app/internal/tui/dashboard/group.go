@@ -79,31 +79,109 @@ func (m Model) activeDim(hosts []domain.HostView) (groupDim, bool) {
 	return dims[m.groupBy-1], true
 }
 
-// matchesFilter reports whether a host matches the filter query — its name/id or
-// any tag (key=value), case-insensitive. An empty query matches everything.
-func (m Model) matchesFilter(h domain.HostView) bool {
-	q := strings.ToLower(strings.TrimSpace(m.filter))
-	if q == "" {
-		return true
+// fieldMatcher is one searchable axis — an adapter over a HostView, mirroring
+// groupDim. Adding a scope means registering another matcher, not editing a
+// switch (Open/Closed); a host satisfies a scoped term via the matcher whose
+// name equals the scope, and a bare term via any matcher.
+type fieldMatcher struct {
+	name string
+	of   func(domain.HostView) string
+}
+
+// matchers returns the searchable fields for the current fleet: host name/id,
+// hub, os, state, the active grouping dimension (as "group"), then each tag key.
+// Tag keys are derived from the fleet like dimensions() — no field is hard-coded
+// beyond the four structural ones.
+func (m Model) matchers() []fieldMatcher {
+	fields := []fieldMatcher{
+		{"host", func(h domain.HostView) string { return h.Host.DisplayName + " " + string(h.Host.ID) }},
+		{"hub", func(h domain.HostView) string { return labelOr(h, "hub", "") }},
+		{"os", osOf},
+		{"state", func(h domain.HostView) string { return stateName(h.State) }},
 	}
-	if strings.Contains(strings.ToLower(h.Host.DisplayName+" "+string(h.Host.ID)), q) {
-		return true
+	// "group" is an alias that delegates to the active grouping dimension, reusing
+	// the grouping strategy instead of duplicating it. Absent when grouping is off.
+	if dim, ok := m.activeDim(m.reg.Hosts()); ok {
+		fields = append(fields, fieldMatcher{"group", dim.of})
 	}
-	for k, v := range h.Host.Context.Labels {
-		if strings.Contains(strings.ToLower(k+"="+v), q) {
+	seen := map[string]bool{"host": true, "hub": true, "os": true, "state": true, "group": true}
+	var keys []string
+	for _, h := range m.reg.Hosts() {
+		for k := range h.Host.Context.Labels {
+			if !seen[k] {
+				seen[k] = true
+				keys = append(keys, k)
+			}
+		}
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		k := k
+		fields = append(fields, fieldMatcher{k, func(h domain.HostView) string { return h.Host.Context.Labels[k] }})
+	}
+	return fields
+}
+
+// searchTerm is one parsed filter token: an optional field scope and a value.
+type searchTerm struct {
+	field string // "" = unscoped (matches any field)
+	value string
+}
+
+// parseTerms splits the filter into space-separated terms. "field=value" is a
+// scoped term only when field names a known matcher; otherwise the whole token
+// (any '=' included) is an unscoped value matched against every field.
+func parseTerms(filter string, fields map[string]bool) []searchTerm {
+	var terms []searchTerm
+	for _, tok := range strings.Fields(strings.ToLower(filter)) {
+		if i := strings.IndexByte(tok, '='); i > 0 && fields[tok[:i]] {
+			terms = append(terms, searchTerm{field: tok[:i], value: tok[i+1:]})
+			continue
+		}
+		terms = append(terms, searchTerm{value: tok})
+	}
+	return terms
+}
+
+// termMatches reports whether a host satisfies one term: a scoped term checks its
+// one field; a bare term checks every field. Substring, case-insensitive.
+func termMatches(t searchTerm, h domain.HostView, fields []fieldMatcher) bool {
+	for _, f := range fields {
+		if t.field != "" && f.name != t.field {
+			continue
+		}
+		if strings.Contains(strings.ToLower(f.of(h)), t.value) {
 			return true
 		}
 	}
 	return false
 }
 
+// matchesFilter reports whether a host satisfies every parsed term (AND). An
+// empty filter yields no terms and matches everything.
+func (m Model) matchesFilter(h domain.HostView, fields []fieldMatcher, terms []searchTerm) bool {
+	for _, t := range terms {
+		if !termMatches(t, h, fields) {
+			return false
+		}
+	}
+	return true
+}
+
 // orderedHosts returns the hosts in display order: filtered, and when grouped,
 // sorted so each group is contiguous. The parallel []string holds each host's
 // group label (nil when not grouped) for section headers.
 func (m Model) orderedHosts() ([]domain.HostView, []string) {
+	fields := m.matchers()
+	names := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		names[f.name] = true
+	}
+	terms := parseTerms(m.filter, names)
+
 	var hosts []domain.HostView
 	for _, h := range m.reg.Hosts() {
-		if m.matchesFilter(h) {
+		if m.matchesFilter(h, fields, terms) {
 			hosts = append(hosts, h)
 		}
 	}

@@ -5,6 +5,27 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-06-28
+
+### Fixed
+- **Dashboard overflowed short terminals.** The fleet grid rendered every row
+  with no height clamp, so on a screen shorter than the fleet (SSH from a tablet
+  or phone) the frame overran the terminal — the header scrolled off and
+  ungrouped filtering looked inert because the visible rows never moved. The grid
+  now windows host rows to the terminal height, keeps the selected host in view,
+  and shows an `↑/↓ N more` indicator for hidden rows. Filtering is visibly
+  effective now regardless of grouping or screen size.
+
+### Changed
+- **Term-scoped fleet filter.** `/` parses space-separated terms. A bare term
+  (`ba`) matches any field — host name, tag value, hub, OS, or state — so it
+  surfaces both hosts named `bar`/`baz` and hosts tagged `env=bar`. A scoped term
+  narrows to one field: `host=ba`, `env=fo`, `hub=home`, `os=linux`,
+  `state=offline`, or `group=<value>` (the active grouping dimension). Multiple
+  terms narrow conjunctively; an empty filter shows everything. Searchable fields
+  are a strategy registry mirroring the grouping dimensions, so adding a scope is
+  registering a matcher, not editing a conditional.
+
 ## [1.5.0] - 2026-06-27
 
 ### Added
@@ -245,6 +266,7 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[1.5.1]: https://github.com/kinncj/Heimdall/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/kinncj/Heimdall/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/kinncj/Heimdall/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/kinncj/Heimdall/compare/v1.3.0...v1.3.1
