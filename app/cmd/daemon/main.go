@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -27,6 +28,7 @@ import (
 	"heimdall/app/internal/command"
 	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
+	"heimdall/app/internal/helper"
 	"heimdall/app/internal/logs"
 	"heimdall/app/internal/options"
 	"heimdall/app/internal/proc"
@@ -262,9 +264,27 @@ func runCommand(req *v1.ControlRequest, push *pusher, trigger chan struct{}) {
 		}
 		return
 	}
-	res := command.Run(context.Background(), req.GetAllowlistedCmd(), req.GetArgs())
+	key := req.GetAllowlistedCmd()
+	var res command.Result
+	if command.IsPrivileged(key) {
+		// Privileged commands are delegated to the root helper over the local unix
+		// socket (v2 Phase 2b). The unprivileged daemon never gains privilege; a
+		// host with no helper simply cannot satisfy the request.
+		r, err := (helper.Client{}).Exec(context.Background(), key, req.GetArgs())
+		switch {
+		case errors.Is(err, helper.ErrUnavailable):
+			res = command.Result{Status: domain.StatusInsufficientPermission, ExitCode: -1,
+				Stderr: "this command needs the privileged helper (heimdall-helper), which is not running on this host"}
+		case err != nil:
+			res = command.Result{Status: domain.StatusError, ExitCode: -1, Stderr: err.Error()}
+		default:
+			res = r
+		}
+	} else {
+		res = command.Run(context.Background(), key, req.GetArgs())
+	}
 	logger.Info("control command",
-		"cmd", req.GetAllowlistedCmd(), "args", req.GetArgs(),
+		"cmd", key, "args", req.GetArgs(), "privileged", command.IsPrivileged(key),
 		"actor", req.GetActor(), "status", res.Status.String(), "exit", res.ExitCode)
 	push.setResult(&v1.ControlResponse{
 		RequestId: req.GetRequestId(),

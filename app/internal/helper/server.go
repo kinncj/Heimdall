@@ -5,20 +5,23 @@ package helper
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"os"
 	"time"
 
+	"heimdall/app/internal/command"
 	"heimdall/app/internal/domain"
 )
 
 // CollectFunc returns the current privileged metrics.
 type CollectFunc func(ctx context.Context) []domain.Metric
 
-// Server serves privileged metrics over a local unix socket. Each connection
-// receives a single JSON envelope of the latest metrics. It is read-only: the
-// client sends nothing and cannot influence what is collected, so the helper
-// presents no argument-injection or command-execution surface to callers.
+// Server serves privileged metrics — and, opt-in, privileged allow-listed
+// commands — over a local unix socket. For commands the helper enforces its OWN
+// allow-list (command.IsPrivileged): it never trusts the daemon and will only run
+// commands that are both allow-listed and explicitly privileged, with bounded
+// output and no shell. A request for anything else is refused.
 type Server struct {
 	SockPath string
 	Collect  CollectFunc
@@ -65,8 +68,29 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	if to == 0 {
 		to = 3 * time.Second
 	}
+	// Read the request first. An old (silent) client sends nothing, so a short read
+	// deadline falls back to "collect" — preserving the metric path.
+	_ = conn.SetReadDeadline(time.Now().Add(300 * time.Millisecond))
+	var req request
+	reqErr := json.NewDecoder(conn).Decode(&req)
+
 	cctx, cancel := context.WithTimeout(ctx, to)
 	defer cancel()
 	_ = conn.SetWriteDeadline(time.Now().Add(to))
+
+	if reqErr == nil && req.Op == "exec" {
+		// The helper trusts no caller: only its own privileged allow-list runs.
+		if !command.IsPrivileged(req.Cmd) {
+			_ = encodeResult(conn, command.Result{
+				Status: domain.StatusInsufficientPermission, ExitCode: -1,
+				Stderr: "command is not a privileged allow-listed command",
+			})
+			return
+		}
+		cmdCtx, cmdCancel := context.WithTimeout(ctx, to)
+		defer cmdCancel()
+		_ = encodeResult(conn, command.Run(cmdCtx, req.Cmd, req.Args))
+		return
+	}
 	_ = encodeMetrics(conn, s.Collect(cctx))
 }

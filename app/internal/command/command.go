@@ -35,17 +35,20 @@ type Result struct {
 	Status    domain.MetricStatus
 }
 
-// spec is one allow-listed command: a per-OS argv builder and optional argument
-// validation. A nil argv for the current OS means "unavailable here".
+// spec is one allow-listed command: a per-OS argv builder, optional argument
+// validation, and whether it needs privilege. A nil argv for the current OS means
+// "unavailable here". Privileged commands are run by the root helper, never by the
+// unprivileged daemon (v2 Phase 2b).
 type spec struct {
-	argv     func(goos string) []string
-	validate func(args []string) ([]string, error)
+	argv       func(goos string) []string
+	validate   func(args []string) ([]string, error)
+	privileged bool
 }
 
 // Keys lists the allow-listed command keys (stable order) for discovery/help.
 func Keys() []string {
 	a := allowlist()
-	order := []string{"process.list", "disk.df", "uptime", "os.info", "dir.list"}
+	order := []string{"process.list", "disk.df", "uptime", "os.info", "dir.list", "dmesg", "journal.tail"}
 	out := make([]string, 0, len(order))
 	for _, k := range order {
 		if _, ok := a[k]; ok {
@@ -54,6 +57,9 @@ func Keys() []string {
 	}
 	return out
 }
+
+// IsPrivileged reports whether a command must run via the privileged helper.
+func IsPrivileged(key string) bool { return allowlist()[key].privileged }
 
 func allowlist() map[string]spec {
 	return map[string]spec{
@@ -90,6 +96,20 @@ func allowlist() map[string]spec {
 			},
 			validate: allowedDirArg,
 		},
+		// Privileged (run via the root helper, v2 Phase 2b) — Linux-only kernel/log
+		// reads that typically need root.
+		"dmesg": {argv: func(os string) []string {
+			if os != "linux" {
+				return nil
+			}
+			return []string{"dmesg", "--ctime"}
+		}, privileged: true},
+		"journal.tail": {argv: func(os string) []string {
+			if os != "linux" {
+				return nil
+			}
+			return []string{"journalctl", "-n", "200", "--no-pager"}
+		}, privileged: true},
 	}
 }
 
