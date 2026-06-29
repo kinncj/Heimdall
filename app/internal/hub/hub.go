@@ -136,6 +136,10 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 		hostID, ms, labels := transport.FromSnapshot(snap)
 		id := domain.HostID(hostID)
 		h.reg.Observe(id, ms, withOrigin(labels, h.idOrDefault()), time.Now())
+		// Heimdallr's sight (ADR 0017): buffer the host's pushed process table and
+		// append its tailed log lines to the bounded ring, for the dashboard modals.
+		procs, procsAt, logs := transport.ObservabilityFromSnapshot(snap)
+		h.reg.RecordPush(id, procs, procsAt, logs)
 		h.recordOrigin(id, h.idOrDefault(), nil)
 		h.publish(h.enrich(id, snap))
 	}
@@ -153,6 +157,12 @@ func (h *Hub) enrich(id domain.HostID, raw *v1.Snapshot) *v1.Snapshot {
 	}
 	out := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, raw.GetSeq(), time.Now())
 	out.Alerts = hv.Alerts
+	// Forward a fresh process table only when the daemon just pushed one (no
+	// re-send between pushes — bandwidth), and pass the freshly tailed log lines
+	// straight through. The dashboard keeps the last table and its own log ring.
+	out.Processes = raw.GetProcesses()
+	out.ProcessesAtUnixMillis = raw.GetProcessesAtUnixMillis()
+	out.LogLines = raw.GetLogLines()
 	return out
 }
 
@@ -165,6 +175,10 @@ func (h *Hub) Subscribe(_ *v1.SubscribeRequest, stream v1.FederationService_Subs
 	for _, hv := range h.reg.Hosts() {
 		snap := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, hv.LastSeen)
 		snap.Alerts = hv.Alerts
+		// Seed a newly-connected dashboard with the latest known process table so
+		// the top modal is populated before the next push. Logs are live-tailed
+		// from connect time, so no backfill here.
+		transport.AttachObservability(snap, hv.Processes, hv.ProcessesAt, string(hv.Host.ID), nil)
 		if err := stream.Send(snap); err != nil {
 			return err
 		}

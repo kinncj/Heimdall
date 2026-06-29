@@ -67,4 +67,10 @@ type HostView struct {
 	LastSeen     time.Time
 	LastSnapshot []Metric
 	Alerts       []string // names of rules currently firing for this host (Gjallarhorn)
+
+	// Heimdallr's sight (ADR 0017): the host's latest pushed process table and a
+	// bounded ring of recent pushed log lines. Empty unless the daemon pushes them.
+	Processes   []ProcessRow
+	ProcessesAt time.Time
+	Logs        []LogLine
 }

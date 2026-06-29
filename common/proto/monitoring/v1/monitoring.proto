@@ -102,6 +102,18 @@ message MetricSample {
   }
 }
 
+// ProcessRow — one row of a pushed process table (Heimdallr's sight, ADR 0017):
+// pid/ppid, the process's CPU% and memory%, and the command. The daemon collects
+// it with an OS-appropriate command and pushes it periodically; it is never
+// requested (the daemon does not serve).
+message ProcessRow {
+  uint32 pid = 1;
+  uint32 ppid = 2;
+  float  cpu_pct = 3;
+  float  mem_pct = 4;
+  string command = 5;
+}
+
 // Snapshot — the metric set for one host at one instant (the streamed unit).
 // Delta encoding: when delta=true, samples[] carries only metrics whose value
 // or status changed since the last keyframe. keyframe=true marks a full set and
@@ -116,6 +128,12 @@ message Snapshot {
   repeated MetricSample samples = 6;
   map<string, string> labels = 7;     // effective host tags (host wins over hub); inherited across Bifröst relay
   repeated string alerts = 8;         // names of rules currently firing for this host (Gjallarhorn)
+
+  // Heimdallr's sight (ADR 0017) — additive, push-only host observability. Empty
+  // unless the daemon is configured to push it; old peers ignore these fields.
+  repeated ProcessRow processes = 9;         // latest process table
+  int64    processes_at_unix_millis = 10;    // when the process table was collected
+  repeated LogLine log_lines = 11;           // log lines tailed since the last push (push tail)
 }
 
 // ---------------------------------------------------------------------------

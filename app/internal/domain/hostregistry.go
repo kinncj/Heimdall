@@ -23,14 +23,20 @@ type HostRegistry struct {
 }
 
 type hostEntry struct {
-	host     Host
-	state    HostState
-	lastSeen time.Time
-	observed bool
-	snapshot []Metric
-	labels   map[string]string
-	alerts   []string
+	host        Host
+	state       HostState
+	lastSeen    time.Time
+	observed    bool
+	snapshot    []Metric
+	labels      map[string]string
+	alerts      []string
+	processes   []ProcessRow
+	processesAt time.Time
+	logRing     []LogLine
 }
+
+// LogRingCap bounds the per-host log ring retained for the dashboard's log modal.
+const LogRingCap = 500
 
 // NewHostRegistry returns a registry with the given liveness thresholds.
 func NewHostRegistry(staleAfter, offlineAfter time.Duration) *HostRegistry {
@@ -78,6 +84,30 @@ func (r *HostRegistry) SetAlerts(id HostID, alerts []string) {
 	defer r.mu.Unlock()
 	if e, ok := r.hosts[id]; ok {
 		e.alerts = alerts
+	}
+}
+
+// RecordPush stores a host's latest pushed process table and appends pushed log
+// lines to its bounded ring (Heimdallr's sight, ADR 0017). nil processes leave the
+// previous table untouched; the log ring is capped at LogRingCap. It creates the
+// host if unseen and never changes liveness — Observe owns that.
+func (r *HostRegistry) RecordPush(id HostID, processes []ProcessRow, processesAt time.Time, logs []LogLine) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	e, ok := r.hosts[id]
+	if !ok {
+		e = &hostEntry{host: Host{ID: id}}
+		r.hosts[id] = e
+	}
+	if processes != nil {
+		e.processes = processes
+		e.processesAt = processesAt
+	}
+	if len(logs) > 0 {
+		e.logRing = append(e.logRing, logs...)
+		if len(e.logRing) > LogRingCap {
+			e.logRing = e.logRing[len(e.logRing)-LogRingCap:]
+		}
 	}
 }
 
@@ -171,7 +201,18 @@ func (e *hostEntry) view(hubLabels map[string]string) HostView {
 	if e.alerts != nil {
 		alerts = append([]string(nil), e.alerts...)
 	}
-	return HostView{Host: host, State: e.state, LastSeen: e.lastSeen, LastSnapshot: snap, Alerts: alerts}
+	var procs []ProcessRow
+	if e.processes != nil {
+		procs = append([]ProcessRow(nil), e.processes...)
+	}
+	var logs []LogLine
+	if e.logRing != nil {
+		logs = append([]LogLine(nil), e.logRing...)
+	}
+	return HostView{
+		Host: host, State: e.state, LastSeen: e.lastSeen, LastSnapshot: snap, Alerts: alerts,
+		Processes: procs, ProcessesAt: e.processesAt, Logs: logs,
+	}
 }
 
 // mergeLabels combines hub-level tags with a host's own tags; the host's value
