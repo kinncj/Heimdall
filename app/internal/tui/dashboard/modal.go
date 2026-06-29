@@ -250,8 +250,8 @@ func (m Model) ModalView() string {
 	if w < 24 {
 		w = 24
 	}
-	hosts := m.orderedList()
-	header := brand.SkinnyHeader(m.mode, w, onlineCount(hosts), len(hosts), m.now.Format("15:04:05"))
+	online, total := m.fleetCounts()
+	header := brand.SkinnyHeader(m.mode, w, online, total, m.now.Format("15:04:05"))
 	heading, _ := m.mode.Role("heading")
 	muted, _ := m.mode.Role("text_muted")
 	keys, _ := m.mode.Role("keybinding")

@@ -24,6 +24,13 @@ func onlineCount(hosts []domain.HostView) int {
 	return n
 }
 
+// fleetCounts returns the whole-fleet online/total, so the header reads the same
+// in the grid, detail, and modal views even while a filter is active.
+func (m Model) fleetCounts() (online, total int) {
+	all := m.reg.Hosts()
+	return onlineCount(all), len(all)
+}
+
 // recordHistory appends each host's OK metric values into a capped in-memory
 // ring buffer for the detail-view sparklines (no TSDB; bounded RAM), and drops
 // history for hosts the registry has purged so the trend store never outgrows
@@ -94,7 +101,8 @@ func (m Model) DetailView() string {
 	if w < 88 {
 		w = 88
 	}
-	header := brand.SkinnyHeader(m.mode, w, onlineCount(hosts), len(hosts), m.now.Format("15:04:05"))
+	online, total := m.fleetCounts()
+	header := brand.SkinnyHeader(m.mode, w, online, total, m.now.Format("15:04:05"))
 
 	// Fixed header + footer; the body sections scroll (detailScroll) so the view
 	// fits short terminals (e.g. SSH from a phone). Chrome = header + 2 blanks +

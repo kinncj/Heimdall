@@ -3,7 +3,9 @@
 
 // Package command runs the on-demand, READ-ONLY, allow-listed commands of the v2
 // socket transport (ADR 0018). A logical key maps to a fixed, OS-appropriate
-// argument vector — never a shell string. Commands run as the daemon's
+// argument vector. A few Windows entries shell out via "cmd /c", but always with
+// a constant argument list — no caller input is ever interpolated into a command
+// line, so there is no shell-injection surface. Commands run as the daemon's
 // unprivileged user; output is bounded. Nothing arbitrary is ever executed.
 package command
 

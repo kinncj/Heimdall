@@ -72,12 +72,18 @@ func (m Model) cmdResultBody(h domain.HostView, w int) []string {
 	}
 	out := []string{head, ""}
 
-	text := cr.Stdout
-	if strings.TrimSpace(cr.Stderr) != "" {
-		text += cr.Stderr
+	if s := strings.TrimRight(cr.Stdout, "\n"); s != "" {
+		for _, line := range strings.Split(s, "\n") {
+			out = append(out, "  "+val.Style().Render(clip(line, w-4)))
+		}
 	}
-	for _, line := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
-		out = append(out, "  "+val.Style().Render(clip(line, w-4)))
+	// Keep stderr visually distinct and never merged onto a stdout line.
+	if s := strings.TrimRight(cr.Stderr, "\n"); s != "" {
+		al, _ := m.mode.State("error")
+		out = append(out, "", muted.Style().Render("  stderr:"))
+		for _, line := range strings.Split(s, "\n") {
+			out = append(out, "  "+al.Style().Render(clip(line, w-4)))
+		}
 	}
 	if cr.Truncated {
 		out = append(out, muted.Style().Render("  [output truncated]"))

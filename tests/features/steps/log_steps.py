@@ -6,6 +6,7 @@
 # read them from the hub. Each step drives the real heimdall-hub, heimdall-daemon,
 # and heimdall-cli binaries — no daemon listener.
 import json
+import os
 import socket
 import subprocess
 import tempfile
@@ -53,8 +54,8 @@ def _start_hub(context):
 
 
 def _start_daemon(context, with_source):
-    source_path = tempfile.mktemp(prefix="heimdall-logsrc-", suffix=".log")
-    open(source_path, "w").close()
+    fd, source_path = tempfile.mkstemp(prefix="heimdall-logsrc-", suffix=".log")
+    os.close(fd)
     args = [
         str(context.bin / "heimdall-daemon"),
         "--hub", f"localhost:{context.hub_port}",
@@ -63,7 +64,9 @@ def _start_daemon(context, with_source):
     ]
     if with_source:
         args += ["--log-source", f"app={source_path}"]
-    dlog = open(tempfile.mktemp(prefix="heimdall-daemon-", suffix=".log"), "w+")
+    dfd, dpath = tempfile.mkstemp(prefix="heimdall-daemon-", suffix=".log")
+    os.close(dfd)
+    dlog = open(dpath, "w+")
     proc = subprocess.Popen(args, stdout=dlog, stderr=subprocess.STDOUT, cwd=str(context.root))
     context.procs.append(proc)
     context.log_source_path = source_path
@@ -96,11 +99,12 @@ def _read_logs_while_appending(context, lines):
     time.sleep(0.8)  # let it subscribe and the window open
     for ln in lines:
         _append(context, ln)
-    out, _ = proc.communicate(timeout=15)
+    out, err = proc.communicate(timeout=15)
+    assert proc.returncode == 0, f"cli logs failed (exit {proc.returncode}): {err}"
     try:
         return [l["line"] for l in json.loads(out).get("lines", [])]
-    except json.JSONDecodeError:
-        return []
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"cli logs emitted non-JSON ({e}): {out!r}")
 
 
 @given(u"a log source is configured on a host")
@@ -159,10 +163,11 @@ def step_no_source(context):
 @when(u"the daemon runs and streams metrics")
 def step_runs_metrics(context):
     out = _cli(context, "logs", "accept-host", "app", wait="2s")
+    assert out.returncode == 0, f"cli logs failed (exit {out.returncode}): {out.stderr}"
     try:
         context.log_lines = [l["line"] for l in json.loads(out.stdout).get("lines", [])]
-    except json.JSONDecodeError:
-        context.log_lines = []
+    except json.JSONDecodeError as e:
+        raise AssertionError(f"cli logs emitted non-JSON ({e}): {out.stdout!r}")
 
 
 @then(u"no log lines are streamed for that host")

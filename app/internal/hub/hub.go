@@ -169,7 +169,10 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 		}
 		hostID, ms, labels := transport.FromSnapshot(snap)
 		id := domain.HostID(hostID)
-		if boundHost != id { // bind this stream to its host for command routing (v2)
+		if boundHost != id { // (re)bind this stream to its host for command routing (v2)
+			if boundHost != "" {
+				h.unbindDaemon(boundHost, ctrl) // drop the stale entry so we never route to the wrong sink
+			}
 			boundHost = id
 			h.bindDaemon(id, ctrl)
 		}

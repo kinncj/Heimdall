@@ -66,7 +66,9 @@ def _start_daemon(context, process=False, allow_commands=False):
     # Isolate the helper socket to a guaranteed-absent path so the "no helper" case
     # is deterministic regardless of any helper running on the default socket.
     env = dict(os.environ)
-    env["HEIMDALL_HELPER_SOCKET"] = tempfile.mktemp(prefix="heimdall-nohelper-", suffix=".sock")
+    env["HEIMDALL_HELPER_SOCKET"] = os.path.join(
+        tempfile.mkdtemp(prefix="heimdall-nohelper-"), "absent.sock"
+    )
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, cwd=str(context.root), env=env)
     context.procs.append(proc)
     deadline = time.time() + 10

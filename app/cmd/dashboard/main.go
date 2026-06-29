@@ -137,6 +137,7 @@ func main() {
 		// result returns on the subscription and lands in the registry; the modal
 		// shows it. A dedicated connection keeps it off the subscription stream.
 		if cmdConn, err := grpc.NewClient(hubAddr, dialOpts...); err == nil {
+			defer cmdConn.Close() // released when the dashboard exits
 			fed := v1.NewFederationServiceClient(cmdConn)
 			actor := os.Getenv("USER")
 			if actor == "" {
