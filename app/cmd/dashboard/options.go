@@ -3,11 +3,16 @@
 
 package main
 
-import "heimdall/app/internal/options"
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+
+	"heimdall/app/internal/options"
+)
 
 // dashboardCatalog declares the persistent dashboard settings. Action/mode flags
-// (--snapshot, --demo, --detail, --control/--run/--tail, --splash) stay separate
-// since they are not saved.
+// (--snapshot, --demo, --detail, --splash) stay separate since they are not saved.
 func dashboardCatalog() options.Catalog {
 	return options.NewCatalog(
 		options.Define("hub").Default("localhost:9090").
@@ -26,7 +31,31 @@ func dashboardCatalog() options.Catalog {
 		options.Define("tls-insecure").Of(options.KindToggle).Default("false").Help("skip hub certificate verification (dev only)"),
 		options.Define("purge-after").Of(options.KindSpan).Default("15m").
 			Help("drop a host from the view after it has been unseen this long (0 disables)"),
+		options.Define("top-sort").Default("cpu").
+			Help("default sort for the top modal: cpu|mem|pid|command (persisted on change)"),
 	)
+}
+
+// saveTopSort persists the chosen top-modal sort to the dashboard config so it
+// becomes the default next launch (ADR 0019). It merges into the existing config
+// file rather than rewriting the full resolved catalog. Best-effort: a write
+// failure is ignored — the choice still applies for the running session.
+func saveTopSort(key string) {
+	path, _ := options.Locate("dashboard")
+	if path == "" {
+		return
+	}
+	doc := map[string]any{}
+	if b, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(b, &doc)
+	}
+	doc["top-sort"] = key
+	b, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(path), 0o700)
+	_ = os.WriteFile(path, append(b, '\n'), 0o600)
 }
 
 // resolveDashboard folds defaults, config, env, and flags, running the first-run

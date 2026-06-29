@@ -25,11 +25,14 @@ var version = "dev"
 
 func usage() {
 	out := flag.CommandLine.Output()
-	fmt.Fprintf(out, `heimdall-helper — Heimdall privileged metrics unit
+	fmt.Fprintf(out, `heimdall-helper — Heimdall privileged sidecar (metrics + commands)
 
 Runs as a privileged process (sudo) and serves power, GPU, and thermal readings
 to the local unprivileged daemon over a unix socket, so the daemon never runs as
-root. Install it on a host only where you want power/GPU/temperature.
+root. It also runs the privileged, allow-listed commands the daemon delegates
+(e.g. dmesg, journal.tail) for the v2 on-demand control plane — enforcing its OWN
+allow-list, never trusting the daemon. Install it on a host only where you want
+power/GPU/temperature or those privileged diagnostics.
 
 Usage:
   sudo heimdall-helper [flags]

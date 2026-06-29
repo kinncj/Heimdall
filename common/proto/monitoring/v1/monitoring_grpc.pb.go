@@ -39,8 +39,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	FederationService_Relay_FullMethodName     = "/monitoring.v1.FederationService/Relay"
-	FederationService_Subscribe_FullMethodName = "/monitoring.v1.FederationService/Subscribe"
+	FederationService_Relay_FullMethodName      = "/monitoring.v1.FederationService/Relay"
+	FederationService_Subscribe_FullMethodName  = "/monitoring.v1.FederationService/Subscribe"
+	FederationService_RunCommand_FullMethodName = "/monitoring.v1.FederationService/RunCommand"
 )
 
 // FederationServiceClient is the client API for FederationService service.
@@ -53,6 +54,11 @@ type FederationServiceClient interface {
 	Relay(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[RelayEnvelope, RelayControl], error)
 	// Subscribe to a hub's bus (used by dashboards and peer/parent hubs).
 	Subscribe(ctx context.Context, in *SubscribeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Snapshot], error)
+	// Dashboard/CLI -> hub: run an allow-listed, read-only command on a host (v2,
+	// ADR 0018). The hub routes it down the host's outbound stream; the result
+	// returns asynchronously on that host's snapshot (command_result), matched by
+	// request_id. The ack only reports whether the host could be reached.
+	RunCommand(ctx context.Context, in *ControlRequest, opts ...grpc.CallOption) (*CommandAck, error)
 }
 
 type federationServiceClient struct {
@@ -95,6 +101,16 @@ func (c *federationServiceClient) Subscribe(ctx context.Context, in *SubscribeRe
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FederationService_SubscribeClient = grpc.ServerStreamingClient[Snapshot]
 
+func (c *federationServiceClient) RunCommand(ctx context.Context, in *ControlRequest, opts ...grpc.CallOption) (*CommandAck, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommandAck)
+	err := c.cc.Invoke(ctx, FederationService_RunCommand_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // FederationServiceServer is the server API for FederationService service.
 // All implementations must embed UnimplementedFederationServiceServer
 // for forward compatibility.
@@ -105,6 +121,11 @@ type FederationServiceServer interface {
 	Relay(grpc.BidiStreamingServer[RelayEnvelope, RelayControl]) error
 	// Subscribe to a hub's bus (used by dashboards and peer/parent hubs).
 	Subscribe(*SubscribeRequest, grpc.ServerStreamingServer[Snapshot]) error
+	// Dashboard/CLI -> hub: run an allow-listed, read-only command on a host (v2,
+	// ADR 0018). The hub routes it down the host's outbound stream; the result
+	// returns asynchronously on that host's snapshot (command_result), matched by
+	// request_id. The ack only reports whether the host could be reached.
+	RunCommand(context.Context, *ControlRequest) (*CommandAck, error)
 	mustEmbedUnimplementedFederationServiceServer()
 }
 
@@ -120,6 +141,9 @@ func (UnimplementedFederationServiceServer) Relay(grpc.BidiStreamingServer[Relay
 }
 func (UnimplementedFederationServiceServer) Subscribe(*SubscribeRequest, grpc.ServerStreamingServer[Snapshot]) error {
 	return status.Error(codes.Unimplemented, "method Subscribe not implemented")
+}
+func (UnimplementedFederationServiceServer) RunCommand(context.Context, *ControlRequest) (*CommandAck, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunCommand not implemented")
 }
 func (UnimplementedFederationServiceServer) mustEmbedUnimplementedFederationServiceServer() {}
 func (UnimplementedFederationServiceServer) testEmbeddedByValue()                           {}
@@ -160,13 +184,36 @@ func _FederationService_Subscribe_Handler(srv interface{}, stream grpc.ServerStr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type FederationService_SubscribeServer = grpc.ServerStreamingServer[Snapshot]
 
+func _FederationService_RunCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ControlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(FederationServiceServer).RunCommand(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: FederationService_RunCommand_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(FederationServiceServer).RunCommand(ctx, req.(*ControlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // FederationService_ServiceDesc is the grpc.ServiceDesc for FederationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var FederationService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "monitoring.v1.FederationService",
 	HandlerType: (*FederationServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RunCommand",
+			Handler:    _FederationService_RunCommand_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Relay",

@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	"heimdall/app/internal/command"
 	"heimdall/app/internal/domain"
 )
 
@@ -40,6 +41,34 @@ func (c Client) Collect(ctx context.Context) ([]domain.Metric, error) {
 		return nil, ErrUnavailable
 	}
 	defer conn.Close()
-	_ = conn.SetReadDeadline(time.Now().Add(to))
+	_ = conn.SetDeadline(time.Now().Add(to))
+	if err := encodeRequest(conn, request{V: protocolVersion, Op: "collect"}); err != nil {
+		return nil, err
+	}
 	return decodeMetrics(conn)
+}
+
+// Exec asks the root helper to run a privileged allow-listed command (v2 Phase
+// 2b). A dial failure (helper absent) returns ErrUnavailable so the daemon can
+// report that the command needs the helper. The helper enforces its own allow-list.
+func (c Client) Exec(ctx context.Context, cmd string, args []string) (command.Result, error) {
+	sock := c.SockPath
+	if sock == "" {
+		sock = DefaultSocketPath()
+	}
+	to := c.Timeout
+	if to == 0 {
+		to = 10 * time.Second // privileged commands may run longer than a metric read
+	}
+	d := net.Dialer{Timeout: 2 * time.Second}
+	conn, err := d.DialContext(ctx, "unix", sock)
+	if err != nil {
+		return command.Result{}, ErrUnavailable
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(to))
+	if err := encodeRequest(conn, request{V: protocolVersion, Op: "exec", Cmd: cmd, Args: args}); err != nil {
+		return command.Result{}, err
+	}
+	return decodeResult(conn)
 }

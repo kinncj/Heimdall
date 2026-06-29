@@ -12,10 +12,51 @@ import (
 	"encoding/json"
 	"io"
 
+	"heimdall/app/internal/command"
 	"heimdall/app/internal/domain"
 )
 
 const protocolVersion = 1
+
+// request is what a client sends first. Op "" or "collect" asks for metrics;
+// "exec" asks the root helper to run a privileged allow-listed command (v2 Phase
+// 2b). An old client sends nothing, which the server treats as "collect".
+type request struct {
+	V    int      `json:"v"`
+	Op   string   `json:"op,omitempty"`
+	Cmd  string   `json:"cmd,omitempty"`
+	Args []string `json:"args,omitempty"`
+}
+
+// resultEnvelope carries a privileged command's bounded result back to the daemon.
+type resultEnvelope struct {
+	V         int    `json:"v"`
+	ExitCode  int    `json:"exit_code"`
+	Stdout    string `json:"stdout,omitempty"`
+	Stderr    string `json:"stderr,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
+	Status    string `json:"status"`
+}
+
+func encodeRequest(w io.Writer, r request) error { return json.NewEncoder(w).Encode(r) }
+
+func encodeResult(w io.Writer, r command.Result) error {
+	return json.NewEncoder(w).Encode(resultEnvelope{
+		V: protocolVersion, ExitCode: r.ExitCode, Stdout: r.Stdout,
+		Stderr: r.Stderr, Truncated: r.Truncated, Status: r.Status.String(),
+	})
+}
+
+func decodeResult(r io.Reader) (command.Result, error) {
+	var env resultEnvelope
+	if err := json.NewDecoder(bufio.NewReader(r)).Decode(&env); err != nil {
+		return command.Result{}, err
+	}
+	return command.Result{
+		ExitCode: env.ExitCode, Stdout: env.Stdout, Stderr: env.Stderr,
+		Truncated: env.Truncated, Status: statusFromString(env.Status),
+	}, nil
+}
 
 type wireMetric struct {
 	Name   string  `json:"name"`

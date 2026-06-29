@@ -7,9 +7,16 @@
 <p align="center"><em>Watch Over All Realms</em></p>
 
 <p align="center">
+  <img alt="release" src="https://img.shields.io/badge/release-v2.0.0-5fd7ff">
   <img alt="license" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
   <img alt="go" src="https://img.shields.io/badge/go-1.26-00ADD8">
   <img alt="ui" src="https://img.shields.io/badge/ui-terminal%20(Bubble%20Tea)-5fd7ff">
+</p>
+
+<p align="center">
+  <b>🎉 v2.0.0 — the <em>everything socket</em> release.</b> On-demand commands, in-dashboard
+  logs &amp; live process view, and a JSON CLI — all over the daemon's single outbound stream,
+  with <b>no inbound port on any host</b>. → <a href="docs/releases/v2.0.0.md">Release notes</a>.
 </p>
 
 ---
@@ -24,6 +31,11 @@ memory, disk, network, temperature, GPU, and power from every machine in one ter
 
 <p align="center">
   <img src="demo.gif" alt="Heimdall dashboard demo" width="900">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/img/grid-wide.png" alt="Heimdall fleet grid" width="900"><br>
+  <sub>The fleet grid — every host's state, CPU/MEM/DISK/TEMP/GPU/PWR, live. <code>--demo</code> shown.</sub>
 </p>
 
 ## Why Heimdall?
@@ -50,8 +62,9 @@ Feature codenames are Norse — see the [glossary](docs/glossary.md) for what th
 - **Realms tags** — tag hosts and hubs (`env=prod`, `region=apac`); hub tags inherit to their hosts, and the fleet is groupable by tag or origin hub.
 - **Mímir export** — a Prometheus/OpenMetrics `/metrics` endpoint over the whole fleet, plus short-range history, so it drops into an existing Grafana.
 - **Gjallarhorn alerting** — declarative threshold rules with hysteresis; fire to a webhook on breach and clear.
-- **Read-only control plane** — allow-listed, no-sudo remote queries, audited.
-- **Opt-in log streaming** — rate-limited, on its own channel.
+- **Heimdallr's sight — in-dashboard observability** — read a host's **logs** (`l`, with `/` search) and a live **process table** (`t`, sortable with `s`) right in the TUI. Pushed through the hub; **no daemon listens**.
+- **On-demand commands (v2)** — read-only, allow-listed diagnostics (`process.list`, `disk.df`, `uptime`, `os.info`, `dir.list`, plus privileged `dmesg`/`journal.tail`) run via the hub and routed down the daemon's outbound stream; privileged ones delegate to the root helper. Opt-in per daemon (`--allow-commands`), audited. From the dashboard (`c`) or `heimdall-cli run`.
+- **`heimdall-cli`** — a machine- & AI-friendly **JSON** client for scripts, CI/CD, and agents: `heimdall-cli hosts | top | logs | run …`, with copy-paste agent/skill files.
 
 ## Quick start
 
@@ -84,8 +97,9 @@ Heimdall separates **collection** from **presentation**:
 |---|---|---|
 | `heimdall-hub` | monitoring station | receives metrics, fans out to dashboards |
 | `heimdall-dashboard` | monitoring station (any number) | renders the fleet — collects nothing itself |
-| `heimdall-daemon` | every host | collects + streams this host's metrics |
-| `heimdall-helper` | a host (optional, root) | serves privileged metrics to the local daemon |
+| `heimdall-daemon` | every host | collects + streams this host's metrics; pushes opt-in logs/processes |
+| `heimdall-helper` | a host (optional, root) | serves privileged metrics + runs privileged allow-listed commands for the daemon |
+| `heimdall-cli` | anywhere | machine/AI-friendly JSON client over a hub (scripts, CI/CD, agents) |
 
 Clean Architecture over a single Go module. The versioned gRPC contract in
 [`common/proto/monitoring/v1`](common/proto/monitoring/v1) is the single source of truth shared by
@@ -106,11 +120,12 @@ Full docs live in **[`docs/`](docs/README.md)**.
 | [Secure Deployment](docs/guides/03-secure-deployment.md) | require TLS + an enrollment token |
 | [Privileged Metrics](docs/guides/04-privileged-metrics.md) | unlock power, GPU, and full thermal |
 | [Federation (Bifröst)](docs/guides/05-federation.md) | span multiple sites / networks |
-| [Control Plane](docs/guides/06-control-plane.md) | run read-only remote diagnostics |
+| [Process View & Commands](docs/guides/06-control-plane.md) | see a host's process table (top) and run allow-listed diagnostics |
 | [Log Streaming](docs/guides/07-log-streaming.md) | tail host logs in the dashboard |
 | [Demo Mode](docs/guides/08-demo-mode.md) | explore the UI with no setup |
 | [Metrics Export (Mímir)](docs/guides/09-metrics-export.md) | scrape Heimdall from Prometheus / Grafana |
 | [Alerting (Gjallarhorn)](docs/guides/10-alerting.md) | fire threshold alerts to a webhook |
+| [`heimdall-cli` (programmatic & agents)](docs/guides/11-hub-cli.md) | query the fleet from scripts, CI/CD, or an AI agent |
 
 **Reference:** [Installation](docs/installation.md) ·
 [Configuration](docs/configuration.md) ·
@@ -136,6 +151,9 @@ curl -fsSL https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/instal
 
 # A user-local dir instead of /usr/local/bin
 curl -fsSL .../scripts/install.sh | sh -s -- --install-location ~/.local/bin daemon
+
+# heimdall-cli (scripts, CI/CD, agents — anywhere that talks to a hub)
+curl -fsSL https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/install.sh | sh -s -- cli
 ```
 
 On Windows, use [`install.ps1`](scripts/install.ps1): `irm https://raw.githubusercontent.com/kinncj/Heimdall/main/scripts/install.ps1 | iex`.

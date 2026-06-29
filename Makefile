@@ -1,9 +1,17 @@
 # Makefile — Unified build/test contract for all agents
-.PHONY: build build-tui run-tui run-demo run-daemon run-hub run-helper tui-snapshot dev-certs test-acceptance release test test-integration test-e2e test-contract test-all lint security-scan fmt containers-up containers-down migrate test-features-sync test-features-scaffold sdlc-report sdlc-rotate-logs sdlc-branch-protection sdlc-bootstrap-project-fields help
+.PHONY: build man screenshots build-tui run-tui run-demo run-daemon run-hub run-helper tui-snapshot dev-certs test-acceptance release test test-integration test-e2e test-contract test-all lint security-scan fmt containers-up containers-down migrate test-features-sync test-features-scaffold sdlc-report sdlc-rotate-logs sdlc-branch-protection sdlc-bootstrap-project-fields help
 
 ## Build
 build:
 	go build ./...
+
+## Generate roff manpages (.1) + Windows plain-text help (.txt) from each --help
+man:
+	bash scripts/gen-manpages.sh
+
+## Generate documentation screenshots of the dashboard TUI (ANSI + HTML, + GIF if vhs)
+screenshots: build-tui
+	bash scripts/gen-screenshots.sh
 
 ## Build the Heimdall binaries (dashboard + daemon + hub) -> bin/
 build-tui:
@@ -12,7 +20,8 @@ build-tui:
 	go build -o bin/heimdall-daemon ./app/cmd/daemon
 	go build -o bin/heimdall-hub ./app/cmd/hub
 	go build -o bin/heimdall-helper ./app/cmd/helper
-	@echo "built bin/heimdall-dashboard, bin/heimdall-daemon, bin/heimdall-hub, bin/heimdall-helper"
+	go build -o bin/heimdall-cli ./app/cmd/cli
+	@echo "built bin/heimdall-{dashboard,daemon,hub,helper,cli}"
 
 ## Run the Heimdall TUI dashboard (subscribes to a hub at localhost:9090)
 run-tui: build-tui

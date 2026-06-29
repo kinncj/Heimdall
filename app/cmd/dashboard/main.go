@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -85,6 +86,7 @@ func main() {
 	var tickFn func(time.Time)
 	var source string
 	var live func() bool
+	var runCmd func(host, cmd string, args []string, reqID string) // v2 Phase 2; nil in demo
 	switch {
 	case *demoMode:
 		src := fake.New(now)
@@ -92,18 +94,39 @@ func main() {
 		tickFn = src.Tick
 		source = "demo"
 		live = func() bool { return true }
+		// Fake command execution so the command modal is explorable in --demo.
+		runCmd = func(host, cmd string, args []string, reqID string) {
+			reg.RecordCommandResult(domain.HostID(host), &domain.CommandResult{
+				RequestID: reqID, Status: domain.StatusOK,
+				Stdout: fmt.Sprintf("(demo) %s on %s\nconnect to a real hub to run live commands\n", cmd, host),
+			})
+		}
 	default:
 		reg = domain.NewHostRegistry(10*time.Second, 30*time.Second)
 		reg.SetPurgeAfter(cfg.Span("purge-after", 15*time.Minute))
 		// Ratatoskr: discover the hub when --hub is "auto" (or --discover with no
 		// explicit hub). Discovery only resolves the address; the token and TLS
-		// still gate trust. An explicit --hub always wins.
+		// still gate trust. An explicit --hub always wins. When several hubs are
+		// found on the LAN, present a picker so the operator chooses (v2).
 		if cfg.Text("hub") == "auto" || (cfg.Toggle("discover") && cfg.Text("hub") == "") {
-			addr, err := discovery.Resolve(cfg.Text("discover-seed"), 5*time.Second)
-			if err != nil {
-				fail(fmt.Errorf("hub discovery failed (Ratatoskr): %w", err))
+			hubs, _ := discovery.BrowseAll(3 * time.Second)
+			switch len(hubs) {
+			case 1:
+				hubAddr = hubs[0].Addr
+			case 0:
+				// fall back to a static seed for overlay networks (no multicast)
+				addr, err := discovery.Resolve(cfg.Text("discover-seed"), 5*time.Second)
+				if err != nil {
+					fail(fmt.Errorf("hub discovery failed (Ratatoskr): %w", err))
+				}
+				hubAddr = addr
+			default:
+				chosen, err := pickHub(hubs, md)
+				if err != nil {
+					fail(err)
+				}
+				hubAddr = chosen
 			}
-			hubAddr = addr
 		}
 		dialOpts, err := clientDialOptions(token, tlsCfg)
 		if err != nil {
@@ -111,6 +134,26 @@ func main() {
 		}
 		lastRecv := new(atomic.Int64)
 		go subscribeHub(hubAddr, reg, dialOpts, lastRecv)
+		// v2 Phase 2: issue on-demand commands to the hub. Fire-and-forget — the
+		// result returns on the subscription and lands in the registry; the modal
+		// shows it. A dedicated connection keeps it off the subscription stream.
+		if cmdConn, err := grpc.NewClient(hubAddr, dialOpts...); err == nil {
+			defer cmdConn.Close() // released when the dashboard exits
+			fed := v1.NewFederationServiceClient(cmdConn)
+			actor := os.Getenv("USER")
+			if actor == "" {
+				actor = "dashboard"
+			}
+			runCmd = func(host, cmd string, args []string, reqID string) {
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+					defer cancel()
+					_, _ = fed.RunCommand(ctx, &v1.ControlRequest{
+						RequestId: reqID, HostId: host, AllowlistedCmd: cmd, Args: args, Actor: actor,
+					})
+				}()
+			}
+		}
 		source = hubAddr
 		live = func() bool {
 			ms := lastRecv.Load()
@@ -121,12 +164,23 @@ func main() {
 		}
 	}
 
-	model := dashboard.New(md, reg, now).WithStatus(source, live)
+	model := dashboard.New(md, reg, now).WithStatus(source, live).
+		WithTopSort(cfg.Text("top-sort")).WithPersistSort(saveTopSort)
+	if runCmd != nil {
+		model = model.WithRunCommand(runCmd)
+	}
 	if tickFn != nil {
 		model = model.WithTick(tickFn)
 	}
 
 	if *snapshot {
+		// Size the frame to the terminal so snapshots are responsive — honour
+		// COLUMNS/LINES first (set by the screenshot generator and most CI), then
+		// the real TTY, then the model default. Drives doc captures at any width.
+		if w, h := snapshotSize(); w > 0 {
+			u, _ := model.Update(tea.WindowSizeMsg{Width: w, Height: h})
+			model = u.(dashboard.Model)
+		}
 		reg.Evaluate(time.Now())
 		if *detailFlag {
 			fmt.Println(model.DetailView())
@@ -149,7 +203,7 @@ func main() {
 	time.Sleep(1500 * time.Millisecond)
 	fmt.Print("\x1b[2J\x1b[3J\x1b[H")
 
-	if _, err := tea.NewProgram(model, tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run(); err != nil {
 		fail(err)
 	}
 }
@@ -157,6 +211,25 @@ func main() {
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "heimdall-dashboard:", err)
 	os.Exit(1)
+}
+
+// snapshotSize resolves the frame size for --snapshot: COLUMNS/LINES env (honoured
+// by the screenshot generator and most CI, where stdout is a pipe with no TTY),
+// else the real terminal, else 0/0 to keep the model default.
+func snapshotSize() (w, h int) {
+	envInt := func(k string) int {
+		if n, err := strconv.Atoi(os.Getenv(k)); err == nil && n > 0 {
+			return n
+		}
+		return 0
+	}
+	if w, h = envInt("COLUMNS"), envInt("LINES"); w > 0 && h > 0 {
+		return w, h
+	}
+	if tw, th, err := term.GetSize(int(os.Stdout.Fd())); err == nil && tw > 0 {
+		return tw, th
+	}
+	return 0, 0
 }
 
 func usage() {
@@ -239,8 +312,15 @@ func foldSnapshot(reg *domain.HostRegistry, snap *v1.Snapshot) {
 	reg.Enroll(domain.Host{ID: hid, Hostname: id, DisplayName: id}, seen)
 	reg.Observe(hid, ms, labels, seen)
 	reg.SetAlerts(hid, snap.GetAlerts())
+	// v2 real-time disconnect: the hub saw this host's stream end, so flip it
+	// Offline now rather than waiting out the local freshness window. Done after
+	// Observe (which would otherwise mark it Online) so the disconnect wins.
+	if snap.GetDisconnected() {
+		reg.MarkOffline(hid, seen)
+	}
 	// Heimdallr's sight (ADR 0017): fold the host's pushed process table and any
 	// tailed log lines into the registry for the detail-view modals.
 	procs, procsAt, logLines := transport.ObservabilityFromSnapshot(snap)
 	reg.RecordPush(hid, procs, procsAt, logLines)
+	reg.RecordCommandResult(hid, transport.CommandResultFromSnapshot(snap)) // v2 Phase 2
 }

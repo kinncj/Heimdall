@@ -13,6 +13,10 @@ import (
 	v1 "heimdall/common/proto/monitoring/v1"
 )
 
+// StatusToProto maps a domain metric status to the wire enum (exported for
+// callers that build non-metric messages carrying a status, e.g. command results).
+func StatusToProto(s domain.MetricStatus) v1.MetricStatus { return statusToProto(s) }
+
 func statusToProto(s domain.MetricStatus) v1.MetricStatus {
 	switch s {
 	case domain.StatusOK:

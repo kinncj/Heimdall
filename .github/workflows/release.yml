@@ -28,7 +28,9 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           mkdir -p dist
-          for c in hub daemon dashboard helper; do
+          # heimdall-cli is pure-Go; building it here just covers the darwin slots
+          # (CGO=1 is harmless for it). The four below genuinely need CGO/IOReport.
+          for c in hub daemon dashboard helper cli; do
             CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
               go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
               -o "dist/heimdall-${c}_darwin_arm64" "./app/cmd/${c}"
@@ -57,6 +59,12 @@ jobs:
           PLATFORMS: "linux/amd64 linux/arm64 windows/amd64 windows/arm64"
           OUT: dist
         run: bash scripts/release.sh
+      - name: Generate manpages (.1) + plain-text help (.txt)
+        # Tracks each binary's own --help. The dist/heimdall-* glob below attaches
+        # and checksums them, so `man heimdall-*` works from the AUR packages.
+        env:
+          OUT: dist
+        run: bash scripts/gen-manpages.sh
       - uses: actions/upload-artifact@v7
         with:
           name: linux-windows
@@ -95,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        component: [hub, dashboard, daemon, helper]
+        component: [hub, dashboard, daemon, helper, cli]
     steps:
       - uses: actions/checkout@v7
       - name: Generate ${{ matrix.component }}-bin PKGBUILD

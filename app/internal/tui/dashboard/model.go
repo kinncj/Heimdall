@@ -36,10 +36,42 @@ type Model struct {
 	filter        string // active filter query
 	filtering     bool   // true while the filter input is open
 	// Heimdallr's sight (ADR 0017): host-detail observability overlays.
-	modal       modalKind // active overlay (none / log list / log view / top)
+	modal       modalKind // active overlay (none / log list / log view / top / sort)
 	modalSel    int       // selection index in the log-source list
 	modalScroll int       // scroll offset in the log/top view
 	logSource   string    // chosen log source in the log view
+	// v2 (ADR 0019): log search + top sorting.
+	topSort      string       // active top sort key ("" = cpu default)
+	topSortSel   int          // selection index in the sort picker
+	logQuery     string       // log-view search query
+	logSearching bool         // true while the log search input is open
+	persistSort  func(string) // persist the chosen top sort to config (injected)
+	// On-demand commands (v2 Phase 2): issue via the injected callback, read the
+	// result back from the registry, matched by the in-flight request id.
+	runCmd       func(host, cmd string, args []string, reqID string)
+	cmdSel       int    // selection in the command picker
+	cmdReqID     string // request id of the in-flight command
+	detailScroll int    // scroll offset for the detail-view body (shift+arrows / wheel)
+}
+
+// WithRunCommand injects the callback that issues an on-demand command to the hub
+// (v2 Phase 2). When nil, the command modal reports that commands are unavailable.
+func (m Model) WithRunCommand(fn func(host, cmd string, args []string, reqID string)) Model {
+	m.runCmd = fn
+	return m
+}
+
+// WithTopSort sets the initial top-modal sort key (the persisted default).
+func (m Model) WithTopSort(key string) Model {
+	m.topSort = key
+	return m
+}
+
+// WithPersistSort injects the callback that persists a chosen top sort to the
+// dashboard config, so the choice becomes the default on next launch.
+func (m Model) WithPersistSort(fn func(string)) Model {
+	m.persistSort = fn
+	return m
 }
 
 type tickMsg time.Time
@@ -76,6 +108,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+	case tea.MouseMsg:
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			return m.scroll(-1), nil
+		case tea.MouseButtonWheelDown:
+			return m.scroll(1), nil
+		}
+		return m, nil
 	case tea.KeyMsg:
 		if m.filtering {
 			return m.updateFilter(msg)
@@ -118,6 +158,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if !m.detail && len(m.orderedList()) > 0 {
 				m.detail = true
+				m.detailScroll = 0
 			}
 		case "up", "k":
 			if m.cursor > 0 {

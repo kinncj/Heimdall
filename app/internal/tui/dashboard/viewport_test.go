@@ -60,6 +60,71 @@ func TestGridViewFitsTerminalWidth(t *testing.T) {
 	}
 }
 
+// Regression: a detail-view modal's header must show the real online/total count,
+// not 0/0 (the modal header was hardcoded to 0,0).
+func TestModalHeaderShowsHostCount(t *testing.T) {
+	m := smallModel(t, obsReg(t), 30) // obsReg has one online host
+	m.detail = true
+	for _, modal := range []modalKind{modalTop, modalLogList, modalCmdList} {
+		m.modal = modal
+		out := m.ModalView()
+		if !strings.Contains(out, "1/1") {
+			t.Fatalf("modal %d header should show 1/1 online, got header:\n%s",
+				modal, strings.SplitN(out, "\n", 4)[1])
+		}
+	}
+}
+
+// Regression: the detail view must fit the terminal height and keep its header on
+// screen on a short terminal (the body used to scroll the header off).
+func TestDetailViewFitsTerminalHeight(t *testing.T) {
+	m := smallModel(t, bigFleet(t, 1), 14)
+	m.detail = true
+	out := m.DetailView()
+	if lines := strings.Count(out, "\n") + 1; lines > 14 {
+		t.Fatalf("detail rendered %d lines on a height-14 terminal, want <= 14", lines)
+	}
+	if !strings.Contains(out, "HEIMDALL") {
+		t.Fatalf("detail header must stay visible:\n%s", out)
+	}
+	if !strings.Contains(out, "esc") {
+		t.Fatalf("detail footer must stay visible:\n%s", out)
+	}
+}
+
+// The detail body scrolls (mouse wheel / shift+arrows) within bounds while the
+// header and footer stay fixed.
+func TestDetailScrollMovesAndClamps(t *testing.T) {
+	m := smallModel(t, bigFleet(t, 1), 12) // short terminal → body overflows
+	m.detail = true
+	max := m.detailMaxScroll()
+	if max == 0 {
+		t.Fatal("a height-12 detail view should be scrollable")
+	}
+
+	m = m.scroll(1) // wheel down
+	if m.detailScroll == 0 {
+		t.Fatal("scrolling down should move the detail body")
+	}
+	for i := 0; i < 50; i++ { // can't scroll past the end
+		m = m.scroll(1)
+	}
+	if m.detailScroll != max {
+		t.Fatalf("scroll should clamp at max %d, got %d", max, m.detailScroll)
+	}
+	for i := 0; i < 50; i++ { // can't scroll above the top
+		m = m.scroll(-1)
+	}
+	if m.detailScroll != 0 {
+		t.Fatalf("scroll should clamp at 0, got %d", m.detailScroll)
+	}
+	// The frame still fits the terminal height while scrolled.
+	m.detailScroll = max
+	if lines := strings.Count(m.DetailView(), "\n") + 1; lines > 12 {
+		t.Fatalf("scrolled detail rendered %d lines, want <= 12", lines)
+	}
+}
+
 func TestGridViewWideShowsEveryColumn(t *testing.T) {
 	m := smallModel(t, bigFleet(t, 4), 30)
 	m.width = 120

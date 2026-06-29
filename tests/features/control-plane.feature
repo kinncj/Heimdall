@@ -1,19 +1,25 @@
-Feature: Read-only allow-listed remote control plane
+Feature: Hub-mediated allow-listed commands (v2 socket transport)
 
-  Scenario: Operator runs an allow-listed read-only query
-    Given the control plane exposes an allow-list of read-only commands on a host
-    When the operator runs an allow-listed query such as listing processes, showing disk usage, or listing files in an allowed directory
-    Then the host runs the query as the unprivileged user and returns the result
-    And the result is shown in the dashboard
+  On-demand, read-only, allow-listed commands run through the hub: the dashboard or
+  CLI asks the hub, which routes the request down the daemon's outbound stream; the
+  daemon runs it as its unprivileged user and returns the result. No daemon listens.
 
-  Scenario: Escalation and non-allow-listed commands are refused
-    Given the control plane runs commands as the unprivileged daemon user
-    When the operator attempts to use sudo or run a command that is not on the allow-list
-    Then the host refuses the command
-    And no command is run with elevated privileges
+  Scenario: Operator runs an allow-listed read-only command
+    Given a hub and a command-enabled daemon
+    When the operator runs an allow-listed command via the CLI
+    Then the command runs on the host and the JSON result is returned
 
-  Scenario: Every control-plane invocation is audit-logged
-    Given the control plane is enabled on a host
-    When any control-plane command is invoked
-    Then the host records an audit log entry for that invocation
-    And the audit entry identifies the command and the requesting operator
+  Scenario: Non-allow-listed commands are refused
+    Given a hub and a command-enabled daemon
+    When the operator runs a command that is not on the allow-list
+    Then the host refuses it with insufficient_permission and runs nothing
+
+  Scenario: A daemon without --allow-commands exposes no command surface
+    Given a hub and a daemon with commands disabled
+    When the operator runs an allow-listed command via the CLI
+    Then the host refuses it because commands are disabled
+
+  Scenario: Every command is audit-logged on the daemon
+    Given a hub and a command-enabled daemon
+    When the operator runs an allow-listed command via the CLI
+    Then the daemon records an audit entry naming the command and the operator

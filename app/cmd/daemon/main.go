@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -24,8 +25,10 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/adapters"
+	"heimdall/app/internal/command"
 	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
+	"heimdall/app/internal/helper"
 	"heimdall/app/internal/logs"
 	"heimdall/app/internal/options"
 	"heimdall/app/internal/proc"
@@ -121,7 +124,10 @@ func main() {
 		if err != nil {
 			fatal("invalid --log-source", err)
 		}
-		push, pushLabels := startPush(context.Background(), sources, cfg.Span("process-interval", 0), proc.Local{})
+		push, pushLabels := startPush(context.Background(), sources, cfg.Span("process-interval", 0), proc.Local{}, cfg.Toggle("allow-commands"))
+		if len(pushLabels) > 0 && tags == nil {
+			tags = map[string]string{} // ParseTags returns nil when no --tags were given
+		}
 		for k, v := range pushLabels {
 			tags[k] = v
 		}
@@ -240,6 +246,60 @@ func clientDialOptions(token string, tlsCfg secure.ClientConfig) ([]grpc.DialOpt
 	return opts, nil
 }
 
+// runCommand executes an allow-listed, read-only on-demand command (v2 Phase 2,
+// ADR 0018), audits it, stages the result for the next snapshot, and triggers an
+// immediate send. Commands run as this unprivileged daemon user.
+func runCommand(req *v1.ControlRequest, push *pusher, trigger chan struct{}) {
+	if !push.allowCommands {
+		logger.Warn("control command refused: commands disabled", "cmd", req.GetAllowlistedCmd(), "actor", req.GetActor())
+		push.setResult(&v1.ControlResponse{
+			RequestId: req.GetRequestId(),
+			ExitCode:  -1,
+			Stderr:    "on-demand commands are disabled on this host (start the daemon with --allow-commands)",
+			Status:    v1.MetricStatus_METRIC_STATUS_INSUFFICIENT_PERMISSION,
+		})
+		select {
+		case trigger <- struct{}{}:
+		default:
+		}
+		return
+	}
+	key := req.GetAllowlistedCmd()
+	var res command.Result
+	if command.IsPrivileged(key) {
+		// Privileged commands are delegated to the root helper over the local unix
+		// socket (v2 Phase 2b). The unprivileged daemon never gains privilege; a
+		// host with no helper simply cannot satisfy the request.
+		r, err := (helper.Client{}).Exec(context.Background(), key, req.GetArgs())
+		switch {
+		case errors.Is(err, helper.ErrUnavailable):
+			res = command.Result{Status: domain.StatusInsufficientPermission, ExitCode: -1,
+				Stderr: "this command needs the privileged helper (heimdall-helper), which is not running on this host"}
+		case err != nil:
+			res = command.Result{Status: domain.StatusError, ExitCode: -1, Stderr: err.Error()}
+		default:
+			res = r
+		}
+	} else {
+		res = command.Run(context.Background(), key, req.GetArgs())
+	}
+	logger.Info("control command",
+		"cmd", key, "args", req.GetArgs(), "privileged", command.IsPrivileged(key),
+		"actor", req.GetActor(), "status", res.Status.String(), "exit", res.ExitCode)
+	push.setResult(&v1.ControlResponse{
+		RequestId: req.GetRequestId(),
+		ExitCode:  int32(res.ExitCode),
+		Stdout:    res.Stdout,
+		Stderr:    res.Stderr,
+		Truncated: res.Truncated,
+		Status:    transport.StatusToProto(res.Status),
+	})
+	select {
+	case trigger <- struct{}{}:
+	default:
+	}
+}
+
 // discoverHub resolves a hub address via mDNS (Ratatoskr), falling back to a
 // static seed for overlay networks where multicast does not reach.
 func discoverHub(seed string) (string, error) {
@@ -291,6 +351,29 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 	}
 	logger.Info("streaming to hub", "addr", addr, "host", host)
 
+	// Heimdallr's sight v2 (ADR 0018): receive directives down the same outbound
+	// stream — demand windows and on-demand allow-listed commands — and act on
+	// them. The daemon still never listens; the hub drives it over the daemon's own
+	// connection. A finished command triggers an immediate send so the result is
+	// timely rather than waiting for the next tick.
+	trigger := make(chan struct{}, 1)
+	if push != nil {
+		go func() {
+			for {
+				ctrl, err := stream.Recv()
+				if err != nil {
+					return // stream closed; streamOnce will reconnect
+				}
+				if w := ctrl.GetObservability(); w != nil {
+					push.setWindow(w.GetLogs(), w.GetProcesses())
+				}
+				if req := ctrl.GetRun(); req != nil {
+					go runCommand(req, push, trigger)
+				}
+			}
+		}()
+	}
+
 	var seq uint64
 	send := func() error {
 		seq++
@@ -298,6 +381,7 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 		if push != nil {
 			procs, procsAt, lines := push.drain()
 			transport.AttachObservability(snap, procs, procsAt, host, lines)
+			snap.CommandResult = push.drainResult()
 		}
 		return stream.Send(snap)
 	}
@@ -311,6 +395,18 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 		case <-t.C:
 			if err := send(); err != nil {
 				return true, fmt.Errorf("send: %w", err)
+			}
+		case <-trigger:
+			// Flush every queued command result — one snapshot each, since the wire
+			// carries a single result per snapshot — so concurrent commands don't
+			// wait a tick apiece (or, before the queue, overwrite each other).
+			for {
+				if err := send(); err != nil {
+					return true, fmt.Errorf("send: %w", err)
+				}
+				if push == nil || !push.hasResults() {
+					break
+				}
 			}
 		case <-sig:
 			_ = stream.CloseSend()

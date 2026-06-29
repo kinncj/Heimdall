@@ -613,9 +613,11 @@ type Snapshot struct {
 	Alerts       []string               `protobuf:"bytes,8,rep,name=alerts,proto3" json:"alerts,omitempty"`                                                                           // names of rules currently firing for this host (Gjallarhorn)
 	// Heimdallr's sight (ADR 0017) — additive, push-only host observability. Empty
 	// unless the daemon is configured to push it; old peers ignore these fields.
-	Processes             []*ProcessRow `protobuf:"bytes,9,rep,name=processes,proto3" json:"processes,omitempty"`                                                            // latest process table
-	ProcessesAtUnixMillis int64         `protobuf:"varint,10,opt,name=processes_at_unix_millis,json=processesAtUnixMillis,proto3" json:"processes_at_unix_millis,omitempty"` // when the process table was collected
-	LogLines              []*LogLine    `protobuf:"bytes,11,rep,name=log_lines,json=logLines,proto3" json:"log_lines,omitempty"`                                             // log lines tailed since the last push (push tail)
+	Processes             []*ProcessRow    `protobuf:"bytes,9,rep,name=processes,proto3" json:"processes,omitempty"`                                                            // latest process table
+	ProcessesAtUnixMillis int64            `protobuf:"varint,10,opt,name=processes_at_unix_millis,json=processesAtUnixMillis,proto3" json:"processes_at_unix_millis,omitempty"` // when the process table was collected
+	LogLines              []*LogLine       `protobuf:"bytes,11,rep,name=log_lines,json=logLines,proto3" json:"log_lines,omitempty"`                                             // log lines tailed since the last push (push tail)
+	CommandResult         *ControlResponse `protobuf:"bytes,12,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`                              // result of an on-demand command (v2), matched by request_id
+	Disconnected          bool             `protobuf:"varint,13,opt,name=disconnected,proto3" json:"disconnected,omitempty"`                                                    // v2: the daemon's stream ended — host is offline NOW, not on a timeout. Old subscribers ignore this and fall back to the freshness window.
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -725,6 +727,20 @@ func (x *Snapshot) GetLogLines() []*LogLine {
 		return x.LogLines
 	}
 	return nil
+}
+
+func (x *Snapshot) GetCommandResult() *ControlResponse {
+	if x != nil {
+		return x.CommandResult
+	}
+	return nil
+}
+
+func (x *Snapshot) GetDisconnected() bool {
+	if x != nil {
+		return x.Disconnected
+	}
+	return false
 }
 
 // EnrollRequest — a daemon presents its enrollment token and self-declared
@@ -1015,7 +1031,64 @@ func (x *KeyframeRequest) GetReason() string {
 	return ""
 }
 
-// StreamControl — multiplexed control frames sent from hub to daemon.
+// ObservabilityWindow — demand-driven push (v2, ADR 0018). The hub tells the
+// daemon whether to push logs / a process table right now, so a configured daemon
+// stops pushing them when no dashboard is watching. Absent ⇒ the daemon keeps its
+// v1 behaviour (push per config), so old hubs and old daemons are unaffected.
+type ObservabilityWindow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Logs          bool                   `protobuf:"varint,1,opt,name=logs,proto3" json:"logs,omitempty"`
+	Processes     bool                   `protobuf:"varint,2,opt,name=processes,proto3" json:"processes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ObservabilityWindow) Reset() {
+	*x = ObservabilityWindow{}
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ObservabilityWindow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ObservabilityWindow) ProtoMessage() {}
+
+func (x *ObservabilityWindow) ProtoReflect() protoreflect.Message {
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ObservabilityWindow.ProtoReflect.Descriptor instead.
+func (*ObservabilityWindow) Descriptor() ([]byte, []int) {
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ObservabilityWindow) GetLogs() bool {
+	if x != nil {
+		return x.Logs
+	}
+	return false
+}
+
+func (x *ObservabilityWindow) GetProcesses() bool {
+	if x != nil {
+		return x.Processes
+	}
+	return false
+}
+
+// StreamControl — multiplexed control frames sent from hub to daemon over the
+// downstream side of the bidi metric stream (no inbound port on the daemon).
 type StreamControl struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Control:
@@ -1023,6 +1096,8 @@ type StreamControl struct {
 	//	*StreamControl_Ack
 	//	*StreamControl_Cadence
 	//	*StreamControl_Keyframe
+	//	*StreamControl_Observability
+	//	*StreamControl_Run
 	Control       isStreamControl_Control `protobuf_oneof:"control"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1030,7 +1105,7 @@ type StreamControl struct {
 
 func (x *StreamControl) Reset() {
 	*x = StreamControl{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[12]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1042,7 +1117,7 @@ func (x *StreamControl) String() string {
 func (*StreamControl) ProtoMessage() {}
 
 func (x *StreamControl) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[12]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1055,7 +1130,7 @@ func (x *StreamControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamControl.ProtoReflect.Descriptor instead.
 func (*StreamControl) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{12}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StreamControl) GetControl() isStreamControl_Control {
@@ -1092,6 +1167,24 @@ func (x *StreamControl) GetKeyframe() *KeyframeRequest {
 	return nil
 }
 
+func (x *StreamControl) GetObservability() *ObservabilityWindow {
+	if x != nil {
+		if x, ok := x.Control.(*StreamControl_Observability); ok {
+			return x.Observability
+		}
+	}
+	return nil
+}
+
+func (x *StreamControl) GetRun() *ControlRequest {
+	if x != nil {
+		if x, ok := x.Control.(*StreamControl_Run); ok {
+			return x.Run
+		}
+	}
+	return nil
+}
+
 type isStreamControl_Control interface {
 	isStreamControl_Control()
 }
@@ -1108,11 +1201,23 @@ type StreamControl_Keyframe struct {
 	Keyframe *KeyframeRequest `protobuf:"bytes,3,opt,name=keyframe,proto3,oneof"`
 }
 
+type StreamControl_Observability struct {
+	Observability *ObservabilityWindow `protobuf:"bytes,4,opt,name=observability,proto3,oneof"`
+}
+
+type StreamControl_Run struct {
+	Run *ControlRequest `protobuf:"bytes,5,opt,name=run,proto3,oneof"` // hub -> daemon: run an allow-listed command (v2)
+}
+
 func (*StreamControl_Ack) isStreamControl_Control() {}
 
 func (*StreamControl_Cadence) isStreamControl_Control() {}
 
 func (*StreamControl_Keyframe) isStreamControl_Control() {}
+
+func (*StreamControl_Observability) isStreamControl_Control() {}
+
+func (*StreamControl_Run) isStreamControl_Control() {}
 
 // RelayEnvelope — a child hub relays a snapshot upstream to a parent hub.
 // origin_hub_id and path[] provide loop and duplication prevention: a hub drops
@@ -1128,7 +1233,7 @@ type RelayEnvelope struct {
 
 func (x *RelayEnvelope) Reset() {
 	*x = RelayEnvelope{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[13]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1140,7 +1245,7 @@ func (x *RelayEnvelope) String() string {
 func (*RelayEnvelope) ProtoMessage() {}
 
 func (x *RelayEnvelope) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[13]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1153,7 +1258,7 @@ func (x *RelayEnvelope) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayEnvelope.ProtoReflect.Descriptor instead.
 func (*RelayEnvelope) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{13}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *RelayEnvelope) GetOriginHubId() string {
@@ -1186,7 +1291,7 @@ type RelayControl struct {
 
 func (x *RelayControl) Reset() {
 	*x = RelayControl{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[14]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1198,7 +1303,7 @@ func (x *RelayControl) String() string {
 func (*RelayControl) ProtoMessage() {}
 
 func (x *RelayControl) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[14]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1211,7 +1316,7 @@ func (x *RelayControl) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayControl.ProtoReflect.Descriptor instead.
 func (*RelayControl) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{14}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *RelayControl) GetAckedSeq() uint64 {
@@ -1233,7 +1338,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[15]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1245,7 +1350,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[15]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1258,7 +1363,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{15}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SubscribeRequest) GetSubscriberId() string {
@@ -1282,6 +1387,68 @@ func (x *SubscribeRequest) GetDeltasOnly() bool {
 	return false
 }
 
+// CommandAck — synchronous acknowledgement that the hub accepted and routed an
+// on-demand command. The actual result arrives later on the host's snapshot.
+type CommandAck struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Accepted      bool                   `protobuf:"varint,2,opt,name=accepted,proto3" json:"accepted,omitempty"` // false when the host is unknown or not connected
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CommandAck) Reset() {
+	*x = CommandAck{}
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CommandAck) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CommandAck) ProtoMessage() {}
+
+func (x *CommandAck) ProtoReflect() protoreflect.Message {
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CommandAck.ProtoReflect.Descriptor instead.
+func (*CommandAck) Descriptor() ([]byte, []int) {
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *CommandAck) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *CommandAck) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *CommandAck) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 // ControlRequest — dashboard -> daemon. allowlisted_cmd is a LOGICAL command
 // key validated against a static allow-list; it is never a shell string. args
 // are typed/validated tokens, never concatenated into a shell. Commands run as
@@ -1299,7 +1466,7 @@ type ControlRequest struct {
 
 func (x *ControlRequest) Reset() {
 	*x = ControlRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[16]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1311,7 +1478,7 @@ func (x *ControlRequest) String() string {
 func (*ControlRequest) ProtoMessage() {}
 
 func (x *ControlRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[16]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1324,7 +1491,7 @@ func (x *ControlRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlRequest.ProtoReflect.Descriptor instead.
 func (*ControlRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{16}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *ControlRequest) GetRequestId() string {
@@ -1379,7 +1546,7 @@ type ControlResponse struct {
 
 func (x *ControlResponse) Reset() {
 	*x = ControlResponse{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[17]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1391,7 +1558,7 @@ func (x *ControlResponse) String() string {
 func (*ControlResponse) ProtoMessage() {}
 
 func (x *ControlResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[17]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1404,7 +1571,7 @@ func (x *ControlResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlResponse.ProtoReflect.Descriptor instead.
 func (*ControlResponse) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{17}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *ControlResponse) GetRequestId() string {
@@ -1463,7 +1630,7 @@ type LogTailRequest struct {
 
 func (x *LogTailRequest) Reset() {
 	*x = LogTailRequest{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[18]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1475,7 +1642,7 @@ func (x *LogTailRequest) String() string {
 func (*LogTailRequest) ProtoMessage() {}
 
 func (x *LogTailRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[18]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1488,7 +1655,7 @@ func (x *LogTailRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogTailRequest.ProtoReflect.Descriptor instead.
 func (*LogTailRequest) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{18}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *LogTailRequest) GetHostId() string {
@@ -1535,7 +1702,7 @@ type LogLine struct {
 
 func (x *LogLine) Reset() {
 	*x = LogLine{}
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[19]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1547,7 +1714,7 @@ func (x *LogLine) String() string {
 func (*LogLine) ProtoMessage() {}
 
 func (x *LogLine) ProtoReflect() protoreflect.Message {
-	mi := &file_monitoring_v1_monitoring_proto_msgTypes[19]
+	mi := &file_monitoring_v1_monitoring_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1560,7 +1727,7 @@ func (x *LogLine) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogLine.ProtoReflect.Descriptor instead.
 func (*LogLine) Descriptor() ([]byte, []int) {
-	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{19}
+	return file_monitoring_v1_monitoring_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *LogLine) GetHostId() string {
@@ -1649,7 +1816,7 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x04ppid\x18\x02 \x01(\rR\x04ppid\x12\x17\n" +
 	"\acpu_pct\x18\x03 \x01(\x02R\x06cpuPct\x12\x17\n" +
 	"\amem_pct\x18\x04 \x01(\x02R\x06memPct\x12\x18\n" +
-	"\acommand\x18\x05 \x01(\tR\acommand\"\xfb\x03\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\"\xe6\x04\n" +
 	"\bSnapshot\x12\x17\n" +
 	"\ahost_id\x18\x01 \x01(\tR\x06hostId\x12$\n" +
 	"\x0ets_unix_millis\x18\x02 \x01(\x03R\ftsUnixMillis\x12\x10\n" +
@@ -1662,7 +1829,9 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\tprocesses\x18\t \x03(\v2\x19.monitoring.v1.ProcessRowR\tprocesses\x127\n" +
 	"\x18processes_at_unix_millis\x18\n" +
 	" \x01(\x03R\x15processesAtUnixMillis\x123\n" +
-	"\tlog_lines\x18\v \x03(\v2\x16.monitoring.v1.LogLineR\blogLines\x1a9\n" +
+	"\tlog_lines\x18\v \x03(\v2\x16.monitoring.v1.LogLineR\blogLines\x12E\n" +
+	"\x0ecommand_result\x18\f \x01(\v2\x1e.monitoring.v1.ControlResponseR\rcommandResult\x12\"\n" +
+	"\fdisconnected\x18\r \x01(\bR\fdisconnected\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"|\n" +
@@ -1683,11 +1852,16 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\rCadenceUpdate\x12,\n" +
 	"\x12sample_interval_ms\x18\x01 \x01(\x05R\x10sampleIntervalMs\")\n" +
 	"\x0fKeyframeRequest\x12\x16\n" +
-	"\x06reason\x18\x01 \x01(\tR\x06reason\"\xc0\x01\n" +
+	"\x06reason\x18\x01 \x01(\tR\x06reason\"G\n" +
+	"\x13ObservabilityWindow\x12\x12\n" +
+	"\x04logs\x18\x01 \x01(\bR\x04logs\x12\x1c\n" +
+	"\tprocesses\x18\x02 \x01(\bR\tprocesses\"\xbf\x02\n" +
 	"\rStreamControl\x12,\n" +
 	"\x03ack\x18\x01 \x01(\v2\x18.monitoring.v1.AckResumeH\x00R\x03ack\x128\n" +
 	"\acadence\x18\x02 \x01(\v2\x1c.monitoring.v1.CadenceUpdateH\x00R\acadence\x12<\n" +
-	"\bkeyframe\x18\x03 \x01(\v2\x1e.monitoring.v1.KeyframeRequestH\x00R\bkeyframeB\t\n" +
+	"\bkeyframe\x18\x03 \x01(\v2\x1e.monitoring.v1.KeyframeRequestH\x00R\bkeyframe\x12J\n" +
+	"\robservability\x18\x04 \x01(\v2\".monitoring.v1.ObservabilityWindowH\x00R\robservability\x121\n" +
+	"\x03run\x18\x05 \x01(\v2\x1d.monitoring.v1.ControlRequestH\x00R\x03runB\t\n" +
 	"\acontrol\"|\n" +
 	"\rRelayEnvelope\x12\"\n" +
 	"\rorigin_hub_id\x18\x01 \x01(\tR\voriginHubId\x12\x12\n" +
@@ -1699,7 +1873,13 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\rsubscriber_id\x18\x01 \x01(\tR\fsubscriberId\x12\x19\n" +
 	"\bhost_ids\x18\x02 \x03(\tR\ahostIds\x12\x1f\n" +
 	"\vdeltas_only\x18\x03 \x01(\bR\n" +
-	"deltasOnly\"\x9b\x01\n" +
+	"deltasOnly\"]\n" +
+	"\n" +
+	"CommandAck\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x1a\n" +
+	"\baccepted\x18\x02 \x01(\bR\baccepted\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\x9b\x01\n" +
 	"\x0eControlRequest\x12\x1d\n" +
 	"\n" +
 	"request_id\x18\x01 \x01(\tR\trequestId\x12\x17\n" +
@@ -1732,10 +1912,12 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x10METRIC_STATUS_OK\x10\x01\x12\x1d\n" +
 	"\x19METRIC_STATUS_UNAVAILABLE\x10\x02\x12)\n" +
 	"%METRIC_STATUS_INSUFFICIENT_PERMISSION\x10\x03\x12\x17\n" +
-	"\x13METRIC_STATUS_ERROR\x10\x042\xa4\x01\n" +
+	"\x13METRIC_STATUS_ERROR\x10\x042\xec\x01\n" +
 	"\x11FederationService\x12F\n" +
 	"\x05Relay\x12\x1c.monitoring.v1.RelayEnvelope\x1a\x1b.monitoring.v1.RelayControl(\x010\x01\x12G\n" +
-	"\tSubscribe\x12\x1f.monitoring.v1.SubscribeRequest\x1a\x17.monitoring.v1.Snapshot0\x012c\n" +
+	"\tSubscribe\x12\x1f.monitoring.v1.SubscribeRequest\x1a\x17.monitoring.v1.Snapshot0\x01\x12F\n" +
+	"\n" +
+	"RunCommand\x12\x1d.monitoring.v1.ControlRequest\x1a\x19.monitoring.v1.CommandAck2c\n" +
 	"\x13ControlPlaneService\x12L\n" +
 	"\aExecute\x12\x1d.monitoring.v1.ControlRequest\x1a\x1e.monitoring.v1.ControlResponse(\x010\x012S\n" +
 	"\x10LogStreamService\x12?\n" +
@@ -1758,65 +1940,72 @@ func file_monitoring_v1_monitoring_proto_rawDescGZIP() []byte {
 }
 
 var file_monitoring_v1_monitoring_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_monitoring_v1_monitoring_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_monitoring_v1_monitoring_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_monitoring_v1_monitoring_proto_goTypes = []any{
-	(MetricStatus)(0),        // 0: monitoring.v1.MetricStatus
-	(*Host)(nil),             // 1: monitoring.v1.Host
-	(*HostContext)(nil),      // 2: monitoring.v1.HostContext
-	(*PerCore)(nil),          // 3: monitoring.v1.PerCore
-	(*Counter)(nil),          // 4: monitoring.v1.Counter
-	(*MetricSample)(nil),     // 5: monitoring.v1.MetricSample
-	(*ProcessRow)(nil),       // 6: monitoring.v1.ProcessRow
-	(*Snapshot)(nil),         // 7: monitoring.v1.Snapshot
-	(*EnrollRequest)(nil),    // 8: monitoring.v1.EnrollRequest
-	(*EnrollResponse)(nil),   // 9: monitoring.v1.EnrollResponse
-	(*AckResume)(nil),        // 10: monitoring.v1.AckResume
-	(*CadenceUpdate)(nil),    // 11: monitoring.v1.CadenceUpdate
-	(*KeyframeRequest)(nil),  // 12: monitoring.v1.KeyframeRequest
-	(*StreamControl)(nil),    // 13: monitoring.v1.StreamControl
-	(*RelayEnvelope)(nil),    // 14: monitoring.v1.RelayEnvelope
-	(*RelayControl)(nil),     // 15: monitoring.v1.RelayControl
-	(*SubscribeRequest)(nil), // 16: monitoring.v1.SubscribeRequest
-	(*ControlRequest)(nil),   // 17: monitoring.v1.ControlRequest
-	(*ControlResponse)(nil),  // 18: monitoring.v1.ControlResponse
-	(*LogTailRequest)(nil),   // 19: monitoring.v1.LogTailRequest
-	(*LogLine)(nil),          // 20: monitoring.v1.LogLine
-	nil,                      // 21: monitoring.v1.HostContext.LabelsEntry
-	nil,                      // 22: monitoring.v1.Snapshot.LabelsEntry
+	(MetricStatus)(0),           // 0: monitoring.v1.MetricStatus
+	(*Host)(nil),                // 1: monitoring.v1.Host
+	(*HostContext)(nil),         // 2: monitoring.v1.HostContext
+	(*PerCore)(nil),             // 3: monitoring.v1.PerCore
+	(*Counter)(nil),             // 4: monitoring.v1.Counter
+	(*MetricSample)(nil),        // 5: monitoring.v1.MetricSample
+	(*ProcessRow)(nil),          // 6: monitoring.v1.ProcessRow
+	(*Snapshot)(nil),            // 7: monitoring.v1.Snapshot
+	(*EnrollRequest)(nil),       // 8: monitoring.v1.EnrollRequest
+	(*EnrollResponse)(nil),      // 9: monitoring.v1.EnrollResponse
+	(*AckResume)(nil),           // 10: monitoring.v1.AckResume
+	(*CadenceUpdate)(nil),       // 11: monitoring.v1.CadenceUpdate
+	(*KeyframeRequest)(nil),     // 12: monitoring.v1.KeyframeRequest
+	(*ObservabilityWindow)(nil), // 13: monitoring.v1.ObservabilityWindow
+	(*StreamControl)(nil),       // 14: monitoring.v1.StreamControl
+	(*RelayEnvelope)(nil),       // 15: monitoring.v1.RelayEnvelope
+	(*RelayControl)(nil),        // 16: monitoring.v1.RelayControl
+	(*SubscribeRequest)(nil),    // 17: monitoring.v1.SubscribeRequest
+	(*CommandAck)(nil),          // 18: monitoring.v1.CommandAck
+	(*ControlRequest)(nil),      // 19: monitoring.v1.ControlRequest
+	(*ControlResponse)(nil),     // 20: monitoring.v1.ControlResponse
+	(*LogTailRequest)(nil),      // 21: monitoring.v1.LogTailRequest
+	(*LogLine)(nil),             // 22: monitoring.v1.LogLine
+	nil,                         // 23: monitoring.v1.HostContext.LabelsEntry
+	nil,                         // 24: monitoring.v1.Snapshot.LabelsEntry
 }
 var file_monitoring_v1_monitoring_proto_depIdxs = []int32{
 	2,  // 0: monitoring.v1.Host.context:type_name -> monitoring.v1.HostContext
-	21, // 1: monitoring.v1.HostContext.labels:type_name -> monitoring.v1.HostContext.LabelsEntry
+	23, // 1: monitoring.v1.HostContext.labels:type_name -> monitoring.v1.HostContext.LabelsEntry
 	0,  // 2: monitoring.v1.MetricSample.status:type_name -> monitoring.v1.MetricStatus
 	3,  // 3: monitoring.v1.MetricSample.per_core:type_name -> monitoring.v1.PerCore
 	4,  // 4: monitoring.v1.MetricSample.counter:type_name -> monitoring.v1.Counter
 	5,  // 5: monitoring.v1.Snapshot.samples:type_name -> monitoring.v1.MetricSample
-	22, // 6: monitoring.v1.Snapshot.labels:type_name -> monitoring.v1.Snapshot.LabelsEntry
+	24, // 6: monitoring.v1.Snapshot.labels:type_name -> monitoring.v1.Snapshot.LabelsEntry
 	6,  // 7: monitoring.v1.Snapshot.processes:type_name -> monitoring.v1.ProcessRow
-	20, // 8: monitoring.v1.Snapshot.log_lines:type_name -> monitoring.v1.LogLine
-	1,  // 9: monitoring.v1.EnrollRequest.host:type_name -> monitoring.v1.Host
-	10, // 10: monitoring.v1.StreamControl.ack:type_name -> monitoring.v1.AckResume
-	11, // 11: monitoring.v1.StreamControl.cadence:type_name -> monitoring.v1.CadenceUpdate
-	12, // 12: monitoring.v1.StreamControl.keyframe:type_name -> monitoring.v1.KeyframeRequest
-	7,  // 13: monitoring.v1.RelayEnvelope.snapshot:type_name -> monitoring.v1.Snapshot
-	0,  // 14: monitoring.v1.ControlResponse.status:type_name -> monitoring.v1.MetricStatus
-	14, // 15: monitoring.v1.FederationService.Relay:input_type -> monitoring.v1.RelayEnvelope
-	16, // 16: monitoring.v1.FederationService.Subscribe:input_type -> monitoring.v1.SubscribeRequest
-	17, // 17: monitoring.v1.ControlPlaneService.Execute:input_type -> monitoring.v1.ControlRequest
-	19, // 18: monitoring.v1.LogStreamService.Tail:input_type -> monitoring.v1.LogTailRequest
-	8,  // 19: monitoring.v1.EnrollmentService.Enroll:input_type -> monitoring.v1.EnrollRequest
-	7,  // 20: monitoring.v1.MetricStreamService.Stream:input_type -> monitoring.v1.Snapshot
-	15, // 21: monitoring.v1.FederationService.Relay:output_type -> monitoring.v1.RelayControl
-	7,  // 22: monitoring.v1.FederationService.Subscribe:output_type -> monitoring.v1.Snapshot
-	18, // 23: monitoring.v1.ControlPlaneService.Execute:output_type -> monitoring.v1.ControlResponse
-	20, // 24: monitoring.v1.LogStreamService.Tail:output_type -> monitoring.v1.LogLine
-	9,  // 25: monitoring.v1.EnrollmentService.Enroll:output_type -> monitoring.v1.EnrollResponse
-	13, // 26: monitoring.v1.MetricStreamService.Stream:output_type -> monitoring.v1.StreamControl
-	21, // [21:27] is the sub-list for method output_type
-	15, // [15:21] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	22, // 8: monitoring.v1.Snapshot.log_lines:type_name -> monitoring.v1.LogLine
+	20, // 9: monitoring.v1.Snapshot.command_result:type_name -> monitoring.v1.ControlResponse
+	1,  // 10: monitoring.v1.EnrollRequest.host:type_name -> monitoring.v1.Host
+	10, // 11: monitoring.v1.StreamControl.ack:type_name -> monitoring.v1.AckResume
+	11, // 12: monitoring.v1.StreamControl.cadence:type_name -> monitoring.v1.CadenceUpdate
+	12, // 13: monitoring.v1.StreamControl.keyframe:type_name -> monitoring.v1.KeyframeRequest
+	13, // 14: monitoring.v1.StreamControl.observability:type_name -> monitoring.v1.ObservabilityWindow
+	19, // 15: monitoring.v1.StreamControl.run:type_name -> monitoring.v1.ControlRequest
+	7,  // 16: monitoring.v1.RelayEnvelope.snapshot:type_name -> monitoring.v1.Snapshot
+	0,  // 17: monitoring.v1.ControlResponse.status:type_name -> monitoring.v1.MetricStatus
+	15, // 18: monitoring.v1.FederationService.Relay:input_type -> monitoring.v1.RelayEnvelope
+	17, // 19: monitoring.v1.FederationService.Subscribe:input_type -> monitoring.v1.SubscribeRequest
+	19, // 20: monitoring.v1.FederationService.RunCommand:input_type -> monitoring.v1.ControlRequest
+	19, // 21: monitoring.v1.ControlPlaneService.Execute:input_type -> monitoring.v1.ControlRequest
+	21, // 22: monitoring.v1.LogStreamService.Tail:input_type -> monitoring.v1.LogTailRequest
+	8,  // 23: monitoring.v1.EnrollmentService.Enroll:input_type -> monitoring.v1.EnrollRequest
+	7,  // 24: monitoring.v1.MetricStreamService.Stream:input_type -> monitoring.v1.Snapshot
+	16, // 25: monitoring.v1.FederationService.Relay:output_type -> monitoring.v1.RelayControl
+	7,  // 26: monitoring.v1.FederationService.Subscribe:output_type -> monitoring.v1.Snapshot
+	18, // 27: monitoring.v1.FederationService.RunCommand:output_type -> monitoring.v1.CommandAck
+	20, // 28: monitoring.v1.ControlPlaneService.Execute:output_type -> monitoring.v1.ControlResponse
+	22, // 29: monitoring.v1.LogStreamService.Tail:output_type -> monitoring.v1.LogLine
+	9,  // 30: monitoring.v1.EnrollmentService.Enroll:output_type -> monitoring.v1.EnrollResponse
+	14, // 31: monitoring.v1.MetricStreamService.Stream:output_type -> monitoring.v1.StreamControl
+	25, // [25:32] is the sub-list for method output_type
+	18, // [18:25] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_monitoring_v1_monitoring_proto_init() }
@@ -1829,10 +2018,12 @@ func file_monitoring_v1_monitoring_proto_init() {
 		(*MetricSample_PerCore)(nil),
 		(*MetricSample_Counter)(nil),
 	}
-	file_monitoring_v1_monitoring_proto_msgTypes[12].OneofWrappers = []any{
+	file_monitoring_v1_monitoring_proto_msgTypes[13].OneofWrappers = []any{
 		(*StreamControl_Ack)(nil),
 		(*StreamControl_Cadence)(nil),
 		(*StreamControl_Keyframe)(nil),
+		(*StreamControl_Observability)(nil),
+		(*StreamControl_Run)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1840,7 +2031,7 @@ func file_monitoring_v1_monitoring_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_monitoring_v1_monitoring_proto_rawDesc), len(file_monitoring_v1_monitoring_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   5,
 		},

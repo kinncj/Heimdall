@@ -42,6 +42,8 @@ func daemonCatalog() options.Catalog {
 			Help("opt-in log sources alias=path,alias2=path2 to tail and push to the hub (Heimdallr's sight)"),
 		options.Define("process-interval").Of(options.KindSpan).Default("0s").
 			Help("push a process table to the hub at this interval (Heimdallr's sight); 0 = off"),
+		options.Define("allow-commands").Of(options.KindToggle).Default("false").
+			Help("expose on-demand allow-listed READ-ONLY commands to the hub (heimdall-cli run); off by default"),
 		options.Define("log-file").Help("operational log destination: unset = stderr; 'false' = disabled; a path = JSON"),
 	)
 }

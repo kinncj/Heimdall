@@ -9,6 +9,7 @@ package hub
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -31,8 +32,10 @@ type Hub struct {
 	auth         secure.Authenticator
 	id           string
 
-	mu   sync.Mutex
-	subs map[chan *v1.Snapshot]struct{}
+	mu           sync.Mutex
+	subs         map[chan *v1.Snapshot]struct{}
+	daemons      map[chan *v1.StreamControl]struct{}      // active daemon control sinks (v2 demand-driven push)
+	daemonByHost map[domain.HostID]chan *v1.StreamControl // hostID -> sink, for routing on-demand commands (v2 Phase 2)
 
 	fmu sync.Mutex
 	fed map[domain.HostID]relayMeta
@@ -55,6 +58,8 @@ func New(staleAfter, offlineAfter time.Duration) *Hub {
 		offlineAfter: offlineAfter,
 		auth:         secure.NewAuthenticator(""),
 		subs:         make(map[chan *v1.Snapshot]struct{}),
+		daemons:      make(map[chan *v1.StreamControl]struct{}),
+		daemonByHost: make(map[domain.HostID]chan *v1.StreamControl),
 		fed:          make(map[domain.HostID]relayMeta),
 	}
 }
@@ -123,8 +128,44 @@ func (h *Hub) Enroll(_ context.Context, req *v1.EnrollRequest) (*v1.EnrollRespon
 	}, nil
 }
 
-// Stream ingests a daemon's snapshots until the stream closes.
+// Stream ingests a daemon's snapshots until the stream closes. It also drives the
+// daemon's demand window: directives ride the downstream side of this same bidi
+// stream (ADR 0018), so the daemon needs no inbound port. The send goroutine runs
+// concurrently with the Recv loop — one reader, one writer, as gRPC allows.
 func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
+	ctrl := make(chan *v1.StreamControl, 4)
+	h.addDaemon(ctrl)
+	var boundHost domain.HostID
+	defer func() {
+		h.removeDaemon(ctrl)
+		if boundHost != "" {
+			h.unbindDaemon(boundHost, ctrl)
+			// The daemon's stream just ended (clean CloseSend EOF or a dropped
+			// socket). Flip the host Offline now and tell subscribers, so the
+			// dashboard reflects the disconnect in real time instead of waiting out
+			// the freshness window. The timeout path stays as the fallback for
+			// disconnects we never see (SIGKILL + frozen network, power loss).
+			h.reg.MarkOffline(boundHost, time.Now())
+			h.publish(h.disconnectSnapshot(boundHost))
+		}
+	}()
+	go func() {
+		for {
+			select {
+			case <-stream.Context().Done():
+				return
+			case c := <-ctrl:
+				if err := stream.Send(c); err != nil {
+					return
+				}
+			}
+		}
+	}()
+	select { // tell the daemon the current demand as soon as it connects
+	case ctrl <- h.observabilityWindow():
+	default:
+	}
+
 	for {
 		snap, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -135,6 +176,13 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 		}
 		hostID, ms, labels := transport.FromSnapshot(snap)
 		id := domain.HostID(hostID)
+		if boundHost != id { // (re)bind this stream to its host for command routing (v2)
+			if boundHost != "" {
+				h.unbindDaemon(boundHost, ctrl) // drop the stale entry so we never route to the wrong sink
+			}
+			boundHost = id
+			h.bindDaemon(id, ctrl)
+		}
 		h.reg.Observe(id, ms, withOrigin(labels, h.idOrDefault()), time.Now())
 		// Heimdallr's sight (ADR 0017): buffer the host's pushed process table and
 		// append its tailed log lines to the bounded ring, for the dashboard modals.
@@ -163,7 +211,64 @@ func (h *Hub) enrich(id domain.HostID, raw *v1.Snapshot) *v1.Snapshot {
 	out.Processes = raw.GetProcesses()
 	out.ProcessesAtUnixMillis = raw.GetProcessesAtUnixMillis()
 	out.LogLines = raw.GetLogLines()
+	out.CommandResult = raw.GetCommandResult() // forward on-demand command results (v2 Phase 2)
 	return out
+}
+
+// disconnectSnapshot builds the final snapshot the hub publishes when a host's
+// stream ends: the host's last-known view with the disconnected flag set, so a
+// subscriber flips it Offline at once. Old subscribers ignore the flag and fall
+// back to the freshness window — the change is additive and backward-compatible.
+func (h *Hub) disconnectSnapshot(id domain.HostID) *v1.Snapshot {
+	hv, ok := h.reg.Host(id)
+	if !ok {
+		return &v1.Snapshot{HostId: string(id), Disconnected: true}
+	}
+	out := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, time.Now())
+	out.Alerts = hv.Alerts
+	out.Disconnected = true
+	return out
+}
+
+// bindDaemon / unbindDaemon map a host to its control sink for command routing.
+func (h *Hub) bindDaemon(id domain.HostID, ctrl chan *v1.StreamControl) {
+	h.mu.Lock()
+	h.daemonByHost[id] = ctrl
+	h.mu.Unlock()
+}
+
+func (h *Hub) unbindDaemon(id domain.HostID, ctrl chan *v1.StreamControl) {
+	h.mu.Lock()
+	if h.daemonByHost[id] == ctrl { // only clear if still ours (a reconnect may have replaced it)
+		delete(h.daemonByHost, id)
+	}
+	h.mu.Unlock()
+}
+
+// RunCommand routes an on-demand allow-listed command to the owning daemon over
+// its outbound stream (v2 Phase 2, ADR 0018). The ack reports only whether the
+// host was reachable; the result returns asynchronously on the host's snapshot
+// (command_result), matched by request_id. The daemon enforces the allow-list.
+func (h *Hub) RunCommand(_ context.Context, req *v1.ControlRequest) (*v1.CommandAck, error) {
+	ack := &v1.CommandAck{RequestId: req.GetRequestId()}
+	if req.GetHostId() == "" || req.GetAllowlistedCmd() == "" {
+		ack.Error = "host_id and allowlisted_cmd are required"
+		return ack, nil
+	}
+	h.mu.Lock()
+	ctrl, ok := h.daemonByHost[domain.HostID(req.GetHostId())]
+	h.mu.Unlock()
+	if !ok {
+		ack.Error = fmt.Sprintf("host %q is not connected to this hub", req.GetHostId())
+		return ack, nil
+	}
+	select {
+	case ctrl <- &v1.StreamControl{Control: &v1.StreamControl_Run{Run: req}}:
+		ack.Accepted = true
+	default:
+		ack.Error = "host control channel is busy; retry"
+	}
+	return ack, nil
 }
 
 // Subscribe streams the current state then live snapshots to a dashboard.
@@ -175,10 +280,10 @@ func (h *Hub) Subscribe(_ *v1.SubscribeRequest, stream v1.FederationService_Subs
 	for _, hv := range h.reg.Hosts() {
 		snap := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, hv.LastSeen)
 		snap.Alerts = hv.Alerts
-		// Seed a newly-connected dashboard with the latest known process table so
-		// the top modal is populated before the next push. Logs are live-tailed
-		// from connect time, so no backfill here.
-		transport.AttachObservability(snap, hv.Processes, hv.ProcessesAt, string(hv.Host.ID), nil)
+		// Seed a newly-connected subscriber (dashboard or `hub cli`) with the latest
+		// process table and the buffered log ring, so the top/log views and the CLI
+		// have history immediately instead of only lines pushed after connect.
+		transport.AttachObservability(snap, hv.Processes, hv.ProcessesAt, string(hv.Host.ID), hv.Logs)
 		if err := stream.Send(snap); err != nil {
 			return err
 		}
@@ -224,10 +329,51 @@ func (h *Hub) addSub(ch chan *v1.Snapshot) {
 	h.mu.Lock()
 	h.subs[ch] = struct{}{}
 	h.mu.Unlock()
+	h.broadcastWindow() // a new watcher may open the observability window (v2)
 }
 
 func (h *Hub) removeSub(ch chan *v1.Snapshot) {
 	h.mu.Lock()
 	delete(h.subs, ch)
 	h.mu.Unlock()
+	h.broadcastWindow() // the last watcher leaving closes the window (v2)
+}
+
+// addDaemon / removeDaemon register a daemon's control sink so the hub can push
+// StreamControl directives down its outbound stream (ADR 0018 — no daemon port).
+func (h *Hub) addDaemon(ch chan *v1.StreamControl) {
+	h.mu.Lock()
+	h.daemons[ch] = struct{}{}
+	h.mu.Unlock()
+}
+
+func (h *Hub) removeDaemon(ch chan *v1.StreamControl) {
+	h.mu.Lock()
+	delete(h.daemons, ch)
+	h.mu.Unlock()
+}
+
+// observabilityWindow is the current demand directive: push logs + a process table
+// only while at least one dashboard is subscribed.
+func (h *Hub) observabilityWindow() *v1.StreamControl {
+	h.mu.Lock()
+	on := len(h.subs) > 0
+	h.mu.Unlock()
+	return &v1.StreamControl{Control: &v1.StreamControl_Observability{
+		Observability: &v1.ObservabilityWindow{Logs: on, Processes: on},
+	}}
+}
+
+// broadcastWindow pushes the current demand window to every connected daemon.
+// Non-blocking: a slow daemon sink misses this edge and gets the next one.
+func (h *Hub) broadcastWindow() {
+	w := h.observabilityWindow()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for ch := range h.daemons {
+		select {
+		case ch <- w:
+		default:
+		}
+	}
 }

@@ -46,7 +46,13 @@ func TestHelpToggleAndView(t *testing.T) {
 	}
 
 	frame := ansiRe.ReplaceAllString(m.View(), "")
-	for _, want := range []string{"Key Bindings", "refresh now", "quit"} {
+	// The help must document the current bindings, including the v2 ones, grouped
+	// into sections — not just the basic grid keys (regression: help was stale).
+	for _, want := range []string{
+		"Key Bindings", "refresh now", "quit",
+		"Fleet", "Host detail", "Modals",
+		"grouping", "filter", "scroll", "logs", "top", "command", "sort",
+	} {
 		if !strings.Contains(frame, want) {
 			t.Errorf("help frame missing %q", want)
 		}

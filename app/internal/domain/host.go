@@ -73,4 +73,5 @@ type HostView struct {
 	Processes   []ProcessRow
 	ProcessesAt time.Time
 	Logs        []LogLine
+	LastCommand *CommandResult // most recent on-demand command result (v2 Phase 2)
 }

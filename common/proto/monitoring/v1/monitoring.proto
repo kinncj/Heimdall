@@ -134,6 +134,8 @@ message Snapshot {
   repeated ProcessRow processes = 9;         // latest process table
   int64    processes_at_unix_millis = 10;    // when the process table was collected
   repeated LogLine log_lines = 11;           // log lines tailed since the last push (push tail)
+  ControlResponse command_result = 12;       // result of an on-demand command (v2), matched by request_id
+  bool     disconnected = 13;                 // v2: the daemon's stream ended — host is offline NOW, not on a timeout. Old subscribers ignore this and fall back to the freshness window.
 }
 
 // ---------------------------------------------------------------------------
@@ -168,12 +170,24 @@ message AckResume      { uint64 acked_seq = 1; }          // hub has durably see
 message CadenceUpdate  { int32 sample_interval_ms = 1; }  // hub re-tunes cadence at runtime
 message KeyframeRequest{ string reason = 1; }             // hub asks daemon for a full keyframe
 
-// StreamControl — multiplexed control frames sent from hub to daemon.
+// ObservabilityWindow — demand-driven push (v2, ADR 0018). The hub tells the
+// daemon whether to push logs / a process table right now, so a configured daemon
+// stops pushing them when no dashboard is watching. Absent ⇒ the daemon keeps its
+// v1 behaviour (push per config), so old hubs and old daemons are unaffected.
+message ObservabilityWindow {
+  bool logs = 1;
+  bool processes = 2;
+}
+
+// StreamControl — multiplexed control frames sent from hub to daemon over the
+// downstream side of the bidi metric stream (no inbound port on the daemon).
 message StreamControl {
   oneof control {
-    AckResume       ack = 1;
-    CadenceUpdate   cadence = 2;
-    KeyframeRequest keyframe = 3;
+    AckResume           ack = 1;
+    CadenceUpdate       cadence = 2;
+    KeyframeRequest     keyframe = 3;
+    ObservabilityWindow observability = 4;
+    ControlRequest      run = 5;          // hub -> daemon: run an allow-listed command (v2)
   }
 }
 
@@ -205,6 +219,19 @@ service FederationService {
   rpc Relay(stream RelayEnvelope) returns (stream RelayControl);
   // Subscribe to a hub's bus (used by dashboards and peer/parent hubs).
   rpc Subscribe(SubscribeRequest) returns (stream Snapshot);
+  // Dashboard/CLI -> hub: run an allow-listed, read-only command on a host (v2,
+  // ADR 0018). The hub routes it down the host's outbound stream; the result
+  // returns asynchronously on that host's snapshot (command_result), matched by
+  // request_id. The ack only reports whether the host could be reached.
+  rpc RunCommand(ControlRequest) returns (CommandAck);
+}
+
+// CommandAck — synchronous acknowledgement that the hub accepted and routed an
+// on-demand command. The actual result arrives later on the host's snapshot.
+message CommandAck {
+  string request_id = 1;
+  bool   accepted = 2;   // false when the host is unknown or not connected
+  string error = 3;
 }
 
 // ---------------------------------------------------------------------------

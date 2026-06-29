@@ -22,6 +22,7 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/alert"
+	"heimdall/app/internal/cli"
 	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/hub"
 	"heimdall/app/internal/observe"
@@ -41,6 +42,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, "heimdall-hub:", err)
 			os.Exit(1)
 		}
+		return
+	}
+	if len(os.Args) > 1 && os.Args[1] == "cli" {
+		cli.Run(os.Args[2:])
 		return
 	}
 	showVersion := flag.Bool("version", false, "print version and exit")

@@ -20,14 +20,27 @@ func (m Model) refresh() {
 	m.recordHistory()
 }
 
+// keyBindings is the help overlay's content. An empty key marks a section header.
 var keyBindings = []struct{ key, desc string }{
-	{"↑ / k", "move selection up"},
-	{"↓ / j", "move selection down"},
-	{"⏎ enter", "open host detail"},
-	{"esc", "back / close"},
+	{"", "Fleet"},
+	{"↑/↓ · j/k", "move selection"},
+	{"⏎", "open host detail"},
+	{"g", "cycle grouping (hub / os / tag)"},
+	{"/", "filter (host, tag, hub, os, state)"},
 	{"r", "refresh now"},
+	{"", "Host detail"},
+	{"↑/↓", "previous / next host"},
+	{"⇧↑/↓ · wheel", "scroll the detail"},
+	{"l / t / c", "logs / top / command (when offered)"},
+	{"", "Modals"},
+	{"↑/↓ · wheel", "pick / scroll"},
+	{"⏎", "open / run"},
+	{"/", "search logs"},
+	{"s", "change top sort"},
+	{"esc", "back — one level at a time"},
+	{"", "General"},
 	{"?", "toggle this help"},
-	{"q / ctrl+c", "quit"},
+	{"q · ctrl+c", "quit"},
 }
 
 // HelpView renders the key-binding overlay, centered on the frame.
@@ -38,10 +51,14 @@ func (m Model) HelpView() string {
 	muted, _ := m.mode.Role("text_muted")
 
 	var b strings.Builder
-	b.WriteString(heading.Style().Render("⬢ HEIMDALL — Key Bindings") + "\n\n")
+	b.WriteString(heading.Style().Render("⬢ HEIMDALL — Key Bindings") + "\n")
 	for _, kb := range keyBindings {
-		b.WriteString("  " + keys.Style().Render(fmt.Sprintf("%-12s", kb.key)) +
-			label.Style().Render(kb.desc) + "\n")
+		if kb.key == "" {
+			b.WriteString("\n" + label.Style().Render(kb.desc) + "\n")
+			continue
+		}
+		b.WriteString("  " + keys.Style().Render(fmt.Sprintf("%-13s", kb.key)) +
+			muted.Style().Render(kb.desc) + "\n")
 	}
 	b.WriteString("\n" + muted.Style().Render("Watch Over All Realms"))
 

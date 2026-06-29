@@ -56,6 +56,28 @@ func TestFoldSnapshotFreshIsOnline(t *testing.T) {
 	}
 }
 
+// v2 real-time disconnect: a snapshot flagged Disconnected flips the host Offline
+// at once, even though its timestamp is fresh (which would otherwise read Online).
+// This is how the hub's stream-end signal reaches the dashboard ahead of the
+// freshness window.
+func TestFoldSnapshotDisconnectedIsOfflineDespiteFreshTimestamp(t *testing.T) {
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	snap := transport.ToSnapshot(
+		"host-d",
+		[]domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 5}},
+		nil, 0, time.Now(),
+	)
+	snap.Disconnected = true
+
+	foldSnapshot(reg, snap)
+	reg.Evaluate(time.Now()) // a fresh-timestamp host would be Online here
+
+	hv, _ := reg.Host("host-d")
+	if hv.State != domain.StateOffline {
+		t.Fatalf("disconnected snapshot should be OFFLINE, got %v", hv.State)
+	}
+}
+
 // Defensive: a snapshot with no timestamp must fall back to now rather than
 // 1970 (which would make every host instantly OFFLINE).
 func TestFoldSnapshotZeroTimestampFallsBackToNow(t *testing.T) {
@@ -68,5 +90,24 @@ func TestFoldSnapshotZeroTimestampFallsBackToNow(t *testing.T) {
 	hv, _ := reg.Host("host-c")
 	if hv.State != domain.StateOnline {
 		t.Fatalf("zero-ts snapshot should fall back to now (ONLINE), got %v", hv.State)
+	}
+}
+
+// snapshotSize honours COLUMNS/LINES so `--snapshot` renders responsively in CI
+// and the screenshot generator (where stdout is a pipe with no TTY). Both must be
+// set and positive; otherwise it falls through to the terminal / model default.
+func TestSnapshotSizeFromEnv(t *testing.T) {
+	t.Setenv("COLUMNS", "64")
+	t.Setenv("LINES", "24")
+	if w, h := snapshotSize(); w != 64 || h != 24 {
+		t.Fatalf("snapshotSize() = %d,%d, want 64,24", w, h)
+	}
+
+	// A partial/invalid pair must not yield a bogus size; with no TTY in the test
+	// harness it falls through to the model default (0,0).
+	t.Setenv("COLUMNS", "64")
+	t.Setenv("LINES", "")
+	if w, _ := snapshotSize(); w == 64 {
+		t.Fatal("snapshotSize() must not apply COLUMNS without a valid LINES")
 	}
 }

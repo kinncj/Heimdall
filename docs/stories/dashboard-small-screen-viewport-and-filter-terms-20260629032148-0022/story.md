@@ -9,12 +9,12 @@ priority: "high"
 ui: false
 adr_required: false
 milestone: "v1.5.1"
-phase: implement
+phase: done
 labels:
   - "type:bug"
   - "type:feature"
   - "priority:high"
-status: in_progress
+status: done
 issue_number: null
 issue_url: null
 created_at: "2026-06-29T03:21:48+0000"

@@ -5,6 +5,10 @@
 
 Start here, then jump to the guide for what you want to do.
 
+> 🎉 **v2.0.0 — the *everything socket* release** is out: on-demand commands,
+> in-dashboard logs & process view, and a JSON CLI, all with no inbound port on any
+> host. → **[Release notes](releases/v2.0.0.md)**.
+
 ## New here?
 
 1. [Installation](installation.md) — get the binaries
@@ -20,11 +24,12 @@ Start here, then jump to the guide for what you want to do.
 | [Secure Deployment](guides/03-secure-deployment.md) | require TLS + an enrollment token |
 | [Privileged Metrics](guides/04-privileged-metrics.md) | unlock power, GPU, and full thermal |
 | [Federation (Bifröst)](guides/05-federation.md) | span multiple sites / networks |
-| [Control Plane](guides/06-control-plane.md) | run read-only remote diagnostics |
+| [Process View & Commands](guides/06-control-plane.md) | see a host's process table (top) and run allow-listed diagnostics |
 | [Log Streaming](guides/07-log-streaming.md) | tail host logs in the dashboard |
 | [Demo Mode](guides/08-demo-mode.md) | explore the UI with no setup |
 | [Metrics Export (Mímir)](guides/09-metrics-export.md) | scrape Heimdall from Prometheus / Grafana |
 | [Alerting (Gjallarhorn)](guides/10-alerting.md) | fire threshold alerts to a webhook |
+| [`heimdall-cli` (programmatic & agents)](guides/11-hub-cli.md) | query the fleet from scripts, CI/CD, or an AI agent |
 
 ## Reference
 
@@ -36,17 +41,18 @@ Start here, then jump to the guide for what you want to do.
 | [Architecture & Operations](deployment.md) | topology, what-runs-where, sequence diagrams, ports |
 | [Troubleshooting](troubleshooting.md) | common issues and host-liveness states |
 
-## The four binaries
+## The five binaries
 
 | Binary | Runs on | Privilege | Job |
 |---|---|---|---|
-| `heimdall-hub` | monitoring station | normal | receives metrics, fans out to dashboards |
+| `heimdall-hub` | monitoring station | normal | receives metrics, fans out to dashboards, mediates directives |
 | `heimdall-dashboard` | monitoring station (any number) | normal | renders the fleet — pure presentation |
-| `heimdall-daemon` | every host | unprivileged | collects + streams this host's metrics |
-| `heimdall-helper` | a host (optional) | root | serves privileged metrics to the local daemon |
+| `heimdall-daemon` | every host | unprivileged | collects + streams metrics; pushes opt-in logs/processes; runs allow-listed commands |
+| `heimdall-helper` | a host (optional) | root | serves privileged metrics + runs privileged allow-listed commands for the daemon |
+| `heimdall-cli` | anywhere | normal | machine/AI-friendly JSON client over a hub (scripts, CI/CD, agents) |
 
-Data flow: **daemon → hub → dashboard(s)**; the helper is a local sidecar to a
-daemon (**helper → daemon** over a unix socket).
+Data flow: **daemon → hub → dashboard(s) / cli**; the helper is a local sidecar to
+a daemon (**helper → daemon** over a unix socket).
 
 ## Design & decisions
 
@@ -59,7 +65,7 @@ daemon (**helper → daemon** over a unix socket).
 ## Contributing / development
 
 ```sh
-make build-tui        # build all four binaries
+make build-tui        # build all five binaries
 make test             # unit tests
 make lint             # gofmt + go vet
 make test-acceptance  # behave acceptance suite (drives the real binaries)

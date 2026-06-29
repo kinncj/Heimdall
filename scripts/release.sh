@@ -13,7 +13,7 @@ set -euo pipefail
 VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
 OUT="${OUT:-dist}"
 PLATFORMS="${PLATFORMS:-linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64}"
-COMPONENTS="${COMPONENTS:-dashboard daemon hub helper}"
+COMPONENTS="${COMPONENTS:-dashboard daemon hub helper cli}"
 
 rm -rf "$OUT"
 mkdir -p "$OUT"
@@ -29,6 +29,10 @@ for c in $COMPONENTS; do
       -o "$OUT/$bin" "./app/cmd/${c}"
   done
 done
+
+# Manpages (.1) + Windows/no-man plain-text help (.txt), generated from --help and
+# dropped next to the binaries so they are attached and checksummed below.
+OUT="$OUT" bash scripts/gen-manpages.sh || echo "release: manpage generation skipped"
 
 ( cd "$OUT" && { sha256sum heimdall-* 2>/dev/null || shasum -a 256 heimdall-*; } > SHA256SUMS )
 
