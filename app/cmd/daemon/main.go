@@ -122,6 +122,9 @@ func main() {
 			fatal("invalid --log-source", err)
 		}
 		push, pushLabels := startPush(context.Background(), sources, cfg.Span("process-interval", 0), proc.Local{})
+		if len(pushLabels) > 0 && tags == nil {
+			tags = map[string]string{} // ParseTags returns nil when no --tags were given
+		}
 		for k, v := range pushLabels {
 			tags[k] = v
 		}

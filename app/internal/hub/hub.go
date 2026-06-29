@@ -175,10 +175,10 @@ func (h *Hub) Subscribe(_ *v1.SubscribeRequest, stream v1.FederationService_Subs
 	for _, hv := range h.reg.Hosts() {
 		snap := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, hv.LastSeen)
 		snap.Alerts = hv.Alerts
-		// Seed a newly-connected dashboard with the latest known process table so
-		// the top modal is populated before the next push. Logs are live-tailed
-		// from connect time, so no backfill here.
-		transport.AttachObservability(snap, hv.Processes, hv.ProcessesAt, string(hv.Host.ID), nil)
+		// Seed a newly-connected subscriber (dashboard or `hub cli`) with the latest
+		// process table and the buffered log ring, so the top/log views and the CLI
+		// have history immediately instead of only lines pushed after connect.
+		transport.AttachObservability(snap, hv.Processes, hv.ProcessesAt, string(hv.Host.ID), hv.Logs)
 		if err := stream.Send(snap); err != nil {
 			return err
 		}

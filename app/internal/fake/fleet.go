@@ -15,12 +15,21 @@ import (
 	"heimdall/app/internal/domain"
 )
 
-// Demo observability (Heimdallr's sight): which hosts advertise log sources and a
-// process table, so the dashboard's l/top modals are explorable in --demo.
-var (
-	demoLogs = map[string]string{"workstation": "app,sys", "dgx-spark": "train"}
-	demoProc = map[string]bool{"workstation": true, "dgx-spark": true, "alienware": true}
-)
+// Demo observability (Heimdallr's sight): every demo host advertises a process
+// table and log sources, so every feature — logs (l, with / search), top (t, with
+// s sort), grouping, filtering, alerts — is explorable on any host in --demo.
+var demoLogs = map[string]string{
+	"workstation": "app,sys",
+	"dgx-spark":   "train,app",
+	"strix-halo":  "app,sys",
+	"mac-mini":    "app",
+	"rpi-5":       "sensor",
+	"alienware":   "game,app",
+	"edge-cloud":  "app,nginx",
+}
+
+// demoProc reports whether a demo host pushes a process table — all of them do.
+func demoProc(id string) bool { return true }
 
 type spec struct {
 	id, os, arch, class  string
@@ -57,7 +66,7 @@ func New(now time.Time) *Source {
 		if v := demoLogs[h.id]; v != "" {
 			labels["_logs"] = v
 		}
-		if demoProc[h.id] {
+		if demoProc(h.id) {
 			labels["_proc"] = "1"
 		}
 		s.reg.Enroll(domain.Host{
@@ -99,13 +108,15 @@ func (s *Source) Tick(now time.Time) {
 // registry for hosts that advertise the capability, so the l/top modals animate.
 func (s *Source) pushObservability(h *spec, now time.Time) {
 	var procs []domain.ProcessRow
-	if demoProc[h.id] {
+	if demoProc(h.id) {
 		procs = demoProcs(h)
 	}
 	var lines []domain.LogLine
-	if src := demoLogs[h.id]; src != "" {
-		alias := strings.SplitN(src, ",", 2)[0]
-		lines = []domain.LogLine{{Source: alias, At: now, Line: demoLogLine(h, now)}}
+	for _, alias := range strings.Split(demoLogs[h.id], ",") {
+		if alias == "" {
+			continue
+		}
+		lines = append(lines, domain.LogLine{Source: alias, At: now, Line: demoLogLine(h, now)})
 	}
 	if procs != nil || lines != nil {
 		s.reg.RecordPush(domain.HostID(h.id), procs, now, lines)
