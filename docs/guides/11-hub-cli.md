@@ -35,10 +35,13 @@ on **stderr** with a non-zero exit.
 | `run <id> <cmd> [args]` | run an **allow-listed, read-only** command on a host (v2) |
 
 `run` commands (read-only, allow-listed, audited on the daemon): `process.list`,
-`disk.df`, `uptime`, `os.info`, `dir.list <dir>` (bounded to safe roots). They are
-hub-mediated — the dashboard/CLI asks the **hub**, which routes the request down
-the host's outbound stream; the daemon runs it as its unprivileged user. Anything
-off the list is refused with `insufficient_permission` and never executed.
+`disk.df`, `uptime`, `os.info`, `dir.list <dir>` (bounded to safe roots), plus the
+privileged `dmesg` and `journal.tail`. They are hub-mediated — the dashboard/CLI
+asks the **hub**, which routes the request down the host's outbound stream; the
+daemon runs unprivileged commands itself and delegates **privileged** ones to the
+root **helper** over the local socket (a host with no helper returns
+`insufficient_permission`). Anything off the list is refused and never executed.
+Requires the daemon to be started with `--allow-commands`.
 
 ```sh
 heimdall-cli --hub "$HUB" run web-01 disk.df  | jq -r .stdout

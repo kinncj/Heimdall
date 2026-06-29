@@ -121,11 +121,15 @@ bidi stream already carries the exact directions we need. Reuse wins.
   `request_id`. The dashboard/CLI issue it to the hub via
   `FederationService.RunCommand`, never to a daemon. Exposed today as
   `heimdall-cli run <host> <cmd>`.
-- **Phase 2b — helper-delegated privileged commands (next).** For commands marked
-  privileged, the daemon asks the **helper** (root) over the existing local unix
-  socket instead of running them itself; a host with no helper returns
-  `insufficient_permission`. The unprivileged daemon never gains privilege. Not yet
-  implemented — all current allow-listed commands are unprivileged.
+- **Phase 2b — helper-delegated privileged commands. ✅ done.** Commands marked
+  privileged (`dmesg`, `journal.tail`) run via the **helper** (root) over the
+  existing local unix socket, never by the daemon. The helper's socket protocol is
+  now request-based (`collect` | `exec`), backward compatible with old/silent
+  clients. The helper **enforces its own allow-list** (`command.IsPrivileged`) — it
+  never trusts the daemon — and runs only allow-listed privileged commands with
+  bounded output and no shell. A host with no helper returns
+  `insufficient_permission` ("needs the privileged helper"). The unprivileged
+  daemon never gains privilege.
 
 ## 4. Open questions (non-blocking)
 
