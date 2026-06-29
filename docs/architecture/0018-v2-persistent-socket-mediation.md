@@ -1,7 +1,7 @@
 ---
 adr: "0018"
 title: "v2 — persistent socket mediation (daemon ⇄ hub ⇄ dashboard)"
-status: proposed
+status: accepted
 date: "2026-06-29"
 supersedes: null
 superseded_by: null
@@ -70,18 +70,71 @@ daemon  ──▶ socket ◀──  HUB  ──▶ socket ◀──  dashboard
 The frames layer onto the existing `monitoring.v1` streams as additive messages,
 so a v2 hub still speaks v1 to old daemons/dashboards.
 
-## 4. Open questions
+## 3a. Decided approach — **Kinn decided (2026-06-29)**
 
-- Frame envelope: extend `MetricStreamService.Stream` (already bidi) vs. a new
-  `HubControlService` stream. Trade-off: reuse one connection vs. isolation.
-- Auth granularity for on-demand command execution beyond the enrollment token.
+> Flagged as decided by Kinn: this is the approach to build on `feature/sockets`.
+
+**Reuse the daemon's existing outbound bidirectional metric stream as the control
+channel.** No new service, no new connection, and — critically — **no listener and
+no open port on any host**.
+
+`MetricStreamService.Stream` is already `rpc Stream(stream Snapshot) returns
+(stream StreamControl)` — bidirectional. The daemon already dials it outbound and
+sends `Snapshot`s; the hub can already send `StreamControl` back down it. v2:
+
+1. **Hub → daemon directives** ride `StreamControl` (extended additively). The
+   daemon adds a receive loop on the stream it already holds. It still **dials out
+   and never listens** — the hub drives it over the daemon's own connection.
+2. **Daemon → hub replies** ride the `Snapshot` stream (additive fields) or a new
+   additive `result` message, correlated by `request_id`.
+3. **Hub is the sole interface and trust boundary.** It maps `hostID → stream`,
+   authorizes the dashboard, routes directives down, and fans replies up. Nothing
+   ever connects *to* a daemon.
+
+**Security model (the constraint driving this):**
+- **Daemons run with the least privilege possible** and open **no inbound port** —
+  the v1 "only hubs listen" rule is preserved exactly. The reverse channel is the
+  daemon's own outbound socket, so no new attack surface is exposed on a host.
+- **Privileged work is delegated to the helper**, which may run as root, over the
+  **existing local unix socket** (the same channel used for privileged metrics).
+  The unprivileged daemon never gains privilege; it asks the helper, which applies
+  its own policy. A host with no helper simply cannot satisfy a privileged request
+  (returns `insufficient_permission`).
+- **The hub is the single door.** Operators secure one listener, not a fleet of
+  them. No daemon port to firewall, MITM, or scan.
+
+**Why not a separate `HubControlService` stream?** It would mean a second
+long-lived connection per daemon for no security or routing benefit; the existing
+bidi stream already carries the exact directions we need. Reuse wins.
+
+### Phasing (each ships green on `feature/sockets`)
+
+- **Phase 1 — demand-driven push.** A new `StreamControl` arm
+  `ObservabilityWindow{logs, processes}` tells the daemon to push logs / a process
+  table **only while the hub has a dashboard watching that host**. Reclaims the v1
+  always-on bandwidth cost. Backward compatible: an old daemon ignores the arm and
+  keeps pushing per config; an old hub sends no arm and the daemon defaults to its
+  v1 behaviour.
+- **Phase 2 — on-demand commands.** A `RunCommand{request_id, allowlisted_cmd,
+  args, privileged}` arm. The daemon runs read-only allow-listed commands as itself
+  (unprivileged); when `privileged`, it asks the **helper** over the unix socket.
+  Results return correlated by `request_id`. The dashboard issues these to the hub,
+  never to a daemon.
+
+## 4. Open questions (non-blocking)
+
 - Back-pressure and fairness when many dashboards subscribe to one busy daemon.
-- Cross-hub (federated) routing of requests along the relay path.
+- Cross-hub (federated) routing of directives along the relay path (Phase 3).
+- Helper command-policy surface (which privileged commands it will satisfy).
 
 ## 5. Decision
 
-Deferred. Recorded here so v2 starts from a written design. Implementation proceeds
-on `feature/sockets`; a future revision of this ADR moves it to **accepted** and
-supersedes the relevant parts of ADR 0017 when v2.0.0 lands.
+**Accepted (Kinn decided, 2026-06-29).** Build the v2 socket transport by reusing
+the daemon's existing outbound bidi `MetricStreamService.Stream`: hub directives
+ride `StreamControl` (additive), daemon replies ride the snapshot stream, the hub
+mediates everything, and privileged work delegates to the helper over the local
+unix socket. Daemons keep needing no inbound port. Ship in phases — demand-driven
+push first, on-demand commands second — each additive and backward compatible on
+the v1.6.0 wire.
 
-Status: **proposed**
+Status: **accepted**
