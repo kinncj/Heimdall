@@ -294,6 +294,22 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 	}
 	logger.Info("streaming to hub", "addr", addr, "host", host)
 
+	// Heimdallr's sight v2 (ADR 0018): receive demand directives down the same
+	// outbound stream and gate pushing accordingly. The daemon still never listens.
+	if push != nil {
+		go func() {
+			for {
+				ctrl, err := stream.Recv()
+				if err != nil {
+					return // stream closed; streamOnce will reconnect
+				}
+				if w := ctrl.GetObservability(); w != nil {
+					push.setWindow(w.GetLogs(), w.GetProcesses())
+				}
+			}
+		}()
+	}
+
 	var seq uint64
 	send := func() error {
 		seq++

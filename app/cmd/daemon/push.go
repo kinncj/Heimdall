@@ -27,6 +27,18 @@ type pusher struct {
 	dropped bool
 	procs   []domain.ProcessRow
 	procsAt time.Time
+	// Demand window (v2, ADR 0018): the hub opens/closes pushing via StreamControl.
+	// Default open so an old hub (which sends no directive) keeps v1 behaviour.
+	wantLogs  bool
+	wantProcs bool
+}
+
+// setWindow applies a demand directive from the hub: push logs / processes only
+// while a dashboard is watching.
+func (p *pusher) setWindow(logs, procs bool) {
+	p.mu.Lock()
+	p.wantLogs, p.wantProcs = logs, procs
+	p.mu.Unlock()
 }
 
 func (p *pusher) addLine(source, line string) {
@@ -51,13 +63,23 @@ func (p *pusher) setProcs(rows []domain.ProcessRow, at time.Time) {
 }
 
 // drain returns the latest process table and the log lines accumulated since the
-// last drain, which it clears. Called once per snapshot send.
+// last drain, which it clears — but only the parts the hub's demand window asks
+// for (v2). When the window is closed, accumulated lines are dropped so they don't
+// grow unbounded while nobody is watching.
 func (p *pusher) drain() ([]domain.ProcessRow, time.Time, []domain.LogLine) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	lines := p.pending
+	var procs []domain.ProcessRow
+	var procsAt time.Time
+	if p.wantProcs {
+		procs, procsAt = p.procs, p.procsAt
+	}
+	var lines []domain.LogLine
+	if p.wantLogs {
+		lines = p.pending
+	}
 	p.pending = nil
-	return p.procs, p.procsAt, lines
+	return procs, procsAt, lines
 }
 
 // startPush launches the tail and process-collection goroutines for the
@@ -68,7 +90,9 @@ func startPush(ctx context.Context, sources logs.Sources, procInterval time.Dura
 	if len(sources) == 0 && procInterval <= 0 {
 		return nil, nil
 	}
-	p := &pusher{}
+	// Open by default: a v1 hub never sends a window directive, so the daemon keeps
+	// pushing per its config until a v2 hub tells it otherwise.
+	p := &pusher{wantLogs: true, wantProcs: true}
 	labels := map[string]string{}
 
 	for alias, path := range sources {

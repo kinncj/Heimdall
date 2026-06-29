@@ -31,8 +31,9 @@ type Hub struct {
 	auth         secure.Authenticator
 	id           string
 
-	mu   sync.Mutex
-	subs map[chan *v1.Snapshot]struct{}
+	mu      sync.Mutex
+	subs    map[chan *v1.Snapshot]struct{}
+	daemons map[chan *v1.StreamControl]struct{} // active daemon control sinks (v2 demand-driven push)
 
 	fmu sync.Mutex
 	fed map[domain.HostID]relayMeta
@@ -55,6 +56,7 @@ func New(staleAfter, offlineAfter time.Duration) *Hub {
 		offlineAfter: offlineAfter,
 		auth:         secure.NewAuthenticator(""),
 		subs:         make(map[chan *v1.Snapshot]struct{}),
+		daemons:      make(map[chan *v1.StreamControl]struct{}),
 		fed:          make(map[domain.HostID]relayMeta),
 	}
 }
@@ -123,8 +125,31 @@ func (h *Hub) Enroll(_ context.Context, req *v1.EnrollRequest) (*v1.EnrollRespon
 	}, nil
 }
 
-// Stream ingests a daemon's snapshots until the stream closes.
+// Stream ingests a daemon's snapshots until the stream closes. It also drives the
+// daemon's demand window: directives ride the downstream side of this same bidi
+// stream (ADR 0018), so the daemon needs no inbound port. The send goroutine runs
+// concurrently with the Recv loop — one reader, one writer, as gRPC allows.
 func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
+	ctrl := make(chan *v1.StreamControl, 4)
+	h.addDaemon(ctrl)
+	defer h.removeDaemon(ctrl)
+	go func() {
+		for {
+			select {
+			case <-stream.Context().Done():
+				return
+			case c := <-ctrl:
+				if err := stream.Send(c); err != nil {
+					return
+				}
+			}
+		}
+	}()
+	select { // tell the daemon the current demand as soon as it connects
+	case ctrl <- h.observabilityWindow():
+	default:
+	}
+
 	for {
 		snap, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -224,10 +249,51 @@ func (h *Hub) addSub(ch chan *v1.Snapshot) {
 	h.mu.Lock()
 	h.subs[ch] = struct{}{}
 	h.mu.Unlock()
+	h.broadcastWindow() // a new watcher may open the observability window (v2)
 }
 
 func (h *Hub) removeSub(ch chan *v1.Snapshot) {
 	h.mu.Lock()
 	delete(h.subs, ch)
 	h.mu.Unlock()
+	h.broadcastWindow() // the last watcher leaving closes the window (v2)
+}
+
+// addDaemon / removeDaemon register a daemon's control sink so the hub can push
+// StreamControl directives down its outbound stream (ADR 0018 — no daemon port).
+func (h *Hub) addDaemon(ch chan *v1.StreamControl) {
+	h.mu.Lock()
+	h.daemons[ch] = struct{}{}
+	h.mu.Unlock()
+}
+
+func (h *Hub) removeDaemon(ch chan *v1.StreamControl) {
+	h.mu.Lock()
+	delete(h.daemons, ch)
+	h.mu.Unlock()
+}
+
+// observabilityWindow is the current demand directive: push logs + a process table
+// only while at least one dashboard is subscribed.
+func (h *Hub) observabilityWindow() *v1.StreamControl {
+	h.mu.Lock()
+	on := len(h.subs) > 0
+	h.mu.Unlock()
+	return &v1.StreamControl{Control: &v1.StreamControl_Observability{
+		Observability: &v1.ObservabilityWindow{Logs: on, Processes: on},
+	}}
+}
+
+// broadcastWindow pushes the current demand window to every connected daemon.
+// Non-blocking: a slow daemon sink misses this edge and gets the next one.
+func (h *Hub) broadcastWindow() {
+	w := h.observabilityWindow()
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for ch := range h.daemons {
+		select {
+		case ch <- w:
+		default:
+		}
+	}
 }

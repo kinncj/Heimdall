@@ -168,12 +168,23 @@ message AckResume      { uint64 acked_seq = 1; }          // hub has durably see
 message CadenceUpdate  { int32 sample_interval_ms = 1; }  // hub re-tunes cadence at runtime
 message KeyframeRequest{ string reason = 1; }             // hub asks daemon for a full keyframe
 
-// StreamControl — multiplexed control frames sent from hub to daemon.
+// ObservabilityWindow — demand-driven push (v2, ADR 0018). The hub tells the
+// daemon whether to push logs / a process table right now, so a configured daemon
+// stops pushing them when no dashboard is watching. Absent ⇒ the daemon keeps its
+// v1 behaviour (push per config), so old hubs and old daemons are unaffected.
+message ObservabilityWindow {
+  bool logs = 1;
+  bool processes = 2;
+}
+
+// StreamControl — multiplexed control frames sent from hub to daemon over the
+// downstream side of the bidi metric stream (no inbound port on the daemon).
 message StreamControl {
   oneof control {
-    AckResume       ack = 1;
-    CadenceUpdate   cadence = 2;
-    KeyframeRequest keyframe = 3;
+    AckResume           ack = 1;
+    CadenceUpdate       cadence = 2;
+    KeyframeRequest     keyframe = 3;
+    ObservabilityWindow observability = 4;
   }
 }
 
