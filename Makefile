@@ -16,7 +16,8 @@ build-tui:
 	go build -o bin/heimdall-daemon ./app/cmd/daemon
 	go build -o bin/heimdall-hub ./app/cmd/hub
 	go build -o bin/heimdall-helper ./app/cmd/helper
-	@echo "built bin/heimdall-dashboard, bin/heimdall-daemon, bin/heimdall-hub, bin/heimdall-helper"
+	go build -o bin/heimdall-cli ./app/cmd/cli
+	@echo "built bin/heimdall-{dashboard,daemon,hub,helper,cli}"
 
 ## Run the Heimdall TUI dashboard (subscribes to a hub at localhost:9090)
 run-tui: build-tui

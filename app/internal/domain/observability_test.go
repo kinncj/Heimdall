@@ -35,6 +35,23 @@ func TestRecordPushStoresProcessesAndRingsLogs(t *testing.T) {
 	}
 }
 
+func TestRecordCommandResult(t *testing.T) {
+	reg := NewHostRegistry(10*time.Second, 30*time.Second)
+	reg.Enroll(Host{ID: "h"}, time.Unix(0, 0))
+
+	reg.RecordCommandResult("h", &CommandResult{RequestID: "r1", Status: StatusOK, Stdout: "out", ExitCode: 0})
+	v, _ := reg.Host("h")
+	if v.LastCommand == nil || v.LastCommand.RequestID != "r1" || v.LastCommand.Stdout != "out" {
+		t.Fatalf("command result not stored: %+v", v.LastCommand)
+	}
+	// nil is a no-op, not a clear.
+	reg.RecordCommandResult("h", nil)
+	v, _ = reg.Host("h")
+	if v.LastCommand == nil {
+		t.Fatal("nil result must not clear the last command")
+	}
+}
+
 func TestRecordPushBoundsLogRing(t *testing.T) {
 	reg := NewHostRegistry(10*time.Second, 30*time.Second)
 	reg.Enroll(Host{ID: "h"}, time.Unix(0, 0))
