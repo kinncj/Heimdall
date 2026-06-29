@@ -32,6 +32,20 @@ on **stderr** with a non-zero exit.
 | `host <id>` | one host in full, including `processes` |
 | `top <id>` | the host's latest process table |
 | `logs <id> [source]` | the host's buffered log lines (optionally one source) |
+| `run <id> <cmd> [args]` | run an **allow-listed, read-only** command on a host (v2) |
+
+`run` commands (read-only, allow-listed, audited on the daemon): `process.list`,
+`disk.df`, `uptime`, `os.info`, `dir.list <dir>` (bounded to safe roots). They are
+hub-mediated — the dashboard/CLI asks the **hub**, which routes the request down
+the host's outbound stream; the daemon runs it as its unprivileged user. Anything
+off the list is refused with `insufficient_permission` and never executed.
+
+```sh
+heimdall-cli --hub "$HUB" run web-01 disk.df  | jq -r .stdout
+heimdall-cli --hub "$HUB" run web-01 os.info   | jq -r .stdout
+# exit non-zero if a command was refused
+test "$(heimdall-cli --hub "$HUB" run web-01 uptime | jq -r .status)" = ok
+```
 
 > `top`/`logs` show data only for hosts that push it (`heimdall-daemon
 > --process-interval` / `--log-source`). On a quiet fleet, raise `--wait` (e.g.
@@ -157,12 +171,14 @@ Connection (read from the environment, with fallbacks):
 - hub: `${HEIMDALL_HUB:-localhost:9090}`
 - token: `$HEIMDALL_TOKEN` (omit `--token` if unset)
 
-Commands (all read-only, JSON on stdout):
+Commands (read-only, JSON on stdout):
 - `heimdall-cli --hub "$HEIMDALL_HUB" fleet`            — counts by state
 - `heimdall-cli --hub "$HEIMDALL_HUB" hosts`            — every host + metrics + capabilities
 - `heimdall-cli --hub "$HEIMDALL_HUB" host <id>`        — one host in full
 - `heimdall-cli --hub "$HEIMDALL_HUB" top <id>`         — process table
 - `heimdall-cli --hub "$HEIMDALL_HUB" logs <id> [src]`  — recent log lines
+- `heimdall-cli --hub "$HEIMDALL_HUB" run <id> <cmd>`   — allow-listed diagnostic
+  (process.list | disk.df | uptime | os.info | dir.list <dir>); read-only, audited
 
 Parse with `jq`. Be concise and factual: name host ids and states explicitly.
 If a host is missing, say so — do not assume it exists. For "is X healthy?",
@@ -192,6 +208,8 @@ Run `heimdall-cli` (JSON, read-only) against the hub at
 - Offline hosts: `heimdall-cli --hub "$HEIMDALL_HUB" hosts | jq -r '.[]|select(.state=="offline").id'`
 - Hot processes: `heimdall-cli --hub "$HEIMDALL_HUB" top <id> | jq '.processes|sort_by(-.cpu_pct)[:5]'`
 - Errors in logs: `heimdall-cli --hub "$HEIMDALL_HUB" logs <id> <src> | jq -r '.lines[]|select(.line|test("error";"i")).line'`
+- Run a diagnostic: `heimdall-cli --hub "$HEIMDALL_HUB" run <id> disk.df | jq -r .stdout`
+  (allow-listed read-only only: process.list, disk.df, uptime, os.info, dir.list)
 
 Always parse the JSON; report host ids, states, and concrete numbers.
 ```

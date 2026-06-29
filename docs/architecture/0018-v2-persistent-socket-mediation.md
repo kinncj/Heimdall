@@ -109,17 +109,23 @@ bidi stream already carries the exact directions we need. Reuse wins.
 
 ### Phasing (each ships green on `feature/sockets`)
 
-- **Phase 1 — demand-driven push.** A new `StreamControl` arm
-  `ObservabilityWindow{logs, processes}` tells the daemon to push logs / a process
-  table **only while the hub has a dashboard watching that host**. Reclaims the v1
-  always-on bandwidth cost. Backward compatible: an old daemon ignores the arm and
-  keeps pushing per config; an old hub sends no arm and the daemon defaults to its
-  v1 behaviour.
-- **Phase 2 — on-demand commands.** A `RunCommand{request_id, allowlisted_cmd,
-  args, privileged}` arm. The daemon runs read-only allow-listed commands as itself
-  (unprivileged); when `privileged`, it asks the **helper** over the unix socket.
-  Results return correlated by `request_id`. The dashboard issues these to the hub,
-  never to a daemon.
+- **Phase 1 — demand-driven push. ✅ done.** `StreamControl.ObservabilityWindow{
+  logs, processes}` tells the daemon to push logs / a process table **only while
+  the hub has a dashboard watching**. Reclaims the v1 always-on bandwidth cost.
+  Backward compatible: an old daemon ignores the arm; an old hub sends none and the
+  daemon defaults to v1 behaviour.
+- **Phase 2 — on-demand commands. ✅ done (unprivileged).** `StreamControl.run`
+  (a `ControlRequest`) carries an allow-listed, read-only command down to the
+  daemon; the daemon runs it as its unprivileged user, audits it, and returns a
+  `ControlResponse` on its next `Snapshot.command_result`, correlated by
+  `request_id`. The dashboard/CLI issue it to the hub via
+  `FederationService.RunCommand`, never to a daemon. Exposed today as
+  `heimdall-cli run <host> <cmd>`.
+- **Phase 2b — helper-delegated privileged commands (next).** For commands marked
+  privileged, the daemon asks the **helper** (root) over the existing local unix
+  socket instead of running them itself; a host with no helper returns
+  `insufficient_permission`. The unprivileged daemon never gains privilege. Not yet
+  implemented — all current allow-listed commands are unprivileged.
 
 ## 4. Open questions (non-blocking)
 
