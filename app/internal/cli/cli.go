@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"heimdall/app/internal/command"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/secure"
 	"heimdall/app/internal/transport"
@@ -49,10 +50,21 @@ func Run(args []string) {
 		return
 	}
 
-	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
-	if err := cliGather(reg, *hubAddr, *token, secure.ClientConfig{
+	tlsCfg := secure.ClientConfig{
 		Enabled: *tls, CAFile: *caFile, ServerName: *serverName, SkipVerify: *skipVerify,
-	}, *wait); err != nil {
+	}
+
+	// `run` issues an on-demand command and waits for its result; it does not fit
+	// the gather-then-print model the read-only commands use.
+	if cmd == "run" {
+		if err := cliRun(*hubAddr, *token, tlsCfg, fs.Args()[1:], *wait); err != nil {
+			cliFail(err)
+		}
+		return
+	}
+
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	if err := cliGather(reg, *hubAddr, *token, tlsCfg, *wait); err != nil {
 		cliFail(err)
 	}
 	if err := cliDispatch(reg, cmd, fs.Args()[1:]); err != nil {
@@ -72,6 +84,8 @@ Commands:
   host <id>             one host in full (metrics, processes, log sources)
   top <id>              the host's latest process table
   logs <id> [source]    the host's buffered log lines (optionally one source)
+  run <id> <cmd> [args] run an allow-listed read-only command on a host (v2)
+                        cmd: process.list | disk.df | uptime | os.info | dir.list <dir>
 
 All output is JSON on stdout; errors are JSON on stderr with a non-zero exit.
 
@@ -79,6 +93,7 @@ Examples:
   heimdall-cli hosts | jq '.[] | select(.state=="offline").id'
   heimdall-cli top dgx-spark
   heimdall-cli logs web-01 app
+  heimdall-cli run web-01 disk.df | jq -r .stdout
 `)
 }
 
@@ -88,18 +103,114 @@ func cliFail(err error) {
 	os.Exit(1)
 }
 
-// cliGather subscribes to the hub and folds its current-state burst into reg over
-// a short window, then computes liveness.
-func cliGather(reg *domain.HostRegistry, addr, token string, tlsCfg secure.ClientConfig, wait time.Duration) error {
+// cliDial opens a hub client connection with the configured transport security
+// and per-RPC enrollment token.
+func cliDial(addr, token string, tlsCfg secure.ClientConfig) (*grpc.ClientConn, error) {
 	transportOpt, err := tlsCfg.DialOption()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	opts := []grpc.DialOption{transportOpt}
 	if token != "" {
 		opts = append(opts, grpc.WithPerRPCCredentials(secure.TokenCredentials{Token: token}))
 	}
-	conn, err := grpc.NewClient(addr, opts...)
+	return grpc.NewClient(addr, opts...)
+}
+
+// cliRun issues an on-demand allow-listed command via the hub and waits for its
+// result (v2 Phase 2, ADR 0018). It subscribes first so it cannot miss the result
+// snapshot, then issues the command and reads until the matching result arrives.
+func cliRun(addr, token string, tlsCfg secure.ClientConfig, args []string, wait time.Duration) error {
+	if len(args) < 1 {
+		return fmt.Errorf("run needs: <host> <command> [args] (commands: %s)", strings.Join(command.Keys(), ", "))
+	}
+	host := args[0]
+	if len(args) < 2 {
+		return fmt.Errorf("run needs a command (one of: %s)", strings.Join(command.Keys(), ", "))
+	}
+	cmdKey, cmdArgs := args[1], args[2:]
+
+	conn, err := cliDial(addr, token, tlsCfg)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	fed := v1.NewFederationServiceClient(conn)
+
+	timeout := wait
+	if timeout < 12*time.Second {
+		timeout = 12 * time.Second // a command runs longer than a state gather
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	stream, err := fed.Subscribe(ctx, &v1.SubscribeRequest{SubscriberId: "hub-cli-run"})
+	if err != nil {
+		return err
+	}
+	actor := os.Getenv("USER")
+	if actor == "" {
+		actor = "heimdall-cli"
+	}
+	reqID := fmt.Sprintf("cli-%d", time.Now().UnixNano())
+	ack, err := fed.RunCommand(ctx, &v1.ControlRequest{
+		RequestId: reqID, HostId: host, AllowlistedCmd: cmdKey, Args: cmdArgs, Actor: actor,
+	})
+	if err != nil {
+		return err
+	}
+	if !ack.GetAccepted() {
+		return fmt.Errorf("%s", ack.GetError())
+	}
+	for {
+		snap, err := stream.Recv()
+		if err != nil {
+			return fmt.Errorf("timed out waiting for the result of %q on %q", cmdKey, host)
+		}
+		if cr := snap.GetCommandResult(); cr != nil && cr.GetRequestId() == reqID {
+			return cliEmit(newJCommand(host, cmdKey, cr))
+		}
+	}
+}
+
+type jCommand struct {
+	Host      string `json:"host"`
+	Command   string `json:"command"`
+	Status    string `json:"status"`
+	ExitCode  int32  `json:"exit_code"`
+	Stdout    string `json:"stdout"`
+	Stderr    string `json:"stderr,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
+}
+
+func newJCommand(host, cmd string, cr *v1.ControlResponse) jCommand {
+	return jCommand{
+		Host: host, Command: cmd,
+		Status:    statusString(cr.GetStatus()),
+		ExitCode:  cr.GetExitCode(),
+		Stdout:    cr.GetStdout(),
+		Stderr:    cr.GetStderr(),
+		Truncated: cr.GetTruncated(),
+	}
+}
+
+func statusString(s v1.MetricStatus) string {
+	switch s {
+	case v1.MetricStatus_METRIC_STATUS_OK:
+		return "ok"
+	case v1.MetricStatus_METRIC_STATUS_INSUFFICIENT_PERMISSION:
+		return "insufficient_permission"
+	case v1.MetricStatus_METRIC_STATUS_ERROR:
+		return "error"
+	default:
+		return "unspecified"
+	}
+}
+
+// cliGather subscribes to the hub and folds its current-state burst into reg over
+// a short window, then computes liveness.
+func cliGather(reg *domain.HostRegistry, addr, token string, tlsCfg secure.ClientConfig, wait time.Duration) error {
+	conn, err := cliDial(addr, token, tlsCfg)
 	if err != nil {
 		return err
 	}

@@ -12,6 +12,7 @@ import (
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/logs"
 	"heimdall/app/internal/proc"
+	v1 "heimdall/common/proto/monitoring/v1"
 )
 
 // pushLogCap bounds the log lines buffered between snapshots, so a noisy source
@@ -31,6 +32,24 @@ type pusher struct {
 	// Default open so an old hub (which sends no directive) keeps v1 behaviour.
 	wantLogs  bool
 	wantProcs bool
+	// On-demand command result awaiting delivery on the next snapshot (v2 Phase 2).
+	result *v1.ControlResponse
+}
+
+// setResult stores a finished on-demand command result for the next send.
+func (p *pusher) setResult(r *v1.ControlResponse) {
+	p.mu.Lock()
+	p.result = r
+	p.mu.Unlock()
+}
+
+// drainResult returns and clears a pending command result, if any.
+func (p *pusher) drainResult() *v1.ControlResponse {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	r := p.result
+	p.result = nil
+	return r
 }
 
 // setWindow applies a demand directive from the hub: push logs / processes only
@@ -87,9 +106,9 @@ func (p *pusher) drain() ([]domain.ProcessRow, time.Time, []domain.LogLine) {
 // configured) and the reserved labels that advertise the capability to the hub
 // and dashboard (`_logs`, `_proc`). Reserved keys are filtered from user tags.
 func startPush(ctx context.Context, sources logs.Sources, procInterval time.Duration, src proc.Source) (*pusher, map[string]string) {
-	if len(sources) == 0 && procInterval <= 0 {
-		return nil, nil
-	}
+	// Always return a pusher when streaming: even a daemon that pushes neither logs
+	// nor a process table must be able to receive and answer on-demand commands
+	// (v2 Phase 2). Observability collection below is gated on its own config.
 	// Open by default: a v1 hub never sends a window directive, so the daemon keeps
 	// pushing per its config until a v2 hub tells it otherwise.
 	p := &pusher{wantLogs: true, wantProcs: true}

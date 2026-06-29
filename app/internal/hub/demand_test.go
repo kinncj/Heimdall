@@ -4,6 +4,7 @@
 package hub
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -52,5 +53,39 @@ func TestObservabilityWindowReflectsDemand(t *testing.T) {
 	h.addSub(sub)
 	if w := h.observabilityWindow().GetObservability(); !w.GetLogs() {
 		t.Fatal("a subscriber should mean an open window")
+	}
+}
+
+// RunCommand routes a directive to the owning daemon's sink and refuses an
+// unknown host (v2 Phase 2, ADR 0018).
+func TestRunCommandRouting(t *testing.T) {
+	h := New(10*time.Second, 30*time.Second)
+	ctrl := make(chan *v1.StreamControl, 4)
+	h.bindDaemon("web-01", ctrl)
+
+	ack, err := h.RunCommand(context.Background(), &v1.ControlRequest{
+		RequestId: "r1", HostId: "web-01", AllowlistedCmd: "process.list",
+	})
+	if err != nil || !ack.GetAccepted() {
+		t.Fatalf("connected host should accept, got accepted=%v err=%v", ack.GetAccepted(), err)
+	}
+	select {
+	case c := <-ctrl:
+		run := c.GetRun()
+		if run == nil || run.GetRequestId() != "r1" || run.GetAllowlistedCmd() != "process.list" {
+			t.Fatalf("directive not routed correctly: %+v", c.GetControl())
+		}
+	default:
+		t.Fatal("no directive was routed to the daemon sink")
+	}
+
+	ack2, _ := h.RunCommand(context.Background(), &v1.ControlRequest{
+		RequestId: "r2", HostId: "ghost", AllowlistedCmd: "process.list",
+	})
+	if ack2.GetAccepted() {
+		t.Fatal("an unconnected host must not be accepted")
+	}
+	if ack2.GetError() == "" {
+		t.Fatal("an unconnected host should report an error")
 	}
 }

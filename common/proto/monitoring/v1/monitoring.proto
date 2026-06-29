@@ -134,6 +134,7 @@ message Snapshot {
   repeated ProcessRow processes = 9;         // latest process table
   int64    processes_at_unix_millis = 10;    // when the process table was collected
   repeated LogLine log_lines = 11;           // log lines tailed since the last push (push tail)
+  ControlResponse command_result = 12;       // result of an on-demand command (v2), matched by request_id
 }
 
 // ---------------------------------------------------------------------------
@@ -185,6 +186,7 @@ message StreamControl {
     CadenceUpdate       cadence = 2;
     KeyframeRequest     keyframe = 3;
     ObservabilityWindow observability = 4;
+    ControlRequest      run = 5;          // hub -> daemon: run an allow-listed command (v2)
   }
 }
 
@@ -216,6 +218,19 @@ service FederationService {
   rpc Relay(stream RelayEnvelope) returns (stream RelayControl);
   // Subscribe to a hub's bus (used by dashboards and peer/parent hubs).
   rpc Subscribe(SubscribeRequest) returns (stream Snapshot);
+  // Dashboard/CLI -> hub: run an allow-listed, read-only command on a host (v2,
+  // ADR 0018). The hub routes it down the host's outbound stream; the result
+  // returns asynchronously on that host's snapshot (command_result), matched by
+  // request_id. The ack only reports whether the host could be reached.
+  rpc RunCommand(ControlRequest) returns (CommandAck);
+}
+
+// CommandAck — synchronous acknowledgement that the hub accepted and routed an
+// on-demand command. The actual result arrives later on the host's snapshot.
+message CommandAck {
+  string request_id = 1;
+  bool   accepted = 2;   // false when the host is unknown or not connected
+  string error = 3;
 }
 
 // ---------------------------------------------------------------------------

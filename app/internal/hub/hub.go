@@ -9,6 +9,7 @@ package hub
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -31,9 +32,10 @@ type Hub struct {
 	auth         secure.Authenticator
 	id           string
 
-	mu      sync.Mutex
-	subs    map[chan *v1.Snapshot]struct{}
-	daemons map[chan *v1.StreamControl]struct{} // active daemon control sinks (v2 demand-driven push)
+	mu           sync.Mutex
+	subs         map[chan *v1.Snapshot]struct{}
+	daemons      map[chan *v1.StreamControl]struct{}      // active daemon control sinks (v2 demand-driven push)
+	daemonByHost map[domain.HostID]chan *v1.StreamControl // hostID -> sink, for routing on-demand commands (v2 Phase 2)
 
 	fmu sync.Mutex
 	fed map[domain.HostID]relayMeta
@@ -57,6 +59,7 @@ func New(staleAfter, offlineAfter time.Duration) *Hub {
 		auth:         secure.NewAuthenticator(""),
 		subs:         make(map[chan *v1.Snapshot]struct{}),
 		daemons:      make(map[chan *v1.StreamControl]struct{}),
+		daemonByHost: make(map[domain.HostID]chan *v1.StreamControl),
 		fed:          make(map[domain.HostID]relayMeta),
 	}
 }
@@ -132,7 +135,13 @@ func (h *Hub) Enroll(_ context.Context, req *v1.EnrollRequest) (*v1.EnrollRespon
 func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 	ctrl := make(chan *v1.StreamControl, 4)
 	h.addDaemon(ctrl)
-	defer h.removeDaemon(ctrl)
+	var boundHost domain.HostID
+	defer func() {
+		h.removeDaemon(ctrl)
+		if boundHost != "" {
+			h.unbindDaemon(boundHost, ctrl)
+		}
+	}()
 	go func() {
 		for {
 			select {
@@ -160,6 +169,10 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 		}
 		hostID, ms, labels := transport.FromSnapshot(snap)
 		id := domain.HostID(hostID)
+		if boundHost != id { // bind this stream to its host for command routing (v2)
+			boundHost = id
+			h.bindDaemon(id, ctrl)
+		}
 		h.reg.Observe(id, ms, withOrigin(labels, h.idOrDefault()), time.Now())
 		// Heimdallr's sight (ADR 0017): buffer the host's pushed process table and
 		// append its tailed log lines to the bounded ring, for the dashboard modals.
@@ -188,7 +201,49 @@ func (h *Hub) enrich(id domain.HostID, raw *v1.Snapshot) *v1.Snapshot {
 	out.Processes = raw.GetProcesses()
 	out.ProcessesAtUnixMillis = raw.GetProcessesAtUnixMillis()
 	out.LogLines = raw.GetLogLines()
+	out.CommandResult = raw.GetCommandResult() // forward on-demand command results (v2 Phase 2)
 	return out
+}
+
+// bindDaemon / unbindDaemon map a host to its control sink for command routing.
+func (h *Hub) bindDaemon(id domain.HostID, ctrl chan *v1.StreamControl) {
+	h.mu.Lock()
+	h.daemonByHost[id] = ctrl
+	h.mu.Unlock()
+}
+
+func (h *Hub) unbindDaemon(id domain.HostID, ctrl chan *v1.StreamControl) {
+	h.mu.Lock()
+	if h.daemonByHost[id] == ctrl { // only clear if still ours (a reconnect may have replaced it)
+		delete(h.daemonByHost, id)
+	}
+	h.mu.Unlock()
+}
+
+// RunCommand routes an on-demand allow-listed command to the owning daemon over
+// its outbound stream (v2 Phase 2, ADR 0018). The ack reports only whether the
+// host was reachable; the result returns asynchronously on the host's snapshot
+// (command_result), matched by request_id. The daemon enforces the allow-list.
+func (h *Hub) RunCommand(_ context.Context, req *v1.ControlRequest) (*v1.CommandAck, error) {
+	ack := &v1.CommandAck{RequestId: req.GetRequestId()}
+	if req.GetHostId() == "" || req.GetAllowlistedCmd() == "" {
+		ack.Error = "host_id and allowlisted_cmd are required"
+		return ack, nil
+	}
+	h.mu.Lock()
+	ctrl, ok := h.daemonByHost[domain.HostID(req.GetHostId())]
+	h.mu.Unlock()
+	if !ok {
+		ack.Error = fmt.Sprintf("host %q is not connected to this hub", req.GetHostId())
+		return ack, nil
+	}
+	select {
+	case ctrl <- &v1.StreamControl{Control: &v1.StreamControl_Run{Run: req}}:
+		ack.Accepted = true
+	default:
+		ack.Error = "host control channel is busy; retry"
+	}
+	return ack, nil
 }
 
 // Subscribe streams the current state then live snapshots to a dashboard.

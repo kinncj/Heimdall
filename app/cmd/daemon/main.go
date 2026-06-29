@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc"
 
 	"heimdall/app/internal/adapters"
+	"heimdall/app/internal/command"
 	"heimdall/app/internal/discovery"
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/logs"
@@ -243,6 +244,28 @@ func clientDialOptions(token string, tlsCfg secure.ClientConfig) ([]grpc.DialOpt
 	return opts, nil
 }
 
+// runCommand executes an allow-listed, read-only on-demand command (v2 Phase 2,
+// ADR 0018), audits it, stages the result for the next snapshot, and triggers an
+// immediate send. Commands run as this unprivileged daemon user.
+func runCommand(req *v1.ControlRequest, push *pusher, trigger chan struct{}) {
+	res := command.Run(context.Background(), req.GetAllowlistedCmd(), req.GetArgs())
+	logger.Info("control command",
+		"cmd", req.GetAllowlistedCmd(), "args", req.GetArgs(),
+		"actor", req.GetActor(), "status", res.Status.String(), "exit", res.ExitCode)
+	push.setResult(&v1.ControlResponse{
+		RequestId: req.GetRequestId(),
+		ExitCode:  int32(res.ExitCode),
+		Stdout:    res.Stdout,
+		Stderr:    res.Stderr,
+		Truncated: res.Truncated,
+		Status:    transport.StatusToProto(res.Status),
+	})
+	select {
+	case trigger <- struct{}{}:
+	default:
+	}
+}
+
 // discoverHub resolves a hub address via mDNS (Ratatoskr), falling back to a
 // static seed for overlay networks where multicast does not reach.
 func discoverHub(seed string) (string, error) {
@@ -294,8 +317,12 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 	}
 	logger.Info("streaming to hub", "addr", addr, "host", host)
 
-	// Heimdallr's sight v2 (ADR 0018): receive demand directives down the same
-	// outbound stream and gate pushing accordingly. The daemon still never listens.
+	// Heimdallr's sight v2 (ADR 0018): receive directives down the same outbound
+	// stream — demand windows and on-demand allow-listed commands — and act on
+	// them. The daemon still never listens; the hub drives it over the daemon's own
+	// connection. A finished command triggers an immediate send so the result is
+	// timely rather than waiting for the next tick.
+	trigger := make(chan struct{}, 1)
 	if push != nil {
 		go func() {
 			for {
@@ -305,6 +332,9 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 				}
 				if w := ctrl.GetObservability(); w != nil {
 					push.setWindow(w.GetLogs(), w.GetProcesses())
+				}
+				if req := ctrl.GetRun(); req != nil {
+					go runCommand(req, push, trigger)
 				}
 			}
 		}()
@@ -317,6 +347,7 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 		if push != nil {
 			procs, procsAt, lines := push.drain()
 			transport.AttachObservability(snap, procs, procsAt, host, lines)
+			snap.CommandResult = push.drainResult()
 		}
 		return stream.Send(snap)
 	}
@@ -328,6 +359,10 @@ func streamOnce(addr, host string, interval time.Duration, labels map[string]str
 	for {
 		select {
 		case <-t.C:
+			if err := send(); err != nil {
+				return true, fmt.Errorf("send: %w", err)
+			}
+		case <-trigger:
 			if err := send(); err != nil {
 				return true, fmt.Errorf("send: %w", err)
 			}
