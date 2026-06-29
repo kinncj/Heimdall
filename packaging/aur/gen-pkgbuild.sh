@@ -20,7 +20,7 @@ set -euo pipefail
 VERSION="${VERSION:?set VERSION to the release tag, e.g. v1.4.0}"
 SUMS="${SUMS:?set SUMS to the release SHA256SUMS file}"
 OUT="${OUT:-aur-out}"
-COMPONENTS="${COMPONENTS:-hub dashboard daemon helper}"
+COMPONENTS="${COMPONENTS:-hub dashboard daemon helper cli}"
 REPO="${REPO:-kinncj/Heimdall}"
 
 [ -f "$SUMS" ] || { echo "gen-pkgbuild: SHA256SUMS not found at $SUMS" >&2; exit 1; }
@@ -35,6 +35,7 @@ desc_for() {
     dashboard) echo "Heimdall dashboard — real-time terminal UI rendering the whole fleet (prebuilt binary)" ;;
     daemon)    echo "Heimdall daemon — unprivileged per-host metric collector that streams to a hub (prebuilt binary)" ;;
     helper)    echo "Heimdall helper — optional root sidecar exposing privileged power/GPU/thermal metrics to the daemon (prebuilt binary)" ;;
+    cli)       echo "Heimdall CLI — machine- and AI-friendly JSON client that queries a hub's fleet for scripts, CI/CD, and agents (prebuilt binary)" ;;
     *)         echo "Heimdall $1 (prebuilt binary)" ;;
   esac
 }
@@ -51,7 +52,7 @@ sha() {
 mkdir -p "$OUT"
 
 for c in $COMPONENTS; do
-  case "$c" in hub|dashboard|daemon|helper) ;; *) echo "gen-pkgbuild: unknown component: $c" >&2; exit 1 ;; esac
+  case "$c" in hub|dashboard|daemon|helper|cli) ;; *) echo "gen-pkgbuild: unknown component: $c" >&2; exit 1 ;; esac
 
   pkgname="heimdall-${c}-bin"
   pkgdir_out="${OUT}/${pkgname}"

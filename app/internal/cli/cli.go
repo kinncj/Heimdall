@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Kinn Coelho Juliao <kinncj@gmail.com>
 
-package main
+package cli
 
 import (
 	"context"
@@ -21,10 +21,11 @@ import (
 	v1 "heimdall/common/proto/monitoring/v1"
 )
 
-// runCLI implements `heimdall-hub cli <command>` — a one-shot, machine-readable
-// (JSON) view of a running hub's fleet, for scripts and AI agents. It subscribes
-// to the hub like a dashboard, gathers the current state, prints JSON, and exits.
-func runCLI(args []string) {
+// Run executes the fleet CLI (`heimdall-cli <command>`, also reachable as the
+// `cli` subcommand of `heimdall-hub`): a one-shot, machine-readable (JSON) view of
+// a running hub's fleet. It subscribes like a dashboard, gathers the current
+// state, prints JSON, and exits — for scripts and AI agents.
+func Run(args []string) {
 	fs := flag.NewFlagSet("cli", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	hubAddr := fs.String("hub", "localhost:9090", "hub address to query")
@@ -60,10 +61,10 @@ func runCLI(args []string) {
 }
 
 func cliUsage() {
-	fmt.Fprint(os.Stderr, `heimdall-hub cli — machine-readable fleet queries (JSON)
+	fmt.Fprint(os.Stderr, `heimdall-cli — machine-readable fleet queries (JSON)
 
 Usage:
-  heimdall-hub cli [--hub addr] [--token t] [--tls …] <command> [args]
+  heimdall-cli [--hub addr] [--token t] [--tls …] <command> [args]
 
 Commands:
   fleet                 fleet summary: host counts by state
@@ -75,9 +76,9 @@ Commands:
 All output is JSON on stdout; errors are JSON on stderr with a non-zero exit.
 
 Examples:
-  heimdall-hub cli hosts | jq '.[] | select(.state=="offline").id'
-  heimdall-hub cli top dgx-spark
-  heimdall-hub cli logs web-01 app
+  heimdall-cli hosts | jq '.[] | select(.state=="offline").id'
+  heimdall-cli top dgx-spark
+  heimdall-cli logs web-01 app
 `)
 }
 

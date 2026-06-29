@@ -122,7 +122,7 @@ verify() { # <file> <asset-name>
 
 # --- install each requested component --------------------------------------
 for c in $COMPONENTS; do
-  case "$c" in hub|dashboard|daemon|helper) ;; *) err "unknown component: $c (want hub|dashboard|daemon|helper)" ;; esac
+  case "$c" in hub|dashboard|daemon|helper|cli) ;; *) err "unknown component: $c (want hub|dashboard|daemon|helper|cli)" ;; esac
   asset="heimdall-${c}_${os}_${arch}"
   echo "downloading ${asset}"
   curl -fSL "${base}/${asset}" -o "${tmp}/${asset}" || err "download failed: ${asset}"
