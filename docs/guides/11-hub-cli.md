@@ -151,9 +151,11 @@ hub's buffered window.
 
 ## Use it from an AI agent / harness (copy-paste)
 
-The three files below make a Claude Code-compatible harness query the fleet
-out-of-the-box. Copy each to the path shown; they assume `heimdall-cli` is on
-`$PATH` and read `HEIMDALL_HUB` / `HEIMDALL_TOKEN` from the environment.
+The files below make an AI harness query the fleet out-of-the-box. The Claude Code
+trio (AGENT/SKILL/COMMAND) comes first; equivalents for **GitHub Copilot** and
+**any other harness (Hermes, OpenAI-compatible, custom)** follow. Copy each to the
+path shown; they assume `heimdall-cli` is on `$PATH` and read `HEIMDALL_HUB` /
+`HEIMDALL_TOKEN` from the environment.
 
 ### AGENT — `.claude/agents/fleet.md`
 
@@ -235,9 +237,70 @@ Inspect the Heimdall fleet with `heimdall-cli` (hub `${HEIMDALL_HUB:-localhost:9
 Keep it to a short, factual brief with explicit host ids and numbers.
 ```
 
+### Copilot — `.github/copilot-instructions.md`
+
+GitHub Copilot Chat reads repo-wide custom instructions from this file. Append the
+block below (it coexists with any existing instructions):
+
+```markdown
+## Heimdall fleet (read-only)
+
+When asked about host or fleet health, run the `heimdall-cli` binary — it prints
+JSON from a running hub. Never invent values; always call the CLI and parse with `jq`.
+
+- Hub: `${HEIMDALL_HUB:-localhost:9090}` · token: `$HEIMDALL_TOKEN` (omit `--token` if unset)
+- `heimdall-cli --hub "$HEIMDALL_HUB" fleet` — counts by state
+- `heimdall-cli --hub "$HEIMDALL_HUB" hosts` — every host + metrics + capabilities
+- `heimdall-cli --hub "$HEIMDALL_HUB" host <id>` — one host in full
+- `heimdall-cli --hub "$HEIMDALL_HUB" top <id>` — process table
+- `heimdall-cli --hub "$HEIMDALL_HUB" logs <id> [src]` — recent log lines
+- `heimdall-cli --hub "$HEIMDALL_HUB" run <id> <cmd>` — allow-listed read-only
+  diagnostic (process.list | disk.df | uptime | os.info | dir.list <dir>)
+
+Report host ids and states explicitly; if a host is missing, say so.
+```
+
+### Any other harness (Hermes, OpenAI-compatible, custom)
+
+There's no standard file, so do two things: (1) drop the AGENT text above into the
+harness's **system / developer message** verbatim — it is the system prompt; and
+(2) for tool-calling models, register **one** tool that shells out to the CLI.
+
+A portable wrapper (works from any language that can exec a process):
+
+```sh
+#!/usr/bin/env sh
+# heimdall-tool <subcommand> [args...]  ->  JSON on stdout, JSON error + non-zero on failure
+exec heimdall-cli --hub "${HEIMDALL_HUB:-localhost:9090}" ${HEIMDALL_TOKEN:+--token "$HEIMDALL_TOKEN"} "$@"
+```
+
+A matching tool/function schema (OpenAI-style; trim to your harness):
+
+```json
+{
+  "name": "heimdall_fleet",
+  "description": "Query a Heimdall fleet (read-only JSON): host state, metrics, top processes, logs, allow-listed diagnostics.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "command": {
+        "type": "string",
+        "enum": ["fleet", "hosts", "host", "top", "logs", "run"],
+        "description": "fleet|hosts need no args; host|top|logs|run take a host id (and logs a source, run a command)."
+      },
+      "args": { "type": "array", "items": { "type": "string" }, "description": "e.g. [\"web-01\"] or [\"web-01\", \"disk.df\"]" }
+    },
+    "required": ["command"]
+  }
+}
+```
+
+Wire the tool handler to run `heimdall-tool "$command" "${args[@]}"` and return its
+stdout. The model gets the same read-only, JSON-only surface every other harness uses.
+
 That's the whole loop: a human pipes JSON through `jq`, CI gates on a host's state,
-a log shipper consumes `logs`, and an agent answers fleet questions — all from the
-same read-only binary.
+a log shipper consumes `logs`, and an agent — Claude, Copilot, Hermes, or your own —
+answers fleet questions, all from the same read-only binary.
 
 ## Notes
 

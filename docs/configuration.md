@@ -223,6 +223,11 @@ first-run wizard runs, or when you pass any setting flag — so
 `heimdall-daemon --hub station:9090` both runs once and records `hub` for next
 time. It prints `saved config to <path>` on stderr when it does.
 
+**One-off runs (`--no-save` / `--ephemeral`).** Every binary accepts `--no-save`
+(alias `--ephemeral`) to run with the given flags but leave the config file
+untouched — so a quick `heimdall-hub --listen :19090 --no-save` test never sticks
+as the new default. The flag itself is never persisted.
+
 **First-run wizard.** On the first run, if no config file exists, no flags were
 passed, and stdin is a terminal, each binary walks through its main settings,
 showing the current value as the `[default]` — press Enter to accept. The wizard

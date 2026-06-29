@@ -78,7 +78,9 @@ func (c Catalog) Each(visit func(Option)) {
 func (c Catalog) Len() int { return len(c.items) }
 
 // Register declares each option as a typed flag on set, using the option's
-// default for the flag default so --help shows the effective baseline.
+// default for the flag default so --help shows the effective baseline. It also
+// declares the universal --no-save / --ephemeral built-ins (NoSaveRequested), so
+// every binary can run a one-off without persisting the run's flags to its config.
 func (c Catalog) Register(set *flag.FlagSet) {
 	c.Each(func(o Option) {
 		switch o.Kind() {
@@ -90,6 +92,8 @@ func (c Catalog) Register(set *flag.FlagSet) {
 			set.String(o.FlagName(), o.Fallback(), o.Summary())
 		}
 	})
+	set.Bool("no-save", false, "run without persisting this run's flags to the config file")
+	set.Bool("ephemeral", false, "alias for --no-save")
 }
 
 func spanOr(text string, fallback time.Duration) time.Duration {

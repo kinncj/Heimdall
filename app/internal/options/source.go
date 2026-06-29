@@ -61,6 +61,18 @@ func FromFlags(catalog Catalog, set *flag.FlagSet) Source {
 // AnyProvided reports whether the user set at least one flag.
 func AnyProvided(set *flag.FlagSet) bool { return set.NFlag() > 0 }
 
+// NoSaveRequested reports whether the user asked for a one-off run that must not
+// be persisted to the config file (--no-save or its --ephemeral alias).
+func NoSaveRequested(set *flag.FlagSet) bool {
+	requested := false
+	set.Visit(func(f *flag.Flag) {
+		if f.Name == "no-save" || f.Name == "ephemeral" {
+			requested = true
+		}
+	})
+	return requested
+}
+
 // Provided reports whether the user explicitly set any flag backed by the
 // catalog — i.e. a real setting, ignoring action flags like --once or --version.
 func Provided(catalog Catalog, set *flag.FlagSet) bool {

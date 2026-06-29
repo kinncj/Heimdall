@@ -145,3 +145,40 @@ func TestProvidedIgnoresUnknownFlags(t *testing.T) {
 		t.Fatal("a catalog flag must count as provided")
 	}
 }
+
+func TestNoSaveFlagDetectedAndNotASetting(t *testing.T) {
+	cat := sampleCatalog()
+
+	// Register must declare the built-ins so parsing accepts them.
+	fs := flag.NewFlagSet("t", flag.ContinueOnError)
+	cat.Register(fs)
+	if err := fs.Parse([]string{"--hub", "x:1", "--no-save"}); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !NoSaveRequested(fs) {
+		t.Fatal("--no-save must be detected")
+	}
+	// The built-in must not be mistaken for a catalog setting (it's never persisted).
+	if Provided(cat, fs) != true {
+		t.Fatal("the catalog --hub flag should still count as provided")
+	}
+
+	// --ephemeral is an alias.
+	fe := flag.NewFlagSet("e", flag.ContinueOnError)
+	cat.Register(fe)
+	_ = fe.Parse([]string{"--ephemeral"})
+	if !NoSaveRequested(fe) {
+		t.Fatal("--ephemeral must be detected as no-save")
+	}
+	if Provided(cat, fe) {
+		t.Fatal("--ephemeral alone is not a catalog setting")
+	}
+
+	// Absent → false.
+	fa := flag.NewFlagSet("a", flag.ContinueOnError)
+	cat.Register(fa)
+	_ = fa.Parse([]string{"--hub", "y:2"})
+	if NoSaveRequested(fa) {
+		t.Fatal("without the flag, NoSaveRequested must be false")
+	}
+}

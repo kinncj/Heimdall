@@ -5,6 +5,17 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`--no-save` / `--ephemeral`** on every binary — run with the given flags but
+  leave the config file untouched, so a one-off (e.g. `heimdall-hub --listen
+  :19090 --no-save`) never sticks as the new default.
+- **Agent harness snippets for Copilot and other harnesses** in the `heimdall-cli`
+  guide — a `.github/copilot-instructions.md` block, plus a portable CLI wrapper
+  and an OpenAI-style tool schema for Hermes / OpenAI-compatible / custom harnesses
+  (alongside the existing Claude Code AGENT/SKILL/COMMAND files).
+
 ## [2.0.0] - 2026-06-29
 
 > The *everything socket* release. On-demand interaction across the fleet with no

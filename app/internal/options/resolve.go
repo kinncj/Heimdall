@@ -36,7 +36,9 @@ func Resolve(binary string, cat Catalog, intro ...string) Resolved {
 		wizardRan = true
 	}
 
-	if path != "" && (wizardRan || Provided(cat, flag.CommandLine)) {
+	// --no-save / --ephemeral: run with the given flags but leave the config file
+	// untouched, so a one-off (e.g. a quick --listen :NNNN test) never sticks.
+	if path != "" && !NoSaveRequested(flag.CommandLine) && (wizardRan || Provided(cat, flag.CommandLine)) {
 		if err := (Sink{Path: path}).Write(cat, resolved); err == nil {
 			fmt.Fprintf(os.Stderr, "heimdall-%s: saved config to %s\n", binary, path)
 		}
