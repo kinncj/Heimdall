@@ -24,7 +24,7 @@ desc() {
     dashboard) echo "real-time terminal dashboard for a Heimdall fleet" ;;
     daemon)    echo "unprivileged per-host metric collector that streams to a hub" ;;
     hub)       echo "central gRPC server aggregating daemons and fanning out to dashboards" ;;
-    helper)    echo "optional root sidecar exposing privileged power/GPU/thermal metrics" ;;
+    helper)    echo "optional root sidecar serving privileged power/GPU/thermal metrics and running delegated privileged commands" ;;
     cli)       echo "machine- and AI-friendly JSON client for a Heimdall hub" ;;
     *)         echo "Heimdall $1" ;;
   esac

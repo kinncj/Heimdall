@@ -22,15 +22,17 @@ It runs with an isolated `HEIMDALL_CONFIG_DIR`, so it never rewrites your real
 Each step degrades gracefully — absent tools are skipped, so the script always
 produces the lower-fidelity artifacts.
 
-| Dir      | Tool        | What                                                       |
-|----------|-------------|------------------------------------------------------------|
-| `ansi/`  | none        | Raw ANSI frames — always produced; diff-able, re-renderable |
-| `html/`  | `aha`       | Styled, embeddable HTML renders of each frame              |
-| `gif/`   | `vhs`       | Animated GIFs of the interactive modal flows              |
+| Dir      | Tool                       | What                                                       |
+|----------|----------------------------|------------------------------------------------------------|
+| `ansi/`  | none                       | Raw ANSI frames — always produced; diff-able, re-renderable |
+| `html/`  | `aha`                      | Styled, embeddable HTML renders of each frame              |
+| `img/`   | `aha` + `chromium` + ImageMagick | Trimmed, retina PNG screenshots                      |
+| `gif/`   | `vhs`                      | Animated GIFs of the interactive modal flows              |
 
-These are build artifacts — **git-ignored**, not committed. The committed sources
-are this README, the generator (`scripts/gen-screenshots.sh`), and the VHS tapes
-under `tapes/`.
+The **`img/` PNGs are committed** — they're embedded in the README and guides,
+which GitHub renders. The intermediate `ansi/`/`html/` and the `gif/` are
+git-ignored build artifacts. The committed sources are this README, the generator
+(`scripts/gen-screenshots.sh`), the VHS tapes under `tapes/`, and `img/`.
 
 ## Static frames
 

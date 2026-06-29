@@ -5,11 +5,10 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-06-29
 
-> The *everything socket* release. In progress on `feature/sockets`; **not yet
-> shipped**. Listed here so the work is recorded as it lands — do not cut a tag
-> from this section until v2 is declared done.
+> The *everything socket* release. On-demand interaction across the fleet with no
+> inbound port on any host. Full notes: [docs/releases/v2.0.0.md](docs/releases/v2.0.0.md).
 
 The release that brings on-demand interaction back to the fleet without giving any
 daemon an inbound port. Daemons stay outbound-only; the hub remains the sole

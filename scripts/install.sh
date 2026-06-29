@@ -120,6 +120,10 @@ verify() { # <file> <asset-name>
   echo "  verified $2"
 }
 
+# Manpages install alongside the bin dir (…/bin -> …/share/man/man1), which both
+# Linux and macOS `man` read for /usr/local and ~/.local prefixes.
+mandir="$(dirname "$bindir")/share/man/man1"
+
 # --- install each requested component --------------------------------------
 for c in $COMPONENTS; do
   case "$c" in hub|dashboard|daemon|helper|cli) ;; *) err "unknown component: $c (want hub|dashboard|daemon|helper|cli)" ;; esac
@@ -131,8 +135,17 @@ for c in $COMPONENTS; do
   dest="${bindir}/heimdall-${c}"
   $SUDO mv "${tmp}/${asset}" "$dest" || err "failed to install ${dest}"
   echo "  installed ${dest}"
+
+  # Manpage (best effort — never fail the install over a doc). `man heimdall-c`.
+  man="heimdall-${c}.1"
+  if curl -fsSL "${base}/${man}" -o "${tmp}/${man}" 2>/dev/null; then
+    verify "${tmp}/${man}" "${man}"
+    if $SUDO mkdir -p "$mandir" 2>/dev/null && $SUDO mv "${tmp}/${man}" "${mandir}/${man}" 2>/dev/null; then
+      echo "  installed ${mandir}/${man}  (man heimdall-${c})"
+    fi
+  fi
 done
 
 echo
 echo "Done. Ensure ${bindir} is on your PATH."
-echo "Try:  heimdall-${COMPONENTS%% *} --help"
+echo "Try:  heimdall-${COMPONENTS%% *} --help   (or: man heimdall-${COMPONENTS%% *})"

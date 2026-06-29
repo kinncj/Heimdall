@@ -5,6 +5,10 @@
 
 Start here, then jump to the guide for what you want to do.
 
+> 🎉 **v2.0.0 — the *everything socket* release** is out: on-demand commands,
+> in-dashboard logs & process view, and a JSON CLI, all with no inbound port on any
+> host. → **[Release notes](releases/v2.0.0.md)**.
+
 ## New here?
 
 1. [Installation](installation.md) — get the binaries
@@ -37,17 +41,18 @@ Start here, then jump to the guide for what you want to do.
 | [Architecture & Operations](deployment.md) | topology, what-runs-where, sequence diagrams, ports |
 | [Troubleshooting](troubleshooting.md) | common issues and host-liveness states |
 
-## The four binaries
+## The five binaries
 
 | Binary | Runs on | Privilege | Job |
 |---|---|---|---|
-| `heimdall-hub` | monitoring station | normal | receives metrics, fans out to dashboards |
+| `heimdall-hub` | monitoring station | normal | receives metrics, fans out to dashboards, mediates directives |
 | `heimdall-dashboard` | monitoring station (any number) | normal | renders the fleet — pure presentation |
-| `heimdall-daemon` | every host | unprivileged | collects + streams this host's metrics |
-| `heimdall-helper` | a host (optional) | root | serves privileged metrics to the local daemon |
+| `heimdall-daemon` | every host | unprivileged | collects + streams metrics; pushes opt-in logs/processes; runs allow-listed commands |
+| `heimdall-helper` | a host (optional) | root | serves privileged metrics + runs privileged allow-listed commands for the daemon |
+| `heimdall-cli` | anywhere | normal | machine/AI-friendly JSON client over a hub (scripts, CI/CD, agents) |
 
-Data flow: **daemon → hub → dashboard(s)**; the helper is a local sidecar to a
-daemon (**helper → daemon** over a unix socket).
+Data flow: **daemon → hub → dashboard(s) / cli**; the helper is a local sidecar to
+a daemon (**helper → daemon** over a unix socket).
 
 ## Design & decisions
 
@@ -60,7 +65,7 @@ daemon (**helper → daemon** over a unix socket).
 ## Contributing / development
 
 ```sh
-make build-tui        # build all four binaries
+make build-tui        # build all five binaries
 make test             # unit tests
 make lint             # gofmt + go vet
 make test-acceptance  # behave acceptance suite (drives the real binaries)

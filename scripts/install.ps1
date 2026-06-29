@@ -64,6 +64,18 @@ foreach ($c in $Components) {
 
     Move-Item -Force $tmp $dest
     Write-Host "  installed $dest"
+
+    # Windows has no `man`; ship the plain-text help next to the binary so
+    # `heimdall-<c> --help` has an offline companion (Get-Content heimdall-<c>.txt).
+    $help = "heimdall-$c.txt"
+    try {
+        $htmp = Join-Path $env:TEMP $help
+        Invoke-WebRequest "$base/$help" -OutFile $htmp -UseBasicParsing -Headers $headers
+        Move-Item -Force $htmp (Join-Path $InstallLocation $help)
+        Write-Host "  installed $(Join-Path $InstallLocation $help)"
+    } catch {
+        Write-Host "  (no manual page published for $c; skipping)"
+    }
 }
 
 if ($env:Path -notlike "*$InstallLocation*") {

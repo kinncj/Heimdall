@@ -54,6 +54,28 @@ daemon  ──▶ socket ◀──  HUB  ──▶ socket ◀──  dashboard
         (outbound)              (outbound)
 ```
 
+End-to-end, an on-demand command is correlated by `request_id` and a privileged one
+is delegated to the root helper — the daemon never gains privilege and never listens:
+
+```mermaid
+sequenceDiagram
+  participant C as dashboard / heimdall-cli
+  participant HUB as heimdall-hub
+  participant D as heimdall-daemon
+  participant H as heimdall-helper (root)
+
+  C->>HUB: RunCommand(host, cmd, reqID)
+  HUB-->>D: StreamControl.run(reqID, cmd) (down the daemon's stream)
+  alt unprivileged
+    D->>D: run as the daemon's own user
+  else privileged
+    D->>H: exec over unix socket
+    H-->>D: bounded result (helper enforces its own allow-list)
+  end
+  D-->>HUB: Snapshot.command_result(reqID)
+  HUB-->>C: result (matched by reqID)
+```
+
 - **Daemon control socket.** The daemon holds one long-lived outbound bidi stream
   to the hub. The hub sends request frames *down* it (run command, start/stop
   tail, set cadence); the daemon replies with response frames and streams (log

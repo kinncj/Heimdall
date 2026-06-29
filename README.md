@@ -7,9 +7,16 @@
 <p align="center"><em>Watch Over All Realms</em></p>
 
 <p align="center">
+  <img alt="release" src="https://img.shields.io/badge/release-v2.0.0-5fd7ff">
   <img alt="license" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
   <img alt="go" src="https://img.shields.io/badge/go-1.26-00ADD8">
   <img alt="ui" src="https://img.shields.io/badge/ui-terminal%20(Bubble%20Tea)-5fd7ff">
+</p>
+
+<p align="center">
+  <b>🎉 v2.0.0 — the <em>everything socket</em> release.</b> On-demand commands, in-dashboard
+  logs &amp; live process view, and a JSON CLI — all over the daemon's single outbound stream,
+  with <b>no inbound port on any host</b>. → <a href="docs/releases/v2.0.0.md">Release notes</a>.
 </p>
 
 ---
@@ -24,6 +31,11 @@ memory, disk, network, temperature, GPU, and power from every machine in one ter
 
 <p align="center">
   <img src="demo.gif" alt="Heimdall dashboard demo" width="900">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/img/grid-wide.png" alt="Heimdall fleet grid" width="900"><br>
+  <sub>The fleet grid — every host's state, CPU/MEM/DISK/TEMP/GPU/PWR, live. <code>--demo</code> shown.</sub>
 </p>
 
 ## Why Heimdall?

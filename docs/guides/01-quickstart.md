@@ -9,6 +9,14 @@ A live terminal dashboard showing this machine's CPU (with per-core detail),
 memory, disk, temperature, network throughput, internet + gateway latency,
 uptime, and — on supported hardware — GPU and power.
 
+![Heimdall fleet grid](../screenshots/img/grid-wide.png)
+
+Press <kbd>Enter</kbd> on a host for the detail view — gauges, sparkline trends,
+and (where the daemon advertises them) logs (`l`), the process table (`t`), and
+on-demand commands (`c`):
+
+![Heimdall host detail](../screenshots/img/detail-wide.png)
+
 ## Prerequisites
 
 - Go 1.26+ (to build from source), or a prebuilt binary set (see

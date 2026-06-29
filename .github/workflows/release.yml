@@ -59,6 +59,12 @@ jobs:
           PLATFORMS: "linux/amd64 linux/arm64 windows/amd64 windows/arm64"
           OUT: dist
         run: bash scripts/release.sh
+      - name: Generate manpages (.1) + plain-text help (.txt)
+        # Tracks each binary's own --help. The dist/heimdall-* glob below attaches
+        # and checksums them, so `man heimdall-*` works from the AUR packages.
+        env:
+          OUT: dist
+        run: bash scripts/gen-manpages.sh
       - uses: actions/upload-artifact@v7
         with:
           name: linux-windows

@@ -34,7 +34,7 @@ desc_for() {
     hub)       echo "Heimdall hub — central gRPC server that ingests host metrics and fans them out to dashboards (prebuilt binary)" ;;
     dashboard) echo "Heimdall dashboard — real-time terminal UI rendering the whole fleet (prebuilt binary)" ;;
     daemon)    echo "Heimdall daemon — unprivileged per-host metric collector that streams to a hub (prebuilt binary)" ;;
-    helper)    echo "Heimdall helper — optional root sidecar exposing privileged power/GPU/thermal metrics to the daemon (prebuilt binary)" ;;
+    helper)    echo "Heimdall helper — optional root sidecar serving privileged power/GPU/thermal metrics and running delegated privileged commands for the daemon (prebuilt binary)" ;;
     cli)       echo "Heimdall CLI — machine- and AI-friendly JSON client that queries a hub's fleet for scripts, CI/CD, and agents (prebuilt binary)" ;;
     *)         echo "Heimdall $1 (prebuilt binary)" ;;
   esac
@@ -61,6 +61,11 @@ for c in $COMPONENTS; do
   sha_amd64="$(sha "$c" amd64)"
   sha_arm64="$(sha "$c" arm64)"
 
+  # The manpage (.1) is arch-independent (it tracks --help). Look up its checksum
+  # the same way; the release attaches it next to the binaries.
+  man_sha="$(grep -E "  heimdall-${c}\.1\$" "$SUMS" | awk '{print $1}' | head -1)"
+  [ -n "$man_sha" ] || { echo "gen-pkgbuild: no checksum for heimdall-${c}.1 in ${SUMS}" >&2; exit 1; }
+
   # daemon gains privileged metrics when the helper is present; surface it as optdepends.
   optdepends=""
   if [ "$c" = "daemon" ]; then
@@ -79,13 +84,16 @@ url="${url}"
 license=('AGPL-3.0-or-later')
 provides=('heimdall-${c}')
 conflicts=('heimdall-${c}')
-${optdepends}source_x86_64=("heimdall-${c}_\${pkgver}_x86_64::${url}/releases/download/v\${pkgver}/heimdall-${c}_linux_amd64")
+${optdepends}source=("heimdall-${c}_\${pkgver}.1::${url}/releases/download/v\${pkgver}/heimdall-${c}.1")
+sha256sums=('${man_sha}')
+source_x86_64=("heimdall-${c}_\${pkgver}_x86_64::${url}/releases/download/v\${pkgver}/heimdall-${c}_linux_amd64")
 source_aarch64=("heimdall-${c}_\${pkgver}_aarch64::${url}/releases/download/v\${pkgver}/heimdall-${c}_linux_arm64")
 sha256sums_x86_64=('${sha_amd64}')
 sha256sums_aarch64=('${sha_arm64}')
 
 package() {
     install -Dm755 "\${srcdir}/heimdall-${c}_\${pkgver}_\${CARCH}" "\${pkgdir}/usr/bin/heimdall-${c}"
+    install -Dm644 "\${srcdir}/heimdall-${c}_\${pkgver}.1" "\${pkgdir}/usr/share/man/man1/heimdall-${c}.1"
 }
 EOF
 

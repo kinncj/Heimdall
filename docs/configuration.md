@@ -87,18 +87,26 @@ Without `--hub`, it prints samples locally (see print mode below).
 | `--tls-server-name` | — | override the verified server name |
 | `--tls-insecure` | `false` | dev only — skip hub verification |
 
-### Control plane & logs (optional)
+### Observability & commands (opt-in, v2)
+
+The daemon is **outbound-only** — it never listens. Logs, the process table, and
+on-demand commands all ride its single stream to the hub. Each is opt-in and
+advertises a capability the dashboard/CLI gate on (`_logs`, `_proc`, `_cmd`).
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--control-listen` | — | serve the read-only control plane on this address (e.g. `:9100`) |
-| `--control-token` | env `HEIMDALL_CONTROL_TOKEN` | token required to invoke control commands |
-| `--control-tls-cert` | — | PEM server cert for the control plane |
-| `--control-tls-key` | — | PEM server key for the control plane |
-| `--log-source` | — | opt-in log sources `alias=path,…` (served on `--control-listen`; empty = logs off) |
+| `--log-source` | — | tail and **push** log sources `alias=path,…` (advertises `_logs`; empty = logs off) |
+| `--process-interval` | off | collect + push a process table every interval, e.g. `5s` (advertises `_proc`) |
+| `--allow-commands` | off | run allow-listed, read-only commands routed from the hub (advertises `_cmd`) |
 
-See [Control Plane](guides/06-control-plane.md) and
-[Log Streaming](guides/07-log-streaming.md).
+> **Removed in v1.6.0:** `--control-listen`, `--control-token`, `--control-tls-cert`,
+> `--control-tls-key`. The daemon no longer serves a control plane; the hub mediates
+> every directive over the daemon's outbound stream. Privileged commands
+> (`dmesg`, `journal.tail`) are delegated to `heimdall-helper` (root) over a local
+> unix socket. See the [v2.0.0 release notes](releases/v2.0.0.md).
+
+See [Control Plane](guides/06-control-plane.md), [Log Streaming](guides/07-log-streaming.md),
+and [`heimdall-cli`](guides/11-hub-cli.md).
 
 ### Daemon logging
 
@@ -147,13 +155,23 @@ metrics itself.
 Same `--token`, `--tls`, `--tls-ca`, `--tls-server-name`, `--tls-insecure` as the
 daemon.
 
-### Control plane client
+### Observability & commands (v2)
 
-| Flag | Meaning |
-|---|---|
-| `--control <addr>` | daemon control-plane address |
-| `--run <cmd>` | run an allow-listed command (e.g. `process.list`, `"dir.list /var/log"`) |
-| `--tail <alias>` | tail an opt-in log source alias; streams until `Ctrl-C` |
+The dashboard reaches a host's logs, process table, and commands **through the hub**
+— there is no direct daemon connection. From a host's detail view:
+
+| Key | Action | Shown when the host advertises |
+|---|---|---|
+| `l` | stream logs (with `/` search) | `_logs` (`--log-source`) |
+| `t` | live process table (sort with `s`) | `_proc` (`--process-interval`) |
+| `c` | run an allow-listed command | `_cmd` (`--allow-commands`) |
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--top-sort` | `cpu` | default sort for the `t` modal (`cpu\|mem\|pid\|command`); persisted on change |
+
+> **Removed in v1.6.0:** `--control`, `--run`, `--tail`. Use the keys above, or
+> [`heimdall-cli`](guides/11-hub-cli.md) for scripted access.
 
 ### Dashboard keys
 
