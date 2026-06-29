@@ -30,6 +30,10 @@ for c in $COMPONENTS; do
   done
 done
 
+# Manpages (.1) + Windows/no-man plain-text help (.txt), generated from --help and
+# dropped next to the binaries so they are attached and checksummed below.
+OUT="$OUT" bash scripts/gen-manpages.sh || echo "release: manpage generation skipped"
+
 ( cd "$OUT" && { sha256sum heimdall-* 2>/dev/null || shasum -a 256 heimdall-*; } > SHA256SUMS )
 
 echo "release artifacts (version ${VERSION}) in ${OUT}/:"

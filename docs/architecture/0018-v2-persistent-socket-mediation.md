@@ -70,9 +70,9 @@ daemon  ──▶ socket ◀──  HUB  ──▶ socket ◀──  dashboard
 The frames layer onto the existing `monitoring.v1` streams as additive messages,
 so a v2 hub still speaks v1 to old daemons/dashboards.
 
-## 3a. Decided approach — **Kinn decided (2026-06-29)**
+## 3a. Approved approach
 
-> Flagged as decided by Kinn: this is the approach to build on `feature/sockets`.
+> **Approver:** Kinn Coelho Juliao (2026-06-29) — for the `feature/sockets` work.
 
 **Reuse the daemon's existing outbound bidirectional metric stream as the control
 channel.** No new service, no new connection, and — critically — **no listener and
@@ -129,7 +129,7 @@ bidi stream already carries the exact directions we need. Reuse wins.
 
 ## 5. Decision
 
-**Accepted (Kinn decided, 2026-06-29).** Build the v2 socket transport by reusing
+**Accepted — approver: Kinn Coelho Juliao (2026-06-29).** Build the v2 socket transport by reusing
 the daemon's existing outbound bidi `MetricStreamService.Stream`: hub directives
 ride `StreamControl` (additive), daemon replies ride the snapshot stream, the hub
 mediates everything, and privileged work delegates to the helper over the local
