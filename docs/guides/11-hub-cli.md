@@ -386,8 +386,6 @@ $ claude -p "any risks for CaptainCanuck or Kinns Macbook Pro on my fleet?"
 > - **Observability gap:** this host reports **no process table and no logs** (`has_processes`/`has_logs` both false), so the disk/memory usage can't be attributed and log-based crash detection is blind here. Worth enabling process + log collection on this agent.
 >
 > **Bottom line:** CaptainCanuck is clean. The one real risk on your fleet is the MacBook Pro's nearly-full disk — clear space there, and consider turning on process/log telemetry so it's not a blind spot.
->
-> Two side notes: load average isn't exposed in the metrics for either host, and the hub is only reachable via mDNS (`--hub auto`) — the configured `$HEIMDALL_HUB` env var and `localhost:9090` are both dead/blocked in this sandbox, which is why the first lookup attempt stalled.
 
 A few things to read out of these transcripts:
 
