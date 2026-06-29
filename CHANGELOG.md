@@ -7,11 +7,11 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
-### Documentation
-- **Run-as-a-service guide** — the Privileged Metrics guide now has a complete
-  systemd setup (helper as root, daemon as your user) using a shared `heimdall`
-  group and a `/run/heimdall` socket, matching the v2 `0660` helper socket. The
-  fleet guide cross-links it.
+## [2.1.0] - 2026-06-29
+
+> Quality-of-life follow-up to v2.0.0: ephemeral runs that never touch your config,
+> and broader agent/CLI onboarding. No wire or behavior changes to the transport.
+> Full notes: [docs/releases/v2.1.0.md](docs/releases/v2.1.0.md).
 
 ### Added
 - **`--no-save` / `--ephemeral`** on every binary — run with the given flags but
@@ -21,6 +21,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   guide — a `.github/copilot-instructions.md` block, plus a portable CLI wrapper
   and an OpenAI-style tool schema for Hermes / OpenAI-compatible / custom harnesses
   (alongside the existing Claude Code AGENT/SKILL/COMMAND files).
+
+### Documentation
+- **Run-as-a-service guide** — the Privileged Metrics guide now has a complete
+  systemd setup (helper as root, daemon as your user) using a shared `heimdall`
+  group and a `/run/heimdall` socket, matching the v2 `0660` helper socket. The
+  fleet guide cross-links it.
+- **Real agent-session transcripts** in the `heimdall-cli` guide — three unedited
+  `claude -p` sessions (free-form, the `/fleet` command, a targeted risk question)
+  showing what fleet Q&A looks like in practice, plus a "Scriptable & agent-friendly"
+  bullet in the README.
 
 ## [2.0.0] - 2026-06-29
 
@@ -413,6 +423,9 @@ dashboard, streaming over mTLS gRPC.
 - Install script, release script, and release workflow.
 - Modality start guides and reference docs.
 
+[Unreleased]: https://github.com/kinncj/Heimdall/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/kinncj/Heimdall/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/kinncj/Heimdall/compare/v1.6.0...v2.0.0
 [1.6.0]: https://github.com/kinncj/Heimdall/compare/v1.5.2...v1.6.0
 [1.5.2]: https://github.com/kinncj/Heimdall/compare/v1.5.1...v1.5.2
 [1.5.1]: https://github.com/kinncj/Heimdall/compare/v1.5.0...v1.5.1
