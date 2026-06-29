@@ -5,6 +5,71 @@ All notable changes to Heimdall are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - Unreleased
+
+> The *everything socket* release. In progress on `feature/sockets`; **not yet
+> shipped**. Listed here so the work is recorded as it lands — do not cut a tag
+> from this section until v2 is declared done.
+
+The release that brings on-demand interaction back to the fleet without giving any
+daemon an inbound port. Daemons stay outbound-only; the hub remains the sole
+listener and mediates every directive over the daemon's existing stream.
+
+### Added
+- **Hub-mediated socket transport (ADR 0018).** The daemon's outbound metric
+  stream is reused as a bidirectional control channel, so the hub can push
+  directives down to a daemon that never listens:
+  - **Demand-driven push (Phase 1).** The hub opens a log/process window on a host
+    only while a dashboard or CLI is subscribed, and closes it on the last
+    unsubscribe — daemons push observability data on demand instead of always-on.
+  - **On-demand commands (Phase 2).** A dashboard or the CLI asks the hub to run an
+    allow-listed, **read-only** command on a host; the hub routes it down the
+    host's stream, the daemon runs it as its unprivileged user, and the result
+    returns correlated by request id. Nothing arbitrary is ever executed.
+  - **Helper-delegated privileged commands (Phase 2b).** Commands that need root
+    (e.g. `dmesg`, `journal.tail`) are delegated by the daemon to the local
+    privileged helper over a unix socket; the helper enforces its **own**
+    allow-list and never trusts the daemon. The daemon itself stays least-
+    privilege.
+- **`heimdall-cli` — a first-class, agent-friendly binary.** Machine-readable JSON
+  for `fleet`, `hosts`, `host`, `top`, `logs`, and `run`, built for scripts,
+  CI/CD, and AI harnesses. `--hub auto` discovers the hub via zeroconf and, when
+  more than one hub is present, reports them and instructs the operator to pick one
+  with `--hub <name>`. Shipped with a programmatic/agent guide (bash parsing, a
+  CI/CD GitHub Action that waits for a host to come online, Datadog log piping, and
+  copy-paste AGENT/SKILL/COMMAND files).
+- **On-demand command modal in the dashboard (`c`).** From a host's detail view,
+  press `c` to run an allow-listed command and read its result inline. The
+  affordance appears only for hosts that advertise the `_cmd` capability — the same
+  capability-gated model as logs (`_logs`) and top (`_proc`).
+- **Log search and top sorting (ADR 0019).** Inside the log modal, `/` filters the
+  buffered and live lines to case-insensitive substring matches, keeping
+  timestamps and scoped to the modal. In the top modal, the process table sorts
+  CPU-descending by default; `s` opens a sort picker, and the choice re-sorts live
+  and **persists to the dashboard config** as the new default.
+- **Zeroconf multi-hub discovery (Ratatoskr).** When more than one hub is
+  advertised, the dashboard shows a picker and the CLI reports the candidates;
+  with a single hub, both connect transparently.
+- **Manpages** for every binary (roff `.1` + plain text), generated from each
+  binary's `--help`.
+- **Capability gating.** Daemons opt in to what they expose — `--log-source`
+  advertises `_logs`, `--process-interval` advertises `_proc`, and
+  `--allow-commands` advertises `_cmd`. Reserved `_`-prefixed labels are filtered
+  from user tags and grouping. A host shows an affordance only for what it
+  advertises.
+
+### Changed
+- The helper protocol is now request-based (`collect` | `exec`) with backward
+  compatibility: a silent old client falls back to `collect` after a short read
+  deadline.
+
+### Wire
+- `StreamControl` gains `ObservabilityWindow` and `ControlRequest` directives;
+  `Snapshot` gains additive `processes`, `processes_at`, `log_lines`, and
+  `command_result` fields; `FederationService.RunCommand` returns a `CommandAck`.
+  All additive — old daemons/hubs ignore the new fields, so there is no lockstep
+  upgrade.
+
 ## [1.6.0] - 2026-06-29
 
 The *Heimdallr's sight* release — host logs and a live process view, inside the
