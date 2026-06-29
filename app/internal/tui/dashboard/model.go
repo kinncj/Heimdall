@@ -48,9 +48,10 @@ type Model struct {
 	persistSort  func(string) // persist the chosen top sort to config (injected)
 	// On-demand commands (v2 Phase 2): issue via the injected callback, read the
 	// result back from the registry, matched by the in-flight request id.
-	runCmd   func(host, cmd string, args []string, reqID string)
-	cmdSel   int    // selection in the command picker
-	cmdReqID string // request id of the in-flight command
+	runCmd       func(host, cmd string, args []string, reqID string)
+	cmdSel       int    // selection in the command picker
+	cmdReqID     string // request id of the in-flight command
+	detailScroll int    // scroll offset for the detail-view body (shift+arrows / wheel)
 }
 
 // WithRunCommand injects the callback that issues an on-demand command to the hub
@@ -107,6 +108,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+	case tea.MouseMsg:
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			return m.scroll(-1), nil
+		case tea.MouseButtonWheelDown:
+			return m.scroll(1), nil
+		}
+		return m, nil
 	case tea.KeyMsg:
 		if m.filtering {
 			return m.updateFilter(msg)
@@ -149,6 +158,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if !m.detail && len(m.orderedList()) > 0 {
 				m.detail = true
+				m.detailScroll = 0
 			}
 		case "up", "k":
 			if m.cursor > 0 {

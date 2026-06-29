@@ -194,7 +194,7 @@ func main() {
 	time.Sleep(1500 * time.Millisecond)
 	fmt.Print("\x1b[2J\x1b[3J\x1b[H")
 
-	if _, err := tea.NewProgram(model, tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(model, tea.WithAltScreen(), tea.WithMouseCellMotion()).Run(); err != nil {
 		fail(err)
 	}
 }

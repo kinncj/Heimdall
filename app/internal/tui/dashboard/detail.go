@@ -96,11 +96,61 @@ func (m Model) DetailView() string {
 	}
 	header := brand.SkinnyHeader(m.mode, w, onlineCount(hosts), len(hosts), m.now.Format("15:04:05"))
 
+	// Fixed header + footer; the body sections scroll (detailScroll) so the view
+	// fits short terminals (e.g. SSH from a phone). Chrome = header + 2 blanks +
+	// footer.
+	body, _ := scrollWindow(m.detailBody(h, w), m.detailScroll, m.height-(lineCount(header)+3))
+	return strings.Join([]string{header, "", strings.Join(body, "\n"), "", m.detailFooter(h)}, "\n")
+}
+
+// detailMaxScroll is the largest valid detail-body scroll offset for the terminal
+// height (0 when everything fits).
+func (m Model) detailMaxScroll() int {
+	h, ok := m.selectedHost()
+	if !ok {
+		return 0
+	}
+	w := m.width
+	if w < 88 {
+		w = 88
+	}
+	maxBody := m.height - 6 // header(3) + 2 blanks + footer(1)
+	if maxBody < 1 {
+		maxBody = 1
+	}
+	if body := m.detailBody(h, w); len(body) > maxBody {
+		return len(body) - maxBody
+	}
+	return 0
+}
+
+// detailFooter is the fixed keybind line, with logs/top/cmd shown only when the
+// host advertises them.
+func (m Model) detailFooter(h domain.HostView) string {
+	muted, _ := m.mode.Role("text_muted")
+	keys, _ := m.mode.Role("keybinding")
+	footer := "  " + keys.Style().Render("esc") + muted.Style().Render(" back   ") +
+		keys.Style().Render("↑/↓") + muted.Style().Render(" host   ") +
+		keys.Style().Render("⇧↑/↓") + muted.Style().Render(" scroll   ")
+	if len(logSourcesOf(h)) > 0 {
+		footer += keys.Style().Render("l") + muted.Style().Render(" logs   ")
+	}
+	if hasProc(h) {
+		footer += keys.Style().Render("t") + muted.Style().Render(" top   ")
+	}
+	if hasCmd(h) && m.runCmd != nil {
+		footer += keys.Style().Render("c") + muted.Style().Render(" cmd   ")
+	}
+	return footer + keys.Style().Render("q") + muted.Style().Render(" quit")
+}
+
+// detailBody renders the per-host detail sections (everything between the brand
+// header and the footer) as lines, so the view can scroll them.
+func (m Model) detailBody(h domain.HostView, w int) []string {
 	heading, _ := m.mode.Role("heading")
 	label, _ := m.mode.Role("label")
 	val, _ := m.mode.Role("value")
 	muted, _ := m.mode.Role("text_muted")
-	keys, _ := m.mode.Role("keybinding")
 
 	byName := make(map[string]domain.Metric, len(h.LastSnapshot))
 	for _, mm := range h.LastSnapshot {
@@ -122,7 +172,6 @@ func (m Model) DetailView() string {
 	osArch := orDash(strings.TrimSpace(desc("host.os", ctx.OS) + " " + desc("host.arch", ctx.Arch)))
 
 	var b strings.Builder
-	b.WriteString(header + "\n\n")
 	b.WriteString("  " + heading.Style().Render("HOST DETAIL — "+dn) + "\n")
 	b.WriteString("  " + st.Badge() + "   " +
 		label.Style().Render("os ") + val.Style().Render(osArch) + "   " +
@@ -192,20 +241,7 @@ func (m Model) DetailView() string {
 
 	b.WriteString(m.nicsSection(byName))
 
-	b.WriteString("\n  " + keys.Style().Render("esc") + muted.Style().Render(" back   ") +
-		keys.Style().Render("↑/↓") + muted.Style().Render(" host   "))
-	// Heimdallr's sight: offer logs/top only when the host advertises them.
-	if len(logSourcesOf(h)) > 0 {
-		b.WriteString(keys.Style().Render("l") + muted.Style().Render(" logs   "))
-	}
-	if hasProc(h) {
-		b.WriteString(keys.Style().Render("t") + muted.Style().Render(" top   "))
-	}
-	if hasCmd(h) && m.runCmd != nil {
-		b.WriteString(keys.Style().Render("c") + muted.Style().Render(" cmd   "))
-	}
-	b.WriteString(keys.Style().Render("q") + muted.Style().Render(" quit"))
-	return b.String()
+	return strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
 }
 
 func (m Model) throughputVal(byName map[string]domain.Metric, key string) string {

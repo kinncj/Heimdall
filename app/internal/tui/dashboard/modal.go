@@ -88,11 +88,21 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
+				m.detailScroll = 0 // a new host starts at the top
 			}
 		case "down", "j":
 			if m.cursor < len(m.orderedList())-1 {
 				m.cursor++
+				m.detailScroll = 0
 			}
+		case "shift+up", "pgup":
+			m.detailScroll = clampScroll(m.detailScroll-3, m.detailMaxScroll())
+		case "shift+down", "pgdown":
+			m.detailScroll = clampScroll(m.detailScroll+3, m.detailMaxScroll())
+		case "home":
+			m.detailScroll = 0
+		case "end":
+			m.detailScroll = m.detailMaxScroll()
 		case "l":
 			if ok && len(logSourcesOf(h)) > 0 {
 				m.modal, m.modalSel = modalLogList, 0
@@ -372,6 +382,40 @@ func (m Model) topBody(h domain.HostView, w int) []string {
 			p.PID, p.PPID, p.CPUPct, p.MemPct, clip(p.Command, w-38))))
 	}
 	return out
+}
+
+func clampScroll(v, max int) int {
+	if v < 0 {
+		return 0
+	}
+	if v > max {
+		return max
+	}
+	return v
+}
+
+// scroll handles a mouse-wheel tick (dir -1 up, +1 down) over whatever is
+// scrollable: the grid cursor, the detail body, or a scrollable modal.
+func (m Model) scroll(dir int) Model {
+	if !m.detail {
+		n := len(m.orderedList())
+		m.cursor += dir
+		switch {
+		case m.cursor < 0 || n == 0:
+			m.cursor = 0
+		case m.cursor > n-1:
+			m.cursor = n - 1
+		}
+		return m
+	}
+	step := dir * 3
+	switch m.modal {
+	case modalNone:
+		m.detailScroll = clampScroll(m.detailScroll+step, m.detailMaxScroll())
+	case modalLogView, modalTop, modalCmdResult:
+		m.modalScroll = clampScroll(m.modalScroll+step, m.modalMaxScroll())
+	}
+	return m
 }
 
 // modalMaxScroll is the largest valid scroll offset for the active modal body,
