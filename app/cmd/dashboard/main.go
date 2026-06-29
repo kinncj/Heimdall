@@ -105,13 +105,27 @@ func main() {
 		reg.SetPurgeAfter(cfg.Span("purge-after", 15*time.Minute))
 		// Ratatoskr: discover the hub when --hub is "auto" (or --discover with no
 		// explicit hub). Discovery only resolves the address; the token and TLS
-		// still gate trust. An explicit --hub always wins.
+		// still gate trust. An explicit --hub always wins. When several hubs are
+		// found on the LAN, present a picker so the operator chooses (v2).
 		if cfg.Text("hub") == "auto" || (cfg.Toggle("discover") && cfg.Text("hub") == "") {
-			addr, err := discovery.Resolve(cfg.Text("discover-seed"), 5*time.Second)
-			if err != nil {
-				fail(fmt.Errorf("hub discovery failed (Ratatoskr): %w", err))
+			hubs, _ := discovery.BrowseAll(3 * time.Second)
+			switch len(hubs) {
+			case 1:
+				hubAddr = hubs[0].Addr
+			case 0:
+				// fall back to a static seed for overlay networks (no multicast)
+				addr, err := discovery.Resolve(cfg.Text("discover-seed"), 5*time.Second)
+				if err != nil {
+					fail(fmt.Errorf("hub discovery failed (Ratatoskr): %w", err))
+				}
+				hubAddr = addr
+			default:
+				chosen, err := pickHub(hubs, md)
+				if err != nil {
+					fail(err)
+				}
+				hubAddr = chosen
 			}
-			hubAddr = addr
 		}
 		dialOpts, err := clientDialOptions(token, tlsCfg)
 		if err != nil {
