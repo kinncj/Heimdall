@@ -100,3 +100,9 @@ tui/template/
 template/template/
 .playwright-mcp/
 SESSION_SUMMARY.md
+
+# Generated documentation screenshots (regenerate with `make screenshots`).
+# Committed sources are the script, the tapes/, and the README.
+/docs/screenshots/ansi/
+/docs/screenshots/html/
+/docs/screenshots/gif/

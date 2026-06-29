@@ -1,5 +1,5 @@
 # Makefile — Unified build/test contract for all agents
-.PHONY: build man build-tui run-tui run-demo run-daemon run-hub run-helper tui-snapshot dev-certs test-acceptance release test test-integration test-e2e test-contract test-all lint security-scan fmt containers-up containers-down migrate test-features-sync test-features-scaffold sdlc-report sdlc-rotate-logs sdlc-branch-protection sdlc-bootstrap-project-fields help
+.PHONY: build man screenshots build-tui run-tui run-demo run-daemon run-hub run-helper tui-snapshot dev-certs test-acceptance release test test-integration test-e2e test-contract test-all lint security-scan fmt containers-up containers-down migrate test-features-sync test-features-scaffold sdlc-report sdlc-rotate-logs sdlc-branch-protection sdlc-bootstrap-project-fields help
 
 ## Build
 build:
@@ -8,6 +8,10 @@ build:
 ## Generate roff manpages (.1) + Windows plain-text help (.txt) from each --help
 man:
 	bash scripts/gen-manpages.sh
+
+## Generate documentation screenshots of the dashboard TUI (ANSI + HTML, + GIF if vhs)
+screenshots: build-tui
+	bash scripts/gen-screenshots.sh
 
 ## Build the Heimdall binaries (dashboard + daemon + hub) -> bin/
 build-tui:

@@ -70,3 +70,22 @@ func TestFoldSnapshotZeroTimestampFallsBackToNow(t *testing.T) {
 		t.Fatalf("zero-ts snapshot should fall back to now (ONLINE), got %v", hv.State)
 	}
 }
+
+// snapshotSize honours COLUMNS/LINES so `--snapshot` renders responsively in CI
+// and the screenshot generator (where stdout is a pipe with no TTY). Both must be
+// set and positive; otherwise it falls through to the terminal / model default.
+func TestSnapshotSizeFromEnv(t *testing.T) {
+	t.Setenv("COLUMNS", "64")
+	t.Setenv("LINES", "24")
+	if w, h := snapshotSize(); w != 64 || h != 24 {
+		t.Fatalf("snapshotSize() = %d,%d, want 64,24", w, h)
+	}
+
+	// A partial/invalid pair must not yield a bogus size; with no TTY in the test
+	// harness it falls through to the model default (0,0).
+	t.Setenv("COLUMNS", "64")
+	t.Setenv("LINES", "")
+	if w, _ := snapshotSize(); w == 64 {
+		t.Fatal("snapshotSize() must not apply COLUMNS without a valid LINES")
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -173,6 +174,13 @@ func main() {
 	}
 
 	if *snapshot {
+		// Size the frame to the terminal so snapshots are responsive — honour
+		// COLUMNS/LINES first (set by the screenshot generator and most CI), then
+		// the real TTY, then the model default. Drives doc captures at any width.
+		if w, h := snapshotSize(); w > 0 {
+			u, _ := model.Update(tea.WindowSizeMsg{Width: w, Height: h})
+			model = u.(dashboard.Model)
+		}
 		reg.Evaluate(time.Now())
 		if *detailFlag {
 			fmt.Println(model.DetailView())
@@ -203,6 +211,25 @@ func main() {
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "heimdall-dashboard:", err)
 	os.Exit(1)
+}
+
+// snapshotSize resolves the frame size for --snapshot: COLUMNS/LINES env (honoured
+// by the screenshot generator and most CI, where stdout is a pipe with no TTY),
+// else the real terminal, else 0/0 to keep the model default.
+func snapshotSize() (w, h int) {
+	envInt := func(k string) int {
+		if n, err := strconv.Atoi(os.Getenv(k)); err == nil && n > 0 {
+			return n
+		}
+		return 0
+	}
+	if w, h = envInt("COLUMNS"), envInt("LINES"); w > 0 && h > 0 {
+		return w, h
+	}
+	if tw, th, err := term.GetSize(int(os.Stdout.Fd())); err == nil && tw > 0 {
+		return tw, th
+	}
+	return 0, 0
 }
 
 func usage() {

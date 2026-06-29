@@ -52,6 +52,11 @@ listener and mediates every directive over the daemon's existing stream.
   with a single hub, both connect transparently.
 - **Manpages** for every binary (roff `.1` + plain text), generated from each
   binary's `--help`.
+- **Documentation screenshot tooling** (`make screenshots`). The `--snapshot`
+  path now honours `COLUMNS`/`LINES`, so the generator captures the dashboard at a
+  matrix of sizes/views/themes headlessly — including the wide vs. narrow grid
+  that shows the responsive column drop — as ANSI (always), styled HTML (`aha`),
+  and animated GIFs of the modal flows (`vhs` tapes).
 - **Capability gating.** Daemons opt in to what they expose — `--log-source`
   advertises `_logs`, `--process-interval` advertises `_proc`, and
   `--allow-commands` advertises `_cmd`. Reserved `_`-prefixed labels are filtered
