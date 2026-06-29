@@ -20,11 +20,12 @@ Start here, then jump to the guide for what you want to do.
 | [Secure Deployment](guides/03-secure-deployment.md) | require TLS + an enrollment token |
 | [Privileged Metrics](guides/04-privileged-metrics.md) | unlock power, GPU, and full thermal |
 | [Federation (Bifröst)](guides/05-federation.md) | span multiple sites / networks |
-| [Control Plane](guides/06-control-plane.md) | run read-only remote diagnostics |
+| [Process View & Commands](guides/06-control-plane.md) | see a host's process table (top) and run allow-listed diagnostics |
 | [Log Streaming](guides/07-log-streaming.md) | tail host logs in the dashboard |
 | [Demo Mode](guides/08-demo-mode.md) | explore the UI with no setup |
 | [Metrics Export (Mímir)](guides/09-metrics-export.md) | scrape Heimdall from Prometheus / Grafana |
 | [Alerting (Gjallarhorn)](guides/10-alerting.md) | fire threshold alerts to a webhook |
+| [`heimdall-cli` (programmatic & agents)](guides/11-hub-cli.md) | query the fleet from scripts, CI/CD, or an AI agent |
 
 ## Reference
 
