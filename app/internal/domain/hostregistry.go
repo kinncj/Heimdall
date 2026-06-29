@@ -23,17 +23,18 @@ type HostRegistry struct {
 }
 
 type hostEntry struct {
-	host        Host
-	state       HostState
-	lastSeen    time.Time
-	observed    bool
-	snapshot    []Metric
-	labels      map[string]string
-	alerts      []string
-	processes   []ProcessRow
-	processesAt time.Time
-	logRing     []LogLine
-	lastCommand *CommandResult
+	host         Host
+	state        HostState
+	lastSeen     time.Time
+	observed     bool
+	disconnected bool // hub saw the stream end; force Offline until re-observed
+	snapshot     []Metric
+	labels       map[string]string
+	alerts       []string
+	processes    []ProcessRow
+	processesAt  time.Time
+	logRing      []LogLine
+	lastCommand  *CommandResult
 }
 
 // LogRingCap bounds the per-host log ring retained for the dashboard's log modal.
@@ -140,12 +141,29 @@ func (r *HostRegistry) Observe(id HostID, snapshot []Metric, labels map[string]s
 		r.hosts[id] = e
 	}
 	e.observed = true
+	e.disconnected = false // a fresh observation clears a prior stream-end
 	e.lastSeen = now
 	e.snapshot = snapshot
 	if labels != nil {
 		e.labels = labels
 	}
 	e.state = StateOnline
+}
+
+// MarkOffline flips an observed host to Offline at once, bypassing the freshness
+// window, and pins it there until the next observation. The hub calls this the
+// moment a daemon's stream ends (a clean CloseSend EOF or a dropped socket), so
+// online -> offline is real-time for any detectable disconnect rather than waiting
+// out offline_after. Unknown or never-observed hosts are left untouched.
+func (r *HostRegistry) MarkOffline(id HostID, now time.Time) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	e, ok := r.hosts[id]
+	if !ok || !e.observed {
+		return
+	}
+	e.disconnected = true
+	e.state = StateOffline
 }
 
 // Evaluate recomputes liveness for every observed host against now, and purges
@@ -162,6 +180,10 @@ func (r *HostRegistry) Evaluate(now time.Time) {
 		age := now.Sub(e.lastSeen)
 		if r.purgeAfter > 0 && age > r.purgeAfter {
 			delete(r.hosts, id)
+			continue
+		}
+		if e.disconnected { // an explicit stream-end overrides the age check
+			e.state = StateOffline
 			continue
 		}
 		switch {

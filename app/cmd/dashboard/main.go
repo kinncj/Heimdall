@@ -312,6 +312,12 @@ func foldSnapshot(reg *domain.HostRegistry, snap *v1.Snapshot) {
 	reg.Enroll(domain.Host{ID: hid, Hostname: id, DisplayName: id}, seen)
 	reg.Observe(hid, ms, labels, seen)
 	reg.SetAlerts(hid, snap.GetAlerts())
+	// v2 real-time disconnect: the hub saw this host's stream end, so flip it
+	// Offline now rather than waiting out the local freshness window. Done after
+	// Observe (which would otherwise mark it Online) so the disconnect wins.
+	if snap.GetDisconnected() {
+		reg.MarkOffline(hid, seen)
+	}
 	// Heimdallr's sight (ADR 0017): fold the host's pushed process table and any
 	// tailed log lines into the registry for the detail-view modals.
 	procs, procsAt, logLines := transport.ObservabilityFromSnapshot(snap)

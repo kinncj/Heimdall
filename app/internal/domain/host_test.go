@@ -95,6 +95,47 @@ func TestGoesOfflineAfterThreshold(t *testing.T) {
 	}
 }
 
+// MarkOffline flips a host to Offline immediately — without waiting out the
+// freshness window — when the hub sees its stream end (v2 real-time disconnect).
+// A just-observed host must go Offline at once, and a following Evaluate must NOT
+// resurrect it (the disconnect overrides the age check until a fresh observation).
+func TestMarkOfflineIsImmediateAndStickyUntilReObserved(t *testing.T) {
+	t0 := time.Unix(3_500, 0)
+	r := NewHostRegistry(10*time.Second, 30*time.Second)
+	r.Enroll(sampleHost("dgx"), t0)
+	r.Observe("dgx", snapshot(), nil, t0) // fresh → Online
+
+	r.MarkOffline("dgx", t0.Add(time.Second))
+	if v, _ := r.Host("dgx"); v.State != StateOffline {
+		t.Fatalf("MarkOffline should be immediate, got %v", v.State)
+	}
+	// Within the freshness window the age check alone would say Online; the
+	// disconnect must keep it Offline.
+	r.Evaluate(t0.Add(2 * time.Second))
+	if v, _ := r.Host("dgx"); v.State != StateOffline {
+		t.Fatalf("Evaluate must not resurrect a disconnected host, got %v", v.State)
+	}
+	// A reconnect (fresh observation) clears the disconnect and returns Online.
+	r.Observe("dgx", snapshot(), nil, t0.Add(3*time.Second))
+	if v, _ := r.Host("dgx"); v.State != StateOnline {
+		t.Fatalf("a re-observed host should be Online again, got %v", v.State)
+	}
+	// Last-known metrics are retained across the disconnect.
+	if v, _ := r.Host("dgx"); len(v.LastSnapshot) == 0 {
+		t.Fatal("MarkOffline must retain the last-known snapshot")
+	}
+}
+
+// MarkOffline on an unknown or never-observed host is a no-op — it must not
+// create a phantom host or panic.
+func TestMarkOfflineUnknownHostIsNoop(t *testing.T) {
+	r := NewHostRegistry(10*time.Second, 30*time.Second)
+	r.MarkOffline("ghost", time.Unix(1, 0))
+	if _, ok := r.Host("ghost"); ok {
+		t.Fatal("MarkOffline must not create an unknown host")
+	}
+}
+
 // Reconnect after an outage returns to Online under the SAME id with no
 // duplicate host created (story 0001).
 func TestReconnectResumesSameHostNoDuplicate(t *testing.T) {

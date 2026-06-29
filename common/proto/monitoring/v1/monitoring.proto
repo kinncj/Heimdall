@@ -135,6 +135,7 @@ message Snapshot {
   int64    processes_at_unix_millis = 10;    // when the process table was collected
   repeated LogLine log_lines = 11;           // log lines tailed since the last push (push tail)
   ControlResponse command_result = 12;       // result of an on-demand command (v2), matched by request_id
+  bool     disconnected = 13;                 // v2: the daemon's stream ended — host is offline NOW, not on a timeout. Old subscribers ignore this and fall back to the freshness window.
 }
 
 // ---------------------------------------------------------------------------

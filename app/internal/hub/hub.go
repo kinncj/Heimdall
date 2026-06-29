@@ -140,6 +140,13 @@ func (h *Hub) Stream(stream v1.MetricStreamService_StreamServer) error {
 		h.removeDaemon(ctrl)
 		if boundHost != "" {
 			h.unbindDaemon(boundHost, ctrl)
+			// The daemon's stream just ended (clean CloseSend EOF or a dropped
+			// socket). Flip the host Offline now and tell subscribers, so the
+			// dashboard reflects the disconnect in real time instead of waiting out
+			// the freshness window. The timeout path stays as the fallback for
+			// disconnects we never see (SIGKILL + frozen network, power loss).
+			h.reg.MarkOffline(boundHost, time.Now())
+			h.publish(h.disconnectSnapshot(boundHost))
 		}
 	}()
 	go func() {
@@ -205,6 +212,21 @@ func (h *Hub) enrich(id domain.HostID, raw *v1.Snapshot) *v1.Snapshot {
 	out.ProcessesAtUnixMillis = raw.GetProcessesAtUnixMillis()
 	out.LogLines = raw.GetLogLines()
 	out.CommandResult = raw.GetCommandResult() // forward on-demand command results (v2 Phase 2)
+	return out
+}
+
+// disconnectSnapshot builds the final snapshot the hub publishes when a host's
+// stream ends: the host's last-known view with the disconnected flag set, so a
+// subscriber flips it Offline at once. Old subscribers ignore the flag and fall
+// back to the freshness window — the change is additive and backward-compatible.
+func (h *Hub) disconnectSnapshot(id domain.HostID) *v1.Snapshot {
+	hv, ok := h.reg.Host(id)
+	if !ok {
+		return &v1.Snapshot{HostId: string(id), Disconnected: true}
+	}
+	out := transport.ToSnapshot(string(hv.Host.ID), hv.LastSnapshot, hv.Host.Context.Labels, 0, time.Now())
+	out.Alerts = hv.Alerts
+	out.Disconnected = true
 	return out
 }
 

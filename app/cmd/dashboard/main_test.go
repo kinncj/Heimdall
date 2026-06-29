@@ -56,6 +56,28 @@ func TestFoldSnapshotFreshIsOnline(t *testing.T) {
 	}
 }
 
+// v2 real-time disconnect: a snapshot flagged Disconnected flips the host Offline
+// at once, even though its timestamp is fresh (which would otherwise read Online).
+// This is how the hub's stream-end signal reaches the dashboard ahead of the
+// freshness window.
+func TestFoldSnapshotDisconnectedIsOfflineDespiteFreshTimestamp(t *testing.T) {
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	snap := transport.ToSnapshot(
+		"host-d",
+		[]domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 5}},
+		nil, 0, time.Now(),
+	)
+	snap.Disconnected = true
+
+	foldSnapshot(reg, snap)
+	reg.Evaluate(time.Now()) // a fresh-timestamp host would be Online here
+
+	hv, _ := reg.Host("host-d")
+	if hv.State != domain.StateOffline {
+		t.Fatalf("disconnected snapshot should be OFFLINE, got %v", hv.State)
+	}
+}
+
 // Defensive: a snapshot with no timestamp must fall back to now rather than
 // 1970 (which would make every host instantly OFFLINE).
 func TestFoldSnapshotZeroTimestampFallsBackToNow(t *testing.T) {

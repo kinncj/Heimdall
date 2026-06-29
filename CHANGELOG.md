@@ -52,6 +52,15 @@ listener and mediates every directive over the daemon's existing stream.
   with a single hub, both connect transparently.
 - **Manpages** for every binary (roff `.1` + plain text), generated from each
   binary's `--help`.
+- **Real-time online → offline on disconnect.** The hub now acts on a daemon's
+  stream ending: it flips the host Offline immediately and pushes a `disconnected`
+  snapshot to subscribers, so the dashboard reflects the change at once instead of
+  waiting out the freshness window. This covers any detectable socket end — the
+  daemon's clean `CloseSend` on SIGTERM *and* an abrupt process death (the OS
+  closes the fd either way). The timeout path is retained as the fallback for
+  disconnects the hub can't observe (SIGKILL with a frozen network, power loss,
+  partition). Additive wire field `Snapshot.disconnected = 13`; old subscribers
+  ignore it and fall back to the timeout.
 - **Socket-hygiene verification.** A `socket-hygiene.feature` acceptance suite
   proves the model against the *running processes'* real sockets (via `ss`): a
   daemon listens on nothing (no inbound surface), the hub is the sole listener,

@@ -617,6 +617,7 @@ type Snapshot struct {
 	ProcessesAtUnixMillis int64            `protobuf:"varint,10,opt,name=processes_at_unix_millis,json=processesAtUnixMillis,proto3" json:"processes_at_unix_millis,omitempty"` // when the process table was collected
 	LogLines              []*LogLine       `protobuf:"bytes,11,rep,name=log_lines,json=logLines,proto3" json:"log_lines,omitempty"`                                             // log lines tailed since the last push (push tail)
 	CommandResult         *ControlResponse `protobuf:"bytes,12,opt,name=command_result,json=commandResult,proto3" json:"command_result,omitempty"`                              // result of an on-demand command (v2), matched by request_id
+	Disconnected          bool             `protobuf:"varint,13,opt,name=disconnected,proto3" json:"disconnected,omitempty"`                                                    // v2: the daemon's stream ended — host is offline NOW, not on a timeout. Old subscribers ignore this and fall back to the freshness window.
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -733,6 +734,13 @@ func (x *Snapshot) GetCommandResult() *ControlResponse {
 		return x.CommandResult
 	}
 	return nil
+}
+
+func (x *Snapshot) GetDisconnected() bool {
+	if x != nil {
+		return x.Disconnected
+	}
+	return false
 }
 
 // EnrollRequest — a daemon presents its enrollment token and self-declared
@@ -1808,7 +1816,7 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x04ppid\x18\x02 \x01(\rR\x04ppid\x12\x17\n" +
 	"\acpu_pct\x18\x03 \x01(\x02R\x06cpuPct\x12\x17\n" +
 	"\amem_pct\x18\x04 \x01(\x02R\x06memPct\x12\x18\n" +
-	"\acommand\x18\x05 \x01(\tR\acommand\"\xc2\x04\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\"\xe6\x04\n" +
 	"\bSnapshot\x12\x17\n" +
 	"\ahost_id\x18\x01 \x01(\tR\x06hostId\x12$\n" +
 	"\x0ets_unix_millis\x18\x02 \x01(\x03R\ftsUnixMillis\x12\x10\n" +
@@ -1822,7 +1830,8 @@ const file_monitoring_v1_monitoring_proto_rawDesc = "" +
 	"\x18processes_at_unix_millis\x18\n" +
 	" \x01(\x03R\x15processesAtUnixMillis\x123\n" +
 	"\tlog_lines\x18\v \x03(\v2\x16.monitoring.v1.LogLineR\blogLines\x12E\n" +
-	"\x0ecommand_result\x18\f \x01(\v2\x1e.monitoring.v1.ControlResponseR\rcommandResult\x1a9\n" +
+	"\x0ecommand_result\x18\f \x01(\v2\x1e.monitoring.v1.ControlResponseR\rcommandResult\x12\"\n" +
+	"\fdisconnected\x18\r \x01(\bR\fdisconnected\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"|\n" +
