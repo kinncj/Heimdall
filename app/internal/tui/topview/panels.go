@@ -40,9 +40,9 @@ func (m Model) body(t tier) []string {
 		if col < 10 {
 			col = 10
 		}
-		add(m.row2(m.cpuPanel(t), m.memPanel(t), col))
-		add(m.row2(m.powerPanel(t), m.gpuPanel(t), col))
-		add(m.row2(m.netDiskPanel(t), m.loadUptimePanel(), col))
+		add(m.row2(m.cpuPanel(t, col), m.memPanel(t, col), col))
+		add(m.row2(m.powerPanel(t, col), m.gpuPanel(t, col), col))
+		add(m.row2(m.netDiskPanel(t, col), m.loadUptimePanel(), col))
 		add(m.renderPanel(m.processPanel(t), full))
 		return out
 	}
@@ -52,8 +52,8 @@ func (m Model) body(t tier) []string {
 		inner = 10
 	}
 	for _, p := range []panelSpec{
-		m.cpuPanel(t), m.memPanel(t), m.powerPanel(t),
-		m.gpuPanel(t), m.netDiskPanel(t), m.processPanel(t),
+		m.cpuPanel(t, inner), m.memPanel(t, inner), m.powerPanel(t, inner),
+		m.gpuPanel(t, inner), m.netDiskPanel(t, inner), m.processPanel(t),
 	} {
 		add(m.renderPanel(p, inner))
 	}
@@ -87,36 +87,39 @@ func (m Model) renderPanel(p panelSpec, inner int) string {
 
 // --- panels -----------------------------------------------------------------
 
-func (m Model) cpuPanel(t tier) panelSpec {
+func (m Model) cpuPanel(t tier, w int) panelSpec {
 	label, _ := m.mode.Role("label")
 	lab := func(s string) string { return label.Style().Render(s) }
 
 	util := m.pctVal("cpu.util")
-	freq := m.numVal("cpu.freq", " GHz", "%.2f")
+	freq := m.freqVal()
 	load := m.numVal("cpu.load", "", "%.2f")
-	spark := m.spark("cpu.util", t)
 
 	if t == tierNarrow {
 		return panelSpec{title: "CPU", lines: []string{
 			lab("util ") + util + "   " + lab("freq ") + freq,
 			lab("load ") + load,
-			lab("util ") + spark + " " + util,
+			lab("util ") + m.sparkW("cpu.util", w) + " " + util,
 			m.coresAggregate(),
 		}}
 	}
 
+	cols := 3
+	if t == tierWide {
+		cols = 4 // a wider grid -> a shorter, denser per-core block
+	}
 	lines := []string{
 		lab("util ") + util + "   " + lab("freq ") + freq + "   " + lab("load ") + load,
-		lab("util ") + spark + "  " + util,
+		lab("util ") + m.sparkW("cpu.util", w) + "  " + util,
 	}
 	if cores, ok := m.ok("cpu.cores"); ok && len(cores.PerCore) > 0 {
 		lines = append(lines, lab(fmt.Sprintf("per-core (%d):", len(cores.PerCore))))
-		lines = append(lines, m.coreMatrix(cores.PerCore, 3)...)
+		lines = append(lines, m.coreMatrix(cores.PerCore, cols)...)
 	}
 	return panelSpec{title: "CPU", lines: lines}
 }
 
-func (m Model) memPanel(t tier) panelSpec {
+func (m Model) memPanel(t tier, w int) panelSpec {
 	label, _ := m.mode.Role("label")
 	muted, _ := m.mode.Role("text_muted")
 	lab := func(s string) string { return label.Style().Render(s) }
@@ -124,64 +127,60 @@ func (m Model) memPanel(t tier) panelSpec {
 	used := m.pctVal("mem.used")
 	usedDet := muted.Style().Render(m.detailOr("mem.used", ""))
 	swap := m.pctVal("mem.swap")
-	swapDet := muted.Style().Render(m.detailOr("mem.swap", ""))
 	bw := m.numVal("mem.bw", " GB/s", "%.0f")
-	bwSpark := m.spark("mem.bw", t)
 
 	if t == tierNarrow {
 		return panelSpec{title: "MEMORY", lines: []string{
 			lab("used ") + used + " " + usedDet + "   " + lab("swap ") + swap,
-			lab("bw ") + bwSpark + " " + bw,
+			lab("bw ") + m.sparkW("mem.bw", w) + " " + bw,
 		}}
 	}
+	// Fill the panel with gauge bars + a usage trend so it isn't a near-empty box
+	// next to the tall CPU panel.
 	return panelSpec{title: "MEMORY", lines: []string{
-		lab("used ") + used + "   " + usedDet,
-		lab("swap ") + swap + "   " + swapDet,
-		lab("bw   ") + bwSpark + "  " + bw,
+		lab("used ") + m.pctBar("mem.used", 10) + " " + used + "   " + usedDet,
+		lab("swap ") + m.pctBar("mem.swap", 10) + " " + swap,
+		lab("mem  ") + m.sparkW("mem.used", w) + "  " + used,
+		lab("bw   ") + m.sparkW("mem.bw", w) + "  " + bw,
 	}}
 }
 
-func (m Model) powerPanel(t tier) panelSpec {
+func (m Model) powerPanel(t tier, w int) panelSpec {
 	label, _ := m.mode.Role("label")
-	muted, _ := m.mode.Role("text_muted")
 	lab := func(s string) string { return label.Style().Render(s) }
 
 	pkg := m.numVal("power.pkg", " W", "%.1f")
 	cpu := m.numVal("power.cpu", " W", "%.1f")
 	gpu := m.numVal("power.gpu", " W", "%.1f")
 	npu := m.numVal("power.npu", " W", "%.1f")
-	pwrSpark := m.spark("power.pkg", t)
 	pwrVal := m.numVal("power.pkg", " W", "%.0f")
 
 	if t == tierNarrow {
 		return panelSpec{title: "POWER", lines: []string{
 			lab("pkg ") + pkg + "  " + lab("cpu ") + cpu + "  " + lab("gpu ") + gpu + "  " + lab("npu ") + npu,
-			lab("pwr ") + pwrSpark + "  " + pwrVal,
+			lab("pwr ") + m.sparkW("power.pkg", w) + "  " + pwrVal,
 		}}
 	}
 	if t == tierMedium {
 		return panelSpec{title: "POWER", lines: []string{
 			lab("pkg ") + pkg + "   " + lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
-			lab("pwr ") + pwrSpark + "  " + pwrVal,
+			lab("pwr ") + m.sparkW("power.pkg", w) + "  " + pwrVal,
 		}}
 	}
-	lines := []string{
+	return panelSpec{title: "POWER", lines: []string{
 		lab("pkg ") + pkg,
 		lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
-		lab("pwr ") + pwrSpark + "  " + pwrVal,
-	}
-	if d := m.detailOr("power.npu", ""); d != "" {
-		lines = append(lines, muted.Style().Render("note: "+d+" → —"))
-	}
-	return panelSpec{title: "POWER", lines: lines}
+		lab("pwr ") + m.sparkW("power.pkg", w) + "  " + pwrVal,
+	}}
 }
 
-func (m Model) gpuPanel(t tier) panelSpec {
+func (m Model) gpuPanel(t tier, w int) panelSpec {
 	label, _ := m.mode.Role("label")
 	lab := func(s string) string { return label.Style().Render(s) }
 
 	gUtil := m.pctVal("gpu.util")
 	vram := m.pctVal("gpu.vram")
+	vramDet := m.detailOr("gpu.vram", "")
 	temp := m.numVal("gpu.temp", "°C", "%.0f")
 	nUtil := m.pctVal("npu.util")
 
@@ -193,18 +192,23 @@ func (m Model) gpuPanel(t tier) panelSpec {
 	}
 	if t == tierMedium {
 		return panelSpec{title: "GPU / NPU", lines: []string{
-			lab("gpu ") + lab("util ") + gUtil + "  " + lab("vram ") + vram + "  " + lab("temp ") + temp,
-			lab("npu ") + lab("util ") + nUtil,
+			lab("gpu  ") + m.pctBar("gpu.util", 10) + " " + gUtil + "   " + lab("temp ") + temp,
+			lab("vram ") + m.pctBar("gpu.vram", 10) + " " + vram,
+			lab("npu  ") + lab("util ") + nUtil,
 		}}
 	}
+	// WIDE: gauge bars for util and vram (no duplicated vram line), plus a util
+	// trend, so the panel reads at a glance and fills its height.
+	muted, _ := m.mode.Role("text_muted")
 	return panelSpec{title: "GPU / NPU", lines: []string{
-		lab("gpu  ") + lab("util ") + gUtil + "   " + lab("vram ") + vram + "   " + lab("temp ") + temp,
+		lab("gpu  ") + m.pctBar("gpu.util", 12) + " " + gUtil + "   " + lab("temp ") + temp,
+		lab("vram ") + m.pctBar("gpu.vram", 12) + " " + vram + "  " + muted.Style().Render(vramDet),
+		lab("util ") + m.sparkW("gpu.util", w) + "  " + gUtil,
 		lab("npu  ") + lab("util ") + nUtil,
-		lab("vram ") + m.spark("gpu.vram", t) + "  " + m.numVal("gpu.vram", "%", "%.0f"),
 	}}
 }
 
-func (m Model) netDiskPanel(t tier) panelSpec {
+func (m Model) netDiskPanel(t tier, w int) panelSpec {
 	label, _ := m.mode.Role("label")
 	lab := func(s string) string { return label.Style().Render(s) }
 
@@ -220,10 +224,10 @@ func (m Model) netDiskPanel(t tier) panelSpec {
 		}}
 	}
 	return panelSpec{title: "NET & DISK", lines: []string{
-		lab("net ↓  ") + m.spark("net.rx", t) + "  " + m.numVal("net.rx", " MB/s", "%.2f"),
-		lab("net ↑  ") + m.spark("net.tx", t) + "  " + m.numVal("net.tx", " MB/s", "%.2f"),
-		lab("disk r ") + m.spark("disk.read", t) + "  " + m.numVal("disk.read", " MB/s", "%.2f"),
-		lab("disk w ") + m.spark("disk.write", t) + "  " + m.numVal("disk.write", " MB/s", "%.2f"),
+		lab("net ↓  ") + m.sparkW("net.rx", w) + "  " + m.numVal("net.rx", " MB/s", "%.2f"),
+		lab("net ↑  ") + m.sparkW("net.tx", w) + "  " + m.numVal("net.tx", " MB/s", "%.2f"),
+		lab("disk r ") + m.sparkW("disk.read", w) + "  " + m.numVal("disk.read", " MB/s", "%.2f"),
+		lab("disk w ") + m.sparkW("disk.write", w) + "  " + m.numVal("disk.write", " MB/s", "%.2f"),
 	}}
 }
 
@@ -264,10 +268,12 @@ func (m Model) processPanel(t tier) panelSpec {
 		return panelSpec{title: title, lines: lines}
 	}
 
-	lines = append(lines, label.Style().Render(fmt.Sprintf("%-7s %-8s %6s %6s  %s", "PID", "USER", "CPU%", "MEM%", "COMMAND")))
+	// No USER column: the pushed process table carries no username, and a column
+	// of dashes reads as broken. PID / CPU% / MEM% / COMMAND are what we have.
+	lines = append(lines, label.Style().Render(fmt.Sprintf("%-7s %6s %6s  %s", "PID", "CPU%", "MEM%", "COMMAND")))
 	for _, p := range procs {
-		lines = append(lines, val.Style().Render(fmt.Sprintf("%-7d %-8s %6.1f %6.1f  %s",
-			p.PID, "—", p.CPUPct, p.MemPct, clip(p.Command, 40))))
+		lines = append(lines, val.Style().Render(fmt.Sprintf("%-7d %6.1f %6.1f  %s",
+			p.PID, p.CPUPct, p.MemPct, clip(p.Command, 48))))
 	}
 	return panelSpec{title: title, lines: lines}
 }
@@ -286,7 +292,7 @@ func (m Model) tinyBody() []string {
 		lab("gpu") + m.pctVal("gpu.util"),
 		lab("npu") + m.pctVal("npu.util"),
 		lab("load") + m.numVal("cpu.load", "", "%.2f"),
-		lab("freq") + m.numVal("cpu.freq", " GHz", "%.2f"),
+		lab("freq") + m.freqVal(),
 	}
 }
 
@@ -378,6 +384,15 @@ func (m Model) pctVal(name string) string {
 	return val.Style().Render(fmt.Sprintf("%.0f", mm.Gauge)) + unit.Style().Render("%")
 }
 
+// pctBar renders a severity-coloured gauge bar for a 0–100 metric, or the dash.
+func (m Model) pctBar(name string, cells int) string {
+	mm, okv := m.ok(name)
+	if !okv {
+		return m.dash()
+	}
+	return render.Gauge(m.mode, mm.Gauge, cells)
+}
+
 // numVal renders a gauge value with the given printf format and unit suffix, or
 // the dash when unavailable. A leading space in unit is treated as a separator.
 func (m Model) numVal(name, unit, format string) string {
@@ -390,13 +405,31 @@ func (m Model) numVal(name, unit, format string) string {
 	return val.Style().Render(fmt.Sprintf(format, mm.Gauge)) + uRole.Style().Render(unit)
 }
 
-// spark renders a braille sparkline from the history buffer, sized for the tier.
-func (m Model) spark(name string, t tier) string {
-	w := 16
-	if t == tierNarrow {
-		w = 10
+// freqVal renders cpu.freq (collected in MHz) as GHz, or the dash. Showing
+// "4200.00 GHz" was wrong — the counter is MHz, so 4200 MHz is 4.20 GHz.
+func (m Model) freqVal() string {
+	mm, okv := m.ok("cpu.freq")
+	if !okv {
+		return m.dash()
 	}
-	return render.BrailleSparkline(m.mode, m.history[name], w)
+	val, _ := m.mode.Role("value")
+	uRole, _ := m.mode.Role("unit")
+	return val.Style().Render(fmt.Sprintf("%.2f", mm.Gauge/1000)) + uRole.Style().Render(" GHz")
+}
+
+// sparkW renders a braille sparkline sized to fill a panel of inner width w,
+// leaving room for the line's label and trailing value.
+func (m Model) sparkW(name string, w int) string {
+	// Reserve room for the box padding (2) plus the longest label + trailing value
+	// on a sparkline row (e.g. "disk r " + "12.40 MB/s") so the value never wraps.
+	sw := w - 22
+	if sw < 8 {
+		sw = 8
+	}
+	if sw > 80 {
+		sw = 80
+	}
+	return render.BrailleSparkline(m.mode, m.history[name], sw)
 }
 
 func clip(s string, n int) string {
