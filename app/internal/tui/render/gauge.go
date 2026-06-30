@@ -67,3 +67,48 @@ func Sparkline(m theme.Mode, history []float64, width int) string {
 	s, _ := m.Role("text_secondary")
 	return s.Style().Render(b.String())
 }
+
+// brailleRunes is a bottom-up braille fill ramp — the btop/mactop sparkline look.
+// Each glyph is display-width 1.
+var brailleRunes = []rune("⣀⣤⣶⣷⣿")
+
+// BrailleSparkline renders the trailing window of a value history (each 0–100) as
+// a braille trend line. The body is drawn in text_secondary; the most recent
+// sample is tinted by its severity tier so the current level reads at a glance.
+// The numeric value is shown beside it by the caller, so the trend survives
+// NO_COLOR. width caps how many samples are drawn; width <= 0 draws all.
+func BrailleSparkline(m theme.Mode, history []float64, width int) string {
+	if width > 0 && len(history) > width {
+		history = history[len(history)-width:]
+	}
+	if len(history) == 0 {
+		return ""
+	}
+	clamp := func(v float64) float64 {
+		if v < 0 {
+			return 0
+		}
+		if v > 100 {
+			return 100
+		}
+		return v
+	}
+	glyph := func(v float64) rune {
+		idx := int(math.Round(clamp(v) / 100 * float64(len(brailleRunes)-1)))
+		return brailleRunes[idx]
+	}
+	sec, _ := m.Role("text_secondary")
+	if len(history) == 1 {
+		tier, _ := m.SeverityFor(clamp(history[0]))
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(tier.FG)).Render(string(glyph(history[0])))
+	}
+	var b strings.Builder
+	for _, v := range history[:len(history)-1] {
+		b.WriteRune(glyph(v))
+	}
+	body := sec.Style().Render(b.String())
+	last := history[len(history)-1]
+	tier, _ := m.SeverityFor(clamp(last))
+	tip := lipgloss.NewStyle().Foreground(lipgloss.Color(tier.FG)).Render(string(glyph(last)))
+	return body + tip
+}
