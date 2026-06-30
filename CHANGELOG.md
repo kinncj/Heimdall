@@ -7,6 +7,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.3] - 2026-06-30
+
+### Fixed
+- **Windows process table showed every process at 0% CPU and 0% memory.** The
+  collector used `tasklist`, which has no CPU column, and the parser also dropped
+  its memory column — so `p` and the top view listed real processes with fake
+  zeros. Windows now reads `Win32_PerfFormattedData_PerfProc_Process` for real
+  instantaneous `PercentProcessorTime` and working-set memory (as a percent of
+  total RAM), falling back to `tasklist` (pid + name only) when that query isn't
+  available. macOS/Linux (`ps`) are unchanged.
+
 ## [2.2.2] - 2026-06-30
 
 ### Fixed

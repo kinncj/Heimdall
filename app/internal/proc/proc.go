@@ -26,8 +26,20 @@ type Source interface {
 // Local collects the process table on the daemon's own host.
 type Local struct{}
 
-// Collect runs the OS-appropriate process command and parses its output.
+// Collect runs the OS-appropriate process command and parses its output. On
+// Windows it first asks the performance-counter class for real CPU% and memory
+// (tasklist exposes neither), falling back to tasklist for pid+name only when
+// that query is unavailable.
 func (Local) Collect(ctx context.Context) ([]domain.ProcessRow, error) {
+	if runtime.GOOS == "windows" {
+		argv := winPerfArgv()
+		if out, err := exec.CommandContext(ctx, argv[0], argv[1:]...).Output(); err == nil {
+			if rows := parseWindowsPerf(out); len(rows) > 0 {
+				return rows, nil
+			}
+		}
+		// fall through to tasklist (pid + name only) when the perf query fails.
+	}
 	argv := argvFor(runtime.GOOS)
 	out, err := exec.CommandContext(ctx, argv[0], argv[1:]...).Output()
 	if err != nil {
@@ -36,9 +48,48 @@ func (Local) Collect(ctx context.Context) ([]domain.ProcessRow, error) {
 	return Parse(runtime.GOOS, out), nil
 }
 
+// winPerfArgv builds the PowerShell query for per-process CPU% and memory%.
+// PercentProcessorTime is instantaneous (0–100×cores, like ps %CPU); WorkingSet
+// is divided by total physical memory for a percentage that matches the Unix
+// pmem column. The _Total/Idle rollups and pid 0 are dropped.
+func winPerfArgv() []string {
+	const ps = `$m=(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory; ` +
+		`Get-CimInstance Win32_PerfFormattedData_PerfProc_Process | ` +
+		`Where-Object { $_.IDProcess -ne 0 -and $_.Name -ne '_Total' } | ` +
+		`ForEach-Object { '{0},{1},{2},{3}' -f $_.IDProcess,$_.PercentProcessorTime,` +
+		`[math]::Round($_.WorkingSet/$m*100,1),$_.Name }`
+	return []string{"powershell", "-NoProfile", "-Command", ps}
+}
+
+// parseWindowsPerf reads the perf-counter query's "pid,cpu,mem,name" lines. The
+// name is taken as the remainder so a process whose name contains a comma is
+// still kept whole.
+func parseWindowsPerf(out []byte) []domain.ProcessRow {
+	lines := strings.Split(strings.TrimRight(string(out), "\r\n"), "\n")
+	rows := make([]domain.ProcessRow, 0, len(lines))
+	for _, ln := range lines {
+		ln = strings.TrimRight(ln, "\r")
+		if strings.TrimSpace(ln) == "" {
+			continue
+		}
+		f := strings.SplitN(ln, ",", 4)
+		if len(f) < 4 {
+			continue
+		}
+		rows = append(rows, domain.ProcessRow{
+			PID:     atou(f[0]),
+			CPUPct:  atof(f[1]),
+			MemPct:  atof(f[2]),
+			Command: strings.TrimSpace(f[3]),
+		})
+	}
+	return rows
+}
+
 // argvFor returns the per-OS process-listing command. Unix uses ps with a fixed
-// column set; Windows uses tasklist in headerless CSV. Selection is a lookup, not
-// a call-site branch.
+// column set; Windows uses tasklist in headerless CSV as the pid+name fallback
+// (the primary Windows path is winPerfArgv). Selection is a lookup, not a
+// call-site branch.
 func argvFor(goos string) []string {
 	switch goos {
 	case "windows":

@@ -39,11 +39,34 @@ func TestParseTasklist(t *testing.T) {
 
 func TestArgvFor(t *testing.T) {
 	if argvFor("windows")[0] != "tasklist" {
-		t.Error("windows should use tasklist")
+		t.Error("windows fallback should use tasklist")
 	}
 	for _, os := range []string{"linux", "darwin"} {
 		if argvFor(os)[0] != "ps" {
 			t.Errorf("%s should use ps", os)
 		}
+	}
+}
+
+func TestParseWindowsPerf(t *testing.T) {
+	// Lines emitted by the perf-counter PowerShell query: pid,cpu%,mem%,name.
+	out := []byte("4,0,0.0,System\r\n" +
+		"1234,12,3.4,heimdall-daemon\r\n" +
+		"5678,1,0.2,svchost#3\r\n")
+	rows := parseWindowsPerf(out)
+	if len(rows) != 3 {
+		t.Fatalf("got %d rows, want 3: %+v", len(rows), rows)
+	}
+	r := rows[1]
+	if r.PID != 1234 || r.CPUPct != 12 || r.MemPct != 3.4 || r.Command != "heimdall-daemon" {
+		t.Fatalf("row = %+v", r)
+	}
+}
+
+func TestParseWindowsPerf_SkipsGarbageAndBlank(t *testing.T) {
+	out := []byte("\r\nnot,enough\r\n9,5,1.0,proc\r\n")
+	rows := parseWindowsPerf(out)
+	if len(rows) != 1 || rows[0].PID != 9 || rows[0].CPUPct != 5 {
+		t.Fatalf("rows = %+v", rows)
 	}
 }
