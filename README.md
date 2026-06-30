@@ -25,6 +25,13 @@
 </p>
 
 <p align="center">
+  <a href="https://aur.archlinux.org/packages/heimdall-dashboard-bin"><img alt="AUR version: heimdall-dashboard-bin" src="https://img.shields.io/aur/version/heimdall-dashboard-bin?label=heimdall-dashboard-bin&color=1793d1"></a>
+  <a href="https://aur.archlinux.org/packages/heimdall-cli-bin"><img alt="AUR version: heimdall-cli-bin" src="https://img.shields.io/aur/version/heimdall-cli-bin?label=heimdall-cli-bin&color=1793d1"></a>
+  <a href="https://aur.archlinux.org/packages/heimdall-daemon-bin"><img alt="AUR version: heimdall-daemon-bin" src="https://img.shields.io/aur/version/heimdall-daemon-bin?label=heimdall-daemon-bin&color=1793d1"></a>
+  <a href="https://aur.archlinux.org/packages/heimdall-helper-bin"><img alt="AUR version: heimdall-helper-bin" src="https://img.shields.io/aur/version/heimdall-helper-bin?label=heimdall-helper-bin&color=1793d1"></a>
+</p>
+
+<p align="center">
   <b>🎉 v2.0.0 — the <em>everything socket</em> release.</b> On-demand commands, in-dashboard
   logs &amp; live process view, and a JSON CLI — all over the daemon's single outbound stream,
   with <b>no inbound port on any host</b>. → <a href="docs/releases/v2.0.0.md">Release notes</a>.
