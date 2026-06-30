@@ -15,11 +15,13 @@
   <img alt="ui" src="https://img.shields.io/badge/ui-terminal%20(Bubble%20Tea)-5fd7ff">
 </p>
 
+<p align="center"><b>📦 Arch Linux — install from the AUR</b> (maintainer shown on each badge)</p>
+
 <p align="center">
-  <a href="https://aur.archlinux.org/packages/heimdall-dashboard-bin"><img alt="AUR dashboard" src="https://img.shields.io/aur/maintainer/heimdall-dashboard-bin?label=aur%3Adashboard-bin"></a>
-  <a href="https://aur.archlinux.org/packages/heimdall-cli-bin"><img alt="AUR cli" src="https://img.shields.io/aur/maintainer/heimdall-cli-bin?label=aur%3Acli-bin"></a>
-  <a href="https://aur.archlinux.org/packages/heimdall-daemon-bin"><img alt="AUR daemon" src="https://img.shields.io/aur/maintainer/heimdall-daemon-bin?label=aur%3Adaemon-bin"></a>
-  <a href="https://aur.archlinux.org/packages/heimdall-helper-bin"><img alt="AUR helper" src="https://img.shields.io/aur/maintainer/heimdall-helper-bin?label=aur%3Ahelper-bin"></a>
+  <a href="https://aur.archlinux.org/packages/heimdall-dashboard-bin"><img alt="AUR: heimdall-dashboard-bin" src="https://img.shields.io/aur/maintainer/heimdall-dashboard-bin?label=heimdall-dashboard-bin&color=1793d1"></a>
+  <a href="https://aur.archlinux.org/packages/heimdall-cli-bin"><img alt="AUR: heimdall-cli-bin" src="https://img.shields.io/aur/maintainer/heimdall-cli-bin?label=heimdall-cli-bin&color=1793d1"></a>
+  <a href="https://aur.archlinux.org/packages/heimdall-daemon-bin"><img alt="AUR: heimdall-daemon-bin" src="https://img.shields.io/aur/maintainer/heimdall-daemon-bin?label=heimdall-daemon-bin&color=1793d1"></a>
+  <a href="https://aur.archlinux.org/packages/heimdall-helper-bin"><img alt="AUR: heimdall-helper-bin" src="https://img.shields.io/aur/maintainer/heimdall-helper-bin?label=heimdall-helper-bin&color=1793d1"></a>
 </p>
 
 <p align="center">
