@@ -25,14 +25,14 @@ func first(t *testing.T, a domain.Adapter) domain.Metric {
 }
 
 func TestDefaultAdapters(t *testing.T) {
-	if n := len(Default()); n != 13 {
-		t.Fatalf("Default() = %d adapters, want 13", n)
+	if n := len(Default()); n != 14 {
+		t.Fatalf("Default() = %d adapters, want 14", n)
 	}
 	ids := map[string]bool{}
 	for _, a := range Default() {
 		ids[a.Describe().ID] = true
 	}
-	for _, want := range []string{"swap", "load"} {
+	for _, want := range []string{"swap", "load", "freq"} {
 		if !ids[want] {
 			t.Errorf("Default() missing the %q adapter", want)
 		}
