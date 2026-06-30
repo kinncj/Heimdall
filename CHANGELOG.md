@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-06-30
+
+### Fixed
+- **macOS power read 0 W on Apple Silicon Pro/Max** (e.g. M3 Max). Those chips
+  report 0 for the IOReport per-domain CPU/ANE energy counters and only a
+  sub-watt GPU figure, so the package total collapsed to ~0 W — while base
+  M-series Macs (which do populate the counters) were fine. The helper now reads
+  the SMC `PSTR` ("System Total Power") rail — the same unprivileged source
+  mactop/btop use — as the package figure on macOS. Source precedence is now SMC
+  → powermetrics → IOReport sum, so a phantom sub-watt IOReport total can no
+  longer shadow a real reading. Linux (RAPL/hwmon) and Windows (WMI) paths are
+  unchanged; the SMC reader is darwin/cgo-only with a no-op stub elsewhere.
+
 ## [2.1.0] - 2026-06-29
 
 > Quality-of-life follow-up to v2.0.0: ephemeral runs that never touch your config,
