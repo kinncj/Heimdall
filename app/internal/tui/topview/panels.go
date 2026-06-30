@@ -43,7 +43,7 @@ func (m Model) body(t tier) []string {
 		add(m.row2(m.cpuPanel(t, col), m.memPanel(t, col), col))
 		add(m.row2(m.powerPanel(t, col), m.gpuPanel(t, col), col))
 		add(m.row2(m.netDiskPanel(t, col), m.loadUptimePanel(), col))
-		add(m.renderPanel(m.processPanel(t), full))
+		add(m.renderPanel(m.processPanel(t, m.procRows(out)), full))
 		return out
 	}
 
@@ -53,11 +53,24 @@ func (m Model) body(t tier) []string {
 	}
 	for _, p := range []panelSpec{
 		m.cpuPanel(t, inner), m.memPanel(t, inner), m.powerPanel(t, inner),
-		m.gpuPanel(t, inner), m.netDiskPanel(t, inner), m.processPanel(t),
+		m.gpuPanel(t, inner), m.netDiskPanel(t, inner),
 	} {
 		add(m.renderPanel(p, inner))
 	}
+	add(m.renderPanel(m.processPanel(t, m.procRows(out)), inner))
 	return out
+}
+
+// procRows is how many content lines the PROCESSES box should hold so it grows
+// to fill the height left below the other panels (btop-style), instead of
+// leaving a void. out is the body built so far; add() will insert one blank
+// separator, and the box itself costs a title row + two borders.
+func (m Model) procRows(out []string) int {
+	n := m.bodyHeight() - (len(out) + 1) - 3
+	if n < 4 {
+		n = 4
+	}
+	return n
 }
 
 // row2 renders two panels side by side and returns the joined block.
@@ -138,8 +151,8 @@ func (m Model) memPanel(t tier, w int) panelSpec {
 	// Fill the panel with gauge bars + a usage trend so it isn't a near-empty box
 	// next to the tall CPU panel.
 	return panelSpec{title: "MEMORY", lines: []string{
-		lab("used ") + m.pctBar("mem.used", 10) + " " + used + "   " + usedDet,
-		lab("swap ") + m.pctBar("mem.swap", 10) + " " + swap,
+		lab("used ") + m.barVal("mem.used", 10) + "   " + usedDet,
+		lab("swap ") + m.barVal("mem.swap", 10),
 		lab("mem  ") + m.sparkW("mem.used", w) + "  " + used,
 		lab("bw   ") + m.sparkW("mem.bw", w) + "  " + bw,
 	}}
@@ -192,8 +205,8 @@ func (m Model) gpuPanel(t tier, w int) panelSpec {
 	}
 	if t == tierMedium {
 		return panelSpec{title: "GPU / NPU", lines: []string{
-			lab("gpu  ") + m.pctBar("gpu.util", 10) + " " + gUtil + "   " + lab("temp ") + temp,
-			lab("vram ") + m.pctBar("gpu.vram", 10) + " " + vram,
+			lab("gpu  ") + m.barVal("gpu.util", 10) + "   " + lab("temp ") + temp,
+			lab("vram ") + m.barVal("gpu.vram", 10),
 			lab("npu  ") + lab("util ") + nUtil,
 		}}
 	}
@@ -201,8 +214,8 @@ func (m Model) gpuPanel(t tier, w int) panelSpec {
 	// trend, so the panel reads at a glance and fills its height.
 	muted, _ := m.mode.Role("text_muted")
 	return panelSpec{title: "GPU / NPU", lines: []string{
-		lab("gpu  ") + m.pctBar("gpu.util", 12) + " " + gUtil + "   " + lab("temp ") + temp,
-		lab("vram ") + m.pctBar("gpu.vram", 12) + " " + vram + "  " + muted.Style().Render(vramDet),
+		lab("gpu  ") + m.barVal("gpu.util", 12) + "   " + lab("temp ") + temp,
+		lab("vram ") + m.barVal("gpu.vram", 12) + "  " + muted.Style().Render(vramDet),
 		lab("util ") + m.sparkW("gpu.util", w) + "  " + gUtil,
 		lab("npu  ") + lab("util ") + nUtil,
 	}}
@@ -244,7 +257,7 @@ func (m Model) loadUptimePanel() panelSpec {
 	}}
 }
 
-func (m Model) processPanel(t tier) panelSpec {
+func (m Model) processPanel(t tier, rows int) panelSpec {
 	label, _ := m.mode.Role("label")
 	val, _ := m.mode.Role("value")
 	muted, _ := m.mode.Role("text_muted")
@@ -253,29 +266,46 @@ func (m Model) processPanel(t tier) panelSpec {
 	if t == tierWide || t == tierMedium {
 		title = "PROCESSES (top by cpu)"
 	}
+	if rows < 2 {
+		rows = 2
+	}
 
 	procs := m.sortedProcs()
 	if len(procs) == 0 {
-		return panelSpec{title: title, lines: []string{muted.Style().Render("waiting for a process table…")}}
+		lines := []string{muted.Style().Render("waiting for a process table…")}
+		return panelSpec{title: title, lines: padTo(lines, rows)}
 	}
 
+	narrow := t == tierNarrow
 	var lines []string
-	if t == tierNarrow {
+	if narrow {
 		lines = append(lines, label.Style().Render(fmt.Sprintf("%-7s %5s  %s", "PID", "CPU%", "COMMAND")))
-		for _, p := range procs {
-			lines = append(lines, val.Style().Render(fmt.Sprintf("%-7d %5.1f  %s", p.PID, p.CPUPct, clip(p.Command, 24))))
+	} else {
+		// No USER column: the pushed process table carries no username, and a column
+		// of dashes reads as broken. PID / CPU% / MEM% / COMMAND are what we have.
+		lines = append(lines, label.Style().Render(fmt.Sprintf("%-7s %6s %6s  %s", "PID", "CPU%", "MEM%", "COMMAND")))
+	}
+	for i, p := range procs {
+		if i >= rows-1 { // leave room for the header within the budget
+			break
 		}
-		return panelSpec{title: title, lines: lines}
+		if narrow {
+			lines = append(lines, val.Style().Render(fmt.Sprintf("%-7d %5.1f  %s", p.PID, p.CPUPct, clip(p.Command, 24))))
+		} else {
+			lines = append(lines, val.Style().Render(fmt.Sprintf("%-7d %6.1f %6.1f  %s",
+				p.PID, p.CPUPct, p.MemPct, clip(p.Command, 48))))
+		}
 	}
+	return panelSpec{title: title, lines: padTo(lines, rows)}
+}
 
-	// No USER column: the pushed process table carries no username, and a column
-	// of dashes reads as broken. PID / CPU% / MEM% / COMMAND are what we have.
-	lines = append(lines, label.Style().Render(fmt.Sprintf("%-7s %6s %6s  %s", "PID", "CPU%", "MEM%", "COMMAND")))
-	for _, p := range procs {
-		lines = append(lines, val.Style().Render(fmt.Sprintf("%-7d %6.1f %6.1f  %s",
-			p.PID, p.CPUPct, p.MemPct, clip(p.Command, 48))))
+// padTo extends lines with blank rows up to n so the boxed panel grows to fill
+// the height budgeted for it.
+func padTo(lines []string, n int) []string {
+	for len(lines) < n {
+		lines = append(lines, "")
 	}
-	return panelSpec{title: title, lines: lines}
+	return lines
 }
 
 // tinyBody renders the key-numbers-only layout: one metric per line, no graphs,
@@ -344,9 +374,6 @@ func (m Model) coresAggregate() string {
 func (m Model) sortedProcs() []domain.ProcessRow {
 	ps := append([]domain.ProcessRow(nil), m.host.Processes...)
 	sort.SliceStable(ps, func(i, j int) bool { return ps[i].CPUPct > ps[j].CPUPct })
-	if len(ps) > 6 {
-		ps = ps[:6]
-	}
 	return ps
 }
 
@@ -391,6 +418,15 @@ func (m Model) pctBar(name string, cells int) string {
 		return m.dash()
 	}
 	return render.Gauge(m.mode, mm.Gauge, cells)
+}
+
+// barVal renders "<bar> NN%" for an OK percentage metric, or a single dash when
+// unavailable (so it never reads as a doubled "— —").
+func (m Model) barVal(name string, cells int) string {
+	if _, okv := m.ok(name); !okv {
+		return m.dash()
+	}
+	return m.pctBar(name, cells) + " " + m.pctVal(name)
 }
 
 // numVal renders a gauge value with the given printf format and unit suffix, or

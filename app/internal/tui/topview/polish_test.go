@@ -38,3 +38,19 @@ func TestProcessTableHasNoUserColumn(t *testing.T) {
 		t.Errorf("process table should not have a USER column:\n%s", out)
 	}
 }
+
+func TestProcessPanelFillsHeight(t *testing.T) {
+	h := freqHost(3000)
+	tall := lineCount(New(h, nil, darkMode(t), 120, 50).View())
+	short := lineCount(New(h, nil, darkMode(t), 120, 30).View())
+	if tall <= short {
+		t.Errorf("top view should grow to fill height: tall=%d short=%d", tall, short)
+	}
+}
+
+func TestNoDoubledDash(t *testing.T) {
+	out := strip(New(freqHost(3000), nil, darkMode(t), 120, 40).View())
+	if strings.Contains(out, "— —") {
+		t.Errorf("unavailable metrics should show a single dash, found '— —':\n%s", out)
+	}
+}
