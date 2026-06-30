@@ -172,14 +172,17 @@ func TestUnavailableRendersDash(t *testing.T) {
 
 func TestExitOnEscQ(t *testing.T) {
 	m := newModel(t, 120, 40)
-	if _, exit := m.Update(tea.KeyMsg{Type: tea.KeyEsc}); !exit {
-		t.Error("esc should exit the top view")
+	if _, act := m.Update(tea.KeyMsg{Type: tea.KeyEsc}); act != ActBack {
+		t.Errorf("esc should go back, got %v", act)
 	}
-	if _, exit := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")}); !exit {
-		t.Error("q should exit the top view")
+	if _, act := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")}); act != ActQuit {
+		t.Errorf("q should quit the app, got %v", act)
 	}
-	if _, exit := m.Update(tea.KeyMsg{Type: tea.KeyDown}); exit {
-		t.Error("down should not exit the top view")
+	if _, act := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC}); act != ActQuit {
+		t.Errorf("ctrl+c should quit the app, got %v", act)
+	}
+	if _, act := m.Update(tea.KeyMsg{Type: tea.KeyDown}); act != ActNone {
+		t.Errorf("down should stay in the view, got %v", act)
 	}
 }
 

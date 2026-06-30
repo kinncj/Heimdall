@@ -128,10 +128,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// The top view is a full-screen takeover: it owns all keys until it exits.
 		if m.top != nil {
-			nt, exit := m.top.Update(msg)
-			if exit {
+			nt, act := m.top.Update(msg)
+			switch act {
+			case topview.ActQuit:
+				return m, tea.Quit
+			case topview.ActBack:
 				m.top = nil
-			} else {
+			default:
 				m.top = &nt
 			}
 			return m, nil
