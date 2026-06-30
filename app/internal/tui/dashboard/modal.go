@@ -107,6 +107,8 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if ok && len(logSourcesOf(h)) > 0 {
 				m.modal, m.modalSel = modalLogList, 0
 			}
+		case "t":
+			return m.enterTop(), nil
 		case "p":
 			if ok && hasProc(h) {
 				m.modal, m.modalScroll = modalTop, 0
