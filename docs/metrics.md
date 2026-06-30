@@ -26,6 +26,8 @@ Gathered once at startup; the value is a string.
 |---|---|---|
 | `cpu.util` | percent | overall CPU utilization |
 | `cpu.cores` | percent (per-core) | per-core utilization; the dashboard shows avg and max |
+| `cpu.load` | load | 1/5/15-minute load average (macOS/Linux; unavailable on Windows) |
+| `cpu.freq` | MHz | CPU clock; per-core where available. `/sys` cpufreq on Linux; unavailable where no clock is exposed (e.g. Apple Silicon) |
 | `gpu.util` | percent | GPU utilization |
 | `gpu.vram` | percent | GPU memory used |
 
@@ -34,6 +36,7 @@ Gathered once at startup; the value is a string.
 | Metric | Unit | Meaning |
 |---|---|---|
 | `mem.used` | percent | memory used; used/total absolutes shown in the detail view |
+| `mem.swap` | percent | swap used; used/total absolutes shown in the detail view |
 | `disk.used` | percent | disk used; used/total absolutes shown in the detail view |
 | `disk.read` | MB/s | disk read throughput |
 | `disk.write` | MB/s | disk write throughput |
@@ -62,4 +65,5 @@ rather than failing. See [Privileged Metrics](guides/04-privileged-metrics.md).
 | `power.pkg` | W | whole-package power |
 | `power.cpu` | W | CPU power |
 | `power.gpu` | W | GPU power |
-| `power.ane` | W | Apple Neural Engine power (Apple Silicon) |
+| `power.npu` | W | NPU / accelerator power (Apple Silicon ANE today). The legacy `power.ane` key is accepted and normalised to `power.npu` on ingest. |
+| `npu.util` | percent | NPU utilisation (where the platform exposes it; otherwise unavailable) |
