@@ -13,10 +13,23 @@ The daemon tries sources in order and degrades gracefully:
 | **Apple Silicon** | GPU power + GPU utilisation via **IOReport** (no sudo) | adds full thermal, CPU/ANE power where the SoC exposes it |
 | **Linux** | CPU/mem/disk/net/uptime (no sudo) | adds CPU package power from RAPL + package temperature from hwmon |
 | **Linux + NVIDIA** | GPU via `nvidia-smi` (unprivileged) | vendor extras |
+| **Linux + AMD** | GPU via `amd-smi` if installed, else **amdgpu sysfs** (both unprivileged) | vendor extras |
 | **Other** | depends on the platform tool | whatever needs root |
 
 When a metric has no source, the dashboard shows a **needs-helper** affordance
 (`⚿`) instead of an error — the daemon keeps running and reports everything else.
+
+### Per-platform guides
+
+This page covers the cross-platform model and the helper/systemd/launchd
+deployment. For the GPU/power specifics of your hardware, jump to:
+
+| Platform | Guide |
+|---|---|
+| **macOS / Apple Silicon** | [Privileged Metrics — macOS](13-privileged-macos.md) |
+| **Linux + NVIDIA** | [Privileged Metrics — Linux + NVIDIA](14-privileged-linux-nvidia.md) |
+| **Linux + AMD** (Radeon / Strix Halo) | [Privileged Metrics — Linux + AMD](15-privileged-linux-amd.md) |
+| **Windows** | [Privileged Metrics — Windows](16-privileged-windows.md) |
 
 > **Apple Silicon note**: some M-series SoCs do not expose a CPU package-power
 > counter at all — neither IOReport nor `powermetrics` reports it. CPU power reads
@@ -54,6 +67,50 @@ unsupported hardware degrades, it does not fail.
 sudo ./bin/heimdall-helper &                 # serves RAPL power + hwmon temp
 ./bin/heimdall-daemon --hub localhost:9090   # auto-detects the socket
 ```
+
+## Linux + AMD GPU (Radeon / Strix Halo)
+
+AMD GPUs — discrete Radeon and the Strix Halo iGPU (e.g. an HP ZBook Ultra G1a)
+— report `gpu.util`, `gpu.vram`, `gpu.temp`, and `power.gpu`. The daemon tries
+two sources, both **unprivileged**:
+
+1. **`amd-smi`** (preferred) — AMD's tool, shipped with ROCm. Richer and
+   version-stable. The daemon runs:
+
+   ```sh
+   amd-smi metric --usage --power --temperature --mem-usage --csv
+   ```
+
+2. **amdgpu sysfs** (automatic fallback) — the in-tree `amdgpu` driver always
+   exposes these, no package required:
+   `gpu_busy_percent`, `mem_info_vram_used/total`, and the hwmon
+   `power1_average` / `temp1_input`. Used for any field `amd-smi` did not
+   provide, or whenever `amd-smi` is absent.
+
+So **you get GPU metrics out of the box** on any amdgpu host. Installing
+`amd-smi` only adds richness and cross-version stability:
+
+```sh
+# Arch / CachyOS
+sudo pacman -S rocm-smi-lib                   # provides amd-smi
+# Debian / Ubuntu (after adding the AMD ROCm repo)
+sudo apt install amd-smi-lib
+# Fedora
+sudo dnf install amd-smi
+
+amd-smi version                                # verify it is on PATH
+./bin/heimdall-daemon --once | grep -E "gpu|power"
+# e.g. gpu.util=37%  gpu.vram=25%  gpu.temp=48C  power.gpu=12.5W
+```
+
+`amd-smi` does **not** need root for these read-only queries — run the daemon as
+your normal user. The helper is only needed for the Linux extras above (RAPL
+package power, hwmon package temp).
+
+> **NPU (XDNA) note**: the Ryzen AI / XDNA NPU (`amdxdna` driver) has no stable
+> utilisation counter yet, so `npu.util` reads as `unavailable` on AMD hosts —
+> the accelerator is advertised but not faked. Same situation as the Apple
+> `npu.util` gap. This will light up when the driver exposes a residency figure.
 
 ## Option B — the privileged helper
 

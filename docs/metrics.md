@@ -30,6 +30,15 @@ Gathered once at startup; the value is a string.
 | `cpu.freq` | MHz | CPU clock; per-core where available. `/sys` cpufreq on Linux; unavailable where no clock is exposed (e.g. Apple Silicon) |
 | `gpu.util` | percent | GPU utilization |
 | `gpu.vram` | percent | GPU memory used |
+| `gpu.mem.util` | percent | GPU memory-controller utilization (distinct from `gpu.vram` occupancy) |
+| `gpu.clock` | MHz | GPU graphics/shader clock |
+| `gpu.fan` | percent | GPU fan speed (where a fan + sensor exist) |
+
+> **GPU sources**: Apple Silicon via IOReport; NVIDIA via `nvidia-smi`; AMD via
+> `amd-smi` when installed, otherwise the `amdgpu` sysfs nodes (both
+> unprivileged). `gpu.clock` / `gpu.mem.util` / `gpu.fan` are best-effort and
+> render `—` where the chip or query doesn't expose them (e.g. fan on a passively
+> cooled DGX). See [Privileged Metrics](guides/04-privileged-metrics.md).
 
 ## Memory & disk
 

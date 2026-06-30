@@ -22,7 +22,11 @@ Start here, then jump to the guide for what you want to do.
 | [Quickstart](guides/01-quickstart.md) | watch a single machine (all-in-one) |
 | [Monitor a Fleet](guides/02-monitor-a-fleet.md) | watch many hosts from one station |
 | [Secure Deployment](guides/03-secure-deployment.md) | require TLS + an enrollment token |
-| [Privileged Metrics](guides/04-privileged-metrics.md) | unlock power, GPU, and full thermal |
+| [Privileged Metrics](guides/04-privileged-metrics.md) | unlock power, GPU, and full thermal (overview + deployment) |
+| ↳ [macOS / Apple Silicon](guides/13-privileged-macos.md) | IOReport GPU/power, SMC whole-system power, ANE |
+| ↳ [Linux + NVIDIA](guides/14-privileged-linux-nvidia.md) | GPU via `nvidia-smi`, CPU power via the helper |
+| ↳ [Linux + AMD](guides/15-privileged-linux-amd.md) | Radeon / Strix Halo via `amd-smi` or amdgpu sysfs |
+| ↳ [Windows](guides/16-privileged-windows.md) | WMI thermal, `nvidia-smi` GPU; no RAPL power |
 | [Federation (Bifröst)](guides/05-federation.md) | span multiple sites / networks |
 | [Process View & Commands](guides/06-control-plane.md) | see a host's process table (top) and run allow-listed diagnostics |
 | [Log Streaming](guides/07-log-streaming.md) | tail host logs in the dashboard |

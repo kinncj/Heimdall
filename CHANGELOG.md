@@ -7,6 +7,29 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-06-30
+
+### Added
+- **AMD GPU metrics** — `gpu.util`, `gpu.vram`, `gpu.temp`, and `power.gpu` now
+  work on AMD hardware (discrete Radeon and the Strix Halo iGPU, e.g. an HP ZBook
+  Ultra G1a). GPU collection was `nvidia-smi`-only, so AMD hosts showed a blank
+  accelerator panel. The daemon now prefers `amd-smi` (ROCm) and falls back to
+  the in-tree `amdgpu` sysfs nodes (`gpu_busy_percent`, `mem_info_vram_*`, hwmon
+  `power1_average` / `temp1_input`) — both unprivileged, so it works out of the
+  box with no extra install. `npu.util` is advertised as `unavailable` on XDNA
+  until the `amdxdna` driver exposes a utilisation counter.
+- **Richer GPU panel** — `gpu.clock` (graphics clock), `gpu.mem.util` (memory-
+  controller utilisation), and `gpu.fan` (fan speed) on both NVIDIA (`nvidia-smi`)
+  and AMD (`amd-smi` / amdgpu hwmon `freq1_input`). The top-view GPU panel now
+  shows clock / mem / fan; anything the chip doesn't expose renders `—` rather
+  than a fabricated value.
+- **Per-platform privileged-metrics guides** — split the one big guide into
+  [macOS](docs/guides/13-privileged-macos.md),
+  [Linux + NVIDIA](docs/guides/14-privileged-linux-nvidia.md),
+  [Linux + AMD](docs/guides/15-privileged-linux-amd.md), and
+  [Windows](docs/guides/16-privileged-windows.md) (with `amd-smi` install steps
+  and Windows service setup). The original stays as the cross-platform overview.
+
 ## [2.2.0] - 2026-06-30
 
 ### Added
