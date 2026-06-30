@@ -41,3 +41,9 @@ Heimdall.
 > The horn Heimdall sounds to warn the gods that danger — Ragnarök — is coming.
 > **In Heimdall:** alerting — threshold rules that raise the alarm and fire
 > notifications when something is wrong.
+
+**Hliðskjálf** · /ˈhlɪðˌskjaːlv/ · *HLITH-skyahlv*
+> Odin's high seat in Asgard, from which he looks out over all the realms and
+> sees everything that happens.
+> **In Heimdall:** the full-screen single-host "top" view (the `t` key) — sit over
+> one host and see all of it at once: CPU, memory, power, accelerators, net, disk.
