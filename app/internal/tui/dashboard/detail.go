@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/tui/brand"
 	"heimdall/app/internal/tui/render"
@@ -98,8 +100,8 @@ func (m Model) DetailView() string {
 	h := hosts[i]
 
 	w := m.width
-	if w < 88 {
-		w = 88
+	if w < 30 {
+		w = 30
 	}
 	online, total := m.fleetCounts()
 	header := brand.SkinnyHeader(m.mode, w, online, total, m.now.Format("15:04:05"))
@@ -108,7 +110,14 @@ func (m Model) DetailView() string {
 	// fits short terminals (e.g. SSH from a phone). Chrome = header + 2 blanks +
 	// footer.
 	body, _ := scrollWindow(m.detailBody(h, w), m.detailScroll, m.height-(lineCount(header)+3))
-	return strings.Join([]string{header, "", strings.Join(body, "\n"), "", m.detailFooter(h)}, "\n")
+	out := strings.Join([]string{header, "", strings.Join(body, "\n"), "", m.detailFooter(h)}, "\n")
+	// Clamp every line to the terminal width so nothing escapes the frame on a
+	// narrow terminal (the body is laid out responsively above; this is the net).
+	lines := strings.Split(out, "\n")
+	for i, l := range lines {
+		lines[i] = lipgloss.NewStyle().MaxWidth(m.width).Render(l)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // detailMaxScroll is the largest valid detail-body scroll offset for the terminal
@@ -119,8 +128,8 @@ func (m Model) detailMaxScroll() int {
 		return 0
 	}
 	w := m.width
-	if w < 88 {
-		w = 88
+	if w < 30 {
+		w = 30
 	}
 	maxBody := m.height - 6 // header(3) + 2 blanks + footer(1)
 	if maxBody < 1 {
@@ -182,18 +191,33 @@ func (m Model) detailBody(h domain.HostView, w int) []string {
 
 	var b strings.Builder
 	b.WriteString("  " + heading.Style().Render("HOST DETAIL — "+dn) + "\n")
-	b.WriteString("  " + st.Badge() + "   " +
-		label.Style().Render("os ") + val.Style().Render(osArch) + "   " +
-		label.Style().Render("kernel ") + val.Style().Render(orDash(desc("host.kernel", ""))) + "   " +
-		label.Style().Render("seen ") + val.Style().Render(h.LastSeen.Format("15:04:05")) + "\n\n")
+	for _, ln := range joinFields(w, []string{
+		st.Badge(),
+		label.Style().Render("os ") + val.Style().Render(osArch),
+		label.Style().Render("kernel ") + val.Style().Render(orDash(desc("host.kernel", ""))),
+		label.Style().Render("seen ") + val.Style().Render(h.LastSeen.Format("15:04:05")),
+	}) {
+		b.WriteString(ln + "\n")
+	}
+	b.WriteString("\n")
 
 	hist := m.history[h.Host.ID]
-	// Cap the trend to the space between the value column and the right edge so
-	// it scrolls in place instead of growing past the frame as history fills.
-	sparkW := w - 66
-	if sparkW < 12 {
-		sparkW = 12
+	// Size the gauge, value column, and trend to the terminal width so the row
+	// reflows instead of overflowing a narrow terminal (e.g. SSH from a phone).
+	gaugeCells, valCellW := 28, 26
+	switch {
+	case w < 45:
+		gaugeCells, valCellW = 6, 9
+	case w < 60:
+		gaugeCells, valCellW = 10, 12
+	case w < 80:
+		gaugeCells, valCellW = 16, 18
+	case w < 100:
+		gaugeCells, valCellW = 22, 22
 	}
+	sparkW := w - (10 + gaugeCells + valCellW + 3)
+	showSpark := sparkW >= 12
+	showDetail := w >= 70
 
 	for _, d := range []struct {
 		keys      []string
@@ -213,16 +237,16 @@ func (m Model) detailBody(h domain.HostView, w int) []string {
 			b.WriteString(lab + "  " + m.nonOK(mm) + "\n")
 			continue
 		}
-		gauge := render.Gauge(m.mode, mm.Gauge, 28)
+		gauge := render.Gauge(m.mode, mm.Gauge, gaugeCells)
 		valAbs := val.Style().Render(fmt.Sprintf("%5.0f%s", mm.Gauge, d.unit))
-		if mm.Detail != "" {
+		if mm.Detail != "" && showDetail {
 			valAbs += "  " + muted.Style().Render(mm.Detail)
 		}
-		spark := ""
-		if hist != nil {
-			spark = render.Sparkline(m.mode, hist[mm.Name], sparkW)
+		row := lab + "  " + gauge + " " + cell(valAbs, valCellW)
+		if showSpark && hist != nil {
+			row += " " + render.Sparkline(m.mode, hist[mm.Name], sparkW)
 		}
-		b.WriteString(lab + "  " + gauge + " " + cell(valAbs, 26) + " " + spark + "\n")
+		b.WriteString(row + "\n")
 	}
 
 	if cores := byName["cpu.cores"]; cores.Status == domain.StatusOK && len(cores.PerCore) > 0 {
@@ -232,25 +256,57 @@ func (m Model) detailBody(h domain.HostView, w int) []string {
 	}
 
 	b.WriteString("\n  " + heading.Style().Render("HARDWARE") + "\n")
-	b.WriteString("  " +
-		label.Style().Render("cpu ") + val.Style().Render(orDash(desc("host.cpu", ""))) + "   " +
-		label.Style().Render("gpu ") + val.Style().Render(orDash(desc("host.gpu", ""))) + "   " +
-		label.Style().Render("heimdall ") + val.Style().Render(orDash(desc("host.version", ""))) + "\n")
+	for _, ln := range joinFields(w, []string{
+		label.Style().Render("cpu ") + val.Style().Render(orDash(desc("host.cpu", ""))),
+		label.Style().Render("gpu ") + val.Style().Render(orDash(desc("host.gpu", ""))),
+		label.Style().Render("heimdall ") + val.Style().Render(orDash(desc("host.version", ""))),
+	}) {
+		b.WriteString(ln + "\n")
+	}
 
 	b.WriteString("\n  " + heading.Style().Render("NETWORK & SYSTEM") + "\n")
-	b.WriteString("  " +
-		label.Style().Render("net ↓ ") + m.throughputVal(byName, "net.rx") + "   " +
-		label.Style().Render("net ↑ ") + m.throughputVal(byName, "net.tx") + "   " +
-		label.Style().Render("ping ") + m.pingVal(byName) + "   " +
-		label.Style().Render("gw ") + m.gatewayVal(byName) + "   " +
-		label.Style().Render("uptime ") + m.uptimeVal(byName) + "\n")
-	b.WriteString("  " +
-		label.Style().Render("disk r ") + m.throughputVal(byName, "disk.read") + "   " +
-		label.Style().Render("disk w ") + m.throughputVal(byName, "disk.write") + "\n")
+	for _, ln := range joinFields(w, []string{
+		label.Style().Render("net ↓ ") + m.throughputVal(byName, "net.rx"),
+		label.Style().Render("net ↑ ") + m.throughputVal(byName, "net.tx"),
+		label.Style().Render("ping ") + m.pingVal(byName),
+		label.Style().Render("gw ") + m.gatewayVal(byName),
+		label.Style().Render("uptime ") + m.uptimeVal(byName),
+		label.Style().Render("disk r ") + m.throughputVal(byName, "disk.read"),
+		label.Style().Render("disk w ") + m.throughputVal(byName, "disk.write"),
+	}) {
+		b.WriteString(ln + "\n")
+	}
 
 	b.WriteString(m.nicsSection(byName))
 
 	return strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+}
+
+// joinFields packs "label value" fields onto as few indented lines as fit within
+// width w, wrapping to a new line when the next field would overflow. This is how
+// the HARDWARE and NETWORK rows reflow on a narrow terminal instead of running
+// off the edge. Fields are measured by display width (ANSI-aware).
+func joinFields(w int, fields []string) []string {
+	const indent = "  "
+	const sep = "   "
+	var lines []string
+	cur := indent
+	for _, f := range fields {
+		piece := f
+		if cur != indent {
+			piece = sep + f
+		}
+		if cur != indent && lipgloss.Width(cur+piece) > w {
+			lines = append(lines, cur)
+			cur = indent + f
+		} else {
+			cur += piece
+		}
+	}
+	if cur != indent {
+		lines = append(lines, cur)
+	}
+	return lines
 }
 
 func (m Model) throughputVal(byName map[string]domain.Metric, key string) string {
