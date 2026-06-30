@@ -7,6 +7,25 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- **Full-screen `top` view (Hliðskjálf)** — press `t` on a focused host for a
+  mactop/btop-style single-host dashboard: per-core CPU bars, braille sparklines
+  for CPU/memory/power, GPU/NPU, network & disk, and a process table. It refreshes
+  live and works on macOS, Linux, and Windows. Responsive across four width tiers
+  down to an iPhone-portrait "key numbers" column, so it stays readable in Termius
+  on a phone. `esc`/`q` exits.
+- **`mem.swap`, `cpu.load`, and `cpu.freq` collectors** — swap usage, 1/5/15m load
+  average, and CPU clock. Each degrades to Unavailable (rendered `—`) where the
+  platform can't supply it (e.g. load average on Windows, clock on Apple Silicon)
+  rather than reporting a fabricated 0.
+
+### Changed
+- **`t` / `p` keys** — the process table now opens on `p` ("processes"); `t` is the
+  new full-screen top view.
+- **ANE → NPU** — accelerator power is now the vendor-neutral `power.npu`. The
+  legacy `power.ane` key is accepted and normalised on ingest, so a mixed fleet
+  with older daemons keeps working.
+
 ## [2.1.1] - 2026-06-30
 
 ### Fixed
