@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-06-30
+
+### Fixed
+- **First-run wizard stored `process-interval` as `0s`** so the top view (`t`)
+  process table was empty out of the box — the daemon never pushed a table. The
+  wizard now prompts for it and **suggests `2s`**, storing what you accept; the
+  runtime/flag default stays `0s` (off) for headless services, so the ADR 0017
+  opt-in posture is unchanged. Existing daemons started with `--process-interval`
+  are unaffected. Set `0` in the wizard to keep it off.
+- **systemd `ExecStart` paths** in the privileged-metrics guide pointed at
+  `/usr/bin`; the manual install dir is `/usr/local/bin`. Fixed, with a note that
+  AUR installs use `/usr/bin`.
+
 ## [2.2.1] - 2026-06-30
 
 ### Added

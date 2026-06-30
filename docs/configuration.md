@@ -96,7 +96,7 @@ advertises a capability the dashboard/CLI gate on (`_logs`, `_proc`, `_cmd`).
 | Flag | Default | Meaning |
 |---|---|---|
 | `--log-source` | — | tail and **push** log sources `alias=path,…` (advertises `_logs`; empty = logs off) |
-| `--process-interval` | off | collect + push a process table every interval, e.g. `5s` (advertises `_proc`) |
+| `--process-interval` | off | collect + push a process table every interval, e.g. `5s` (advertises `_proc`). The flag default is off; the first-run wizard suggests `2s` so the top view works out of the box. |
 | `--allow-commands` | off | run allow-listed, read-only commands routed from the hub (advertises `_cmd`) |
 
 > **Removed in v1.6.0:** `--control-listen`, `--control-token`, `--control-tls-cert`,

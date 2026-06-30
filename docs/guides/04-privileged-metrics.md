@@ -165,7 +165,7 @@ Group=heimdall
 # systemd creates /run/heimdall as root:heimdall; 0710 lets the group traverse it.
 RuntimeDirectory=heimdall
 RuntimeDirectoryMode=0710
-ExecStart=/usr/bin/heimdall-helper --socket /run/heimdall/helper.sock
+ExecStart=/usr/local/bin/heimdall-helper --socket /run/heimdall/helper.sock
 Restart=on-failure
 RestartSec=2
 
@@ -190,7 +190,7 @@ Type=simple
 User=YOUR_USER
 SupplementaryGroups=heimdall
 Environment=HEIMDALL_HELPER_SOCKET=/run/heimdall/helper.sock
-ExecStart=/usr/bin/heimdall-daemon --hub YOUR_HUB:9090 --name %H --allow-commands --process-interval 5s
+ExecStart=/usr/local/bin/heimdall-daemon --hub YOUR_HUB:9090 --name %H --allow-commands --process-interval 5s
 Restart=on-failure
 RestartSec=2
 
@@ -218,7 +218,9 @@ If `power`/`gpu` show `needs-helper`, the daemon isn't reaching the socket — c
 that your user is in `heimdall` and that both units use the same socket path.
 
 > **Install via the AUR** on Arch/CachyOS: `paru -S heimdall-helper-bin
-> heimdall-daemon-bin heimdall-cli-bin` (binaries land in `/usr/bin`, with manpages).
+> heimdall-daemon-bin heimdall-cli-bin` (the AUR packages install to `/usr/bin`,
+> with manpages — set the units' `ExecStart` to `/usr/bin/...` if you go that
+> route; the examples above assume a manual install under `/usr/local/bin`).
 
 ### Run both as launchd services (macOS, helper root, daemon as you)
 
