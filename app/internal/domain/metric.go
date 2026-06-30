@@ -53,6 +53,22 @@ type Counter struct {
 	Rate  float64
 }
 
+// metricAliases maps legacy metric names to their canonical form. Older daemons
+// in a mixed fleet keep emitting the legacy key; the registry rewrites it on
+// ingest so the rest of the system only ever sees the canonical name.
+var metricAliases = map[string]string{
+	"power.ane": "power.npu", // ANE generalised to a vendor-neutral NPU
+}
+
+// canonicalMetricName returns the canonical name for a (possibly legacy) metric
+// key, leaving non-aliased names unchanged.
+func canonicalMetricName(name string) string {
+	if c, ok := metricAliases[name]; ok {
+		return c
+	}
+	return name
+}
+
 // Metric is one reading from one adapter. Status is always meaningful; a non-OK
 // status (Unavailable, InsufficientPermission, Error) carries no value and is
 // explained by Detail. This is the failure-isolation guarantee in the domain.
