@@ -91,6 +91,23 @@ func TestProcessesModalTitleSaysProcesses(t *testing.T) {
 	}
 }
 
+func TestTopViewEntersAndExits(t *testing.T) {
+	// From the grid, "t" enters the full-screen top view for the focused host;
+	// "esc" and "q" each leave it.
+	base := Model{reg: obsReg(t), detail: false, height: 40, width: 100}
+	for _, exitKey := range []string{"esc", "q"} {
+		next, _ := base.Update(mkey("t"))
+		m := next.(Model)
+		if m.top == nil {
+			t.Fatalf("t should enter the top view")
+		}
+		out, _ := m.Update(mkey(exitKey))
+		if out.(Model).top != nil {
+			t.Fatalf("%q should exit the top view", exitKey)
+		}
+	}
+}
+
 func TestModalAffordancesGatedByCapability(t *testing.T) {
 	// A host advertising nothing must not open the modals.
 	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)

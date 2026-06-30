@@ -69,6 +69,21 @@ func New(host domain.HostView, history map[string][]float64, mode theme.Mode, wi
 	return Model{host: host, history: history, mode: mode, width: width, height: height, byName: bn}
 }
 
+// Refresh returns a copy bound to a newer host snapshot and history while keeping
+// the current scroll offset, so a live tick updates the numbers without jumping
+// the view. The next key press re-clamps scroll against the new content height.
+func (m Model) Refresh(host domain.HostView, history map[string][]float64) Model {
+	n := New(host, history, m.mode, m.width, m.height)
+	n.scroll = m.scroll
+	return n
+}
+
+// Resize returns a copy at a new terminal size, preserving scroll.
+func (m Model) Resize(width, height int) Model {
+	m.width, m.height = width, height
+	return m
+}
+
 // Update handles a key press. It returns the updated model and exit=true when the
 // operator asked to leave the view (esc or q), so the dashboard knows to switch
 // back to the fleet grid. All other keys scroll the body in place.

@@ -17,6 +17,7 @@ import (
 	"heimdall/app/internal/tui/brand"
 	"heimdall/app/internal/tui/render"
 	"heimdall/app/internal/tui/theme"
+	"heimdall/app/internal/tui/topview"
 )
 
 // Model is the dashboard state.
@@ -52,6 +53,10 @@ type Model struct {
 	cmdSel       int    // selection in the command picker
 	cmdReqID     string // request id of the in-flight command
 	detailScroll int    // scroll offset for the detail-view body (shift+arrows / wheel)
+	// Hliðskjálf (0025): the full-screen single-host top view. Non-nil while open;
+	// topHost is the host it shows so a tick can refresh it in place.
+	top     *topview.Model
+	topHost domain.HostID
 }
 
 // WithRunCommand injects the callback that issues an on-demand command to the hub
@@ -108,6 +113,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.top != nil {
+			t := m.top.Resize(msg.Width, msg.Height)
+			m.top = &t
+		}
 	case tea.MouseMsg:
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
@@ -117,6 +126,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyMsg:
+		// The top view is a full-screen takeover: it owns all keys until it exits.
+		if m.top != nil {
+			nt, exit := m.top.Update(msg)
+			if exit {
+				m.top = nil
+			} else {
+				m.top = &nt
+			}
+			return m, nil
+		}
 		if m.filtering {
 			return m.updateFilter(msg)
 		}
@@ -155,6 +174,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "/":
 			m.filtering = true
 			return m, nil
+		case "t":
+			return m.enterTop(), nil
 		case "enter":
 			if !m.detail && len(m.orderedList()) > 0 {
 				m.detail = true
@@ -176,9 +197,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.reg.Evaluate(m.now)
 		m.recordHistory()
+		if m.top != nil {
+			if h, ok := m.reg.Host(m.topHost); ok {
+				t := m.top.Refresh(h, m.history[m.topHost])
+				m.top = &t
+			}
+		}
 		return m, tick()
 	}
 	return m, nil
+}
+
+// enterTop opens the full-screen top view for the focused host. With no focused
+// host (empty fleet) it is a no-op.
+func (m Model) enterTop() Model {
+	h, ok := m.selectedHost()
+	if !ok {
+		return m
+	}
+	t := topview.New(h, m.history[h.Host.ID], m.mode, m.width, m.height)
+	m.top = &t
+	m.topHost = h.Host.ID
+	return m
 }
 
 // updateFilter handles keystrokes while the filter input is open: type to
@@ -205,6 +245,9 @@ func (m Model) updateFilter(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // View renders one frame.
 func (m Model) View() string {
+	if m.top != nil {
+		return m.top.View()
+	}
 	if m.help {
 		return m.HelpView()
 	}
