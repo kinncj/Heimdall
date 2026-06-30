@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.4] - 2026-06-30
+
+### Fixed
+- **Running the helper could blank out power/GPU it was meant to provide.** The
+  privileged adapter trusted the helper's reply on any successful socket call —
+  even one with no `ok` metrics — so a reachable-but-empty helper *shadowed* the
+  daemon's own in-process reading. On Apple Silicon, where IOReport/SMC are
+  unprivileged, bootstrapping the helper made `power.*` and `gpu.*` disappear on
+  a Mac that worked fine without it. The adapter now uses the helper only when it
+  returns an `ok` metric, otherwise falls back to in-process collection — so the
+  helper is additive, never subtractive. Also covers Windows hosts where the
+  helper would otherwise shadow the daemon's `nvidia-smi` GPU read.
+
 ## [2.2.3] - 2026-06-30
 
 ### Fixed

@@ -7,7 +7,9 @@
 <p align="center"><em>Watch Over All Realms</em></p>
 
 <p align="center">
-  <img alt="release" src="https://img.shields.io/badge/release-v2.1.0-5fd7ff">
+  <a href="https://github.com/kinncj/Heimdall/releases/latest"><img alt="release" src="https://img.shields.io/github/v/release/kinncj/heimdall?color=5fd7ff"></a>
+  <a href="https://github.com/kinncj/Heimdall/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/kinncj/heimdall/total"></a>
+  <a href="https://github.com/kinncj/Heimdall/releases/latest"><img alt="downloads@latest" src="https://img.shields.io/github/downloads/kinncj/heimdall/latest/total"></a>
   <img alt="license" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
   <img alt="go" src="https://img.shields.io/badge/go-1.26-00ADD8">
   <img alt="ui" src="https://img.shields.io/badge/ui-terminal%20(Bubble%20Tea)-5fd7ff">
