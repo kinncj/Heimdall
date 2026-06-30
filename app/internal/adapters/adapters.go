@@ -28,7 +28,7 @@ type Options struct {
 func Build(o Options) []domain.Adapter {
 	return []domain.Adapter{
 		&Inventory{Version: o.Version},
-		CPU{}, Mem{}, Swap{}, Load{}, Disk{Path: "/"}, &DiskIO{},
+		CPU{}, Mem{}, Swap{}, Load{}, Freq{}, Disk{Path: "/"}, &DiskIO{},
 		Temperature{}, &Network{}, Reachability{Target: o.PingTarget}, Uptime{},
 		&Gateway{}, Helper{},
 	}
