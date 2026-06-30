@@ -139,7 +139,8 @@ func (m Model) detailFooter(h domain.HostView) string {
 	keys, _ := m.mode.Role("keybinding")
 	footer := "  " + keys.Style().Render("esc") + muted.Style().Render(" back   ") +
 		keys.Style().Render("↑/↓") + muted.Style().Render(" host   ") +
-		keys.Style().Render("⇧↑/↓") + muted.Style().Render(" scroll   ")
+		keys.Style().Render("⇧↑/↓") + muted.Style().Render(" scroll   ") +
+		keys.Style().Render("t") + muted.Style().Render(" top   ")
 	if len(logSourcesOf(h)) > 0 {
 		footer += keys.Style().Render("l") + muted.Style().Render(" logs   ")
 	}

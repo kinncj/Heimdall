@@ -108,6 +108,17 @@ func TestTopViewEntersAndExits(t *testing.T) {
 	}
 }
 
+func TestDetailFooterShowsTopAndProc(t *testing.T) {
+	m := Model{reg: obsReg(t), detail: true, height: 40, width: 120}
+	h, _ := m.selectedHost()
+	f := ansiRe.ReplaceAllString(m.detailFooter(h), "")
+	for _, want := range []string{"top", "proc"} {
+		if !strings.Contains(f, want) {
+			t.Errorf("detail footer missing %q: %q", want, f)
+		}
+	}
+}
+
 func TestModalAffordancesGatedByCapability(t *testing.T) {
 	// A host advertising nothing must not open the modals.
 	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
