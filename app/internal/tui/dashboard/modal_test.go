@@ -92,19 +92,27 @@ func TestProcessesModalTitleSaysProcesses(t *testing.T) {
 }
 
 func TestTopViewEntersAndExits(t *testing.T) {
-	// From the grid, "t" enters the full-screen top view for the focused host;
-	// "esc" and "q" each leave it.
+	// "t" enters the full-screen top view for the focused host; "esc" goes back to
+	// the dashboard, while "q" quits the whole app (like everywhere else).
 	base := Model{reg: obsReg(t), detail: false, height: 40, width: 100}
-	for _, exitKey := range []string{"esc", "q"} {
-		next, _ := base.Update(mkey("t"))
-		m := next.(Model)
-		if m.top == nil {
-			t.Fatalf("t should enter the top view")
-		}
-		out, _ := m.Update(mkey(exitKey))
-		if out.(Model).top != nil {
-			t.Fatalf("%q should exit the top view", exitKey)
-		}
+
+	next, _ := base.Update(mkey("t"))
+	m := next.(Model)
+	if m.top == nil {
+		t.Fatal("t should enter the top view")
+	}
+	out, _ := m.Update(mkey("esc"))
+	if out.(Model).top != nil {
+		t.Fatal("esc should leave the top view (back to the dashboard)")
+	}
+
+	next2, _ := base.Update(mkey("t"))
+	_, cmd := next2.(Model).Update(mkey("q"))
+	if cmd == nil {
+		t.Fatal("q should quit the app from the top view")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Errorf("q should issue tea.Quit, got %T", cmd())
 	}
 }
 

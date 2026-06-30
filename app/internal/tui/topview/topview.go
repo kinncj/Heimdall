@@ -84,13 +84,24 @@ func (m Model) Resize(width, height int) Model {
 	return m
 }
 
-// Update handles a key press. It returns the updated model and exit=true when the
-// operator asked to leave the view (esc or q), so the dashboard knows to switch
-// back to the fleet grid. All other keys scroll the body in place.
-func (m Model) Update(msg tea.KeyMsg) (Model, bool) {
+// Action is what the dashboard should do after a key press in the top view.
+type Action int
+
+const (
+	ActNone Action = iota // stayed in the view (e.g. scrolled)
+	ActBack               // esc: return to the dashboard
+	ActQuit               // q / ctrl+c: quit the whole app
+)
+
+// Update handles a key press. esc returns ActBack (leave the view); q and ctrl+c
+// return ActQuit (quit the app), matching the rest of the TUI. All other keys
+// scroll the body in place and return ActNone.
+func (m Model) Update(msg tea.KeyMsg) (Model, Action) {
 	switch msg.String() {
-	case "esc", "q":
-		return m, true
+	case "esc":
+		return m, ActBack
+	case "q", "ctrl+c":
+		return m, ActQuit
 	case "up", "k":
 		m.scroll = clampScroll(m.scroll-1, m.maxScroll())
 	case "down", "j":
@@ -104,7 +115,7 @@ func (m Model) Update(msg tea.KeyMsg) (Model, bool) {
 	case "end":
 		m.scroll = m.maxScroll()
 	}
-	return m, false
+	return m, ActNone
 }
 
 // View renders the fixed header, the scrollable panel body, and the fixed footer,
