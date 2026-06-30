@@ -4,6 +4,7 @@
 package dashboard
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -71,13 +72,22 @@ func TestModalUnwindsWithEscape(t *testing.T) {
 	}
 }
 
-func TestTopModalOpensAndCloses(t *testing.T) {
+func TestProcessesModalOpensAndCloses(t *testing.T) {
+	// v2.2: "p" opens the process table (was "t"); "t" is now the full-screen top view.
 	m := Model{reg: obsReg(t), detail: true, height: 40, width: 100}
-	if m = press(m, "t"); m.modal != modalTop {
-		t.Fatalf("t should open top, got %d", m.modal)
+	if m = press(m, "p"); m.modal != modalTop {
+		t.Fatalf("p should open the process table, got %d", m.modal)
 	}
 	if m = press(m, "esc"); m.modal != modalNone {
-		t.Fatalf("esc should close top, got %d", m.modal)
+		t.Fatalf("esc should close the process table, got %d", m.modal)
+	}
+}
+
+func TestProcessesModalTitleSaysProcesses(t *testing.T) {
+	m := Model{reg: obsReg(t), detail: true, height: 40, width: 100}
+	m = press(m, "p")
+	if got := m.ModalView(); !strings.Contains(strings.ToLower(ansiRe.ReplaceAllString(got, "")), "processes") {
+		t.Fatalf("process modal title should say 'processes', got:\n%s", got)
 	}
 }
 
@@ -92,7 +102,7 @@ func TestModalAffordancesGatedByCapability(t *testing.T) {
 	if m = press(m, "l"); m.modal != modalNone {
 		t.Fatal("l must do nothing without log sources")
 	}
-	if m = press(m, "t"); m.modal != modalNone {
-		t.Fatal("t must do nothing without a process table")
+	if m = press(m, "p"); m.modal != modalNone {
+		t.Fatal("p must do nothing without a process table")
 	}
 }
