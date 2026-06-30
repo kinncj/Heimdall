@@ -70,7 +70,7 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 			out = append(out, powerMetric("power.gpu", gpu))
 		}
 		if ane > 0 {
-			out = append(out, powerMetric("power.ane", ane))
+			out = append(out, powerMetric("power.npu", ane))
 		}
 		if gpuUtil >= 0 {
 			out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: gpuUtil})

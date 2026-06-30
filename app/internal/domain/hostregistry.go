@@ -143,6 +143,11 @@ func (r *HostRegistry) Observe(id HostID, snapshot []Metric, labels map[string]s
 	e.observed = true
 	e.disconnected = false // a fresh observation clears a prior stream-end
 	e.lastSeen = now
+	// Rewrite legacy metric names to their canonical form so a mixed fleet (older
+	// daemons emitting e.g. power.ane) is normalised before anything else sees it.
+	for i := range snapshot {
+		snapshot[i].Name = canonicalMetricName(snapshot[i].Name)
+	}
 	e.snapshot = snapshot
 	if labels != nil {
 		e.labels = labels
