@@ -22,6 +22,23 @@ func TestBuildFreqMeanAndPerCore(t *testing.T) {
 	}
 }
 
+func TestFreqFromKHzMeanAndPerCore(t *testing.T) {
+	// sysfs scaling_cur_freq is kHz; 2_800_000 kHz -> 2800 MHz.
+	m := freqFromKHz([]string{"2800000", "2400000", "bad", ""})
+	if m.Status != domain.StatusOK || m.Gauge != 2600 {
+		t.Fatalf("mean MHz wrong: %+v", m)
+	}
+	if len(m.PerCore) != 2 || m.PerCore[0] != 2800 {
+		t.Errorf("PerCore should be MHz per readable core, got %v", m.PerCore)
+	}
+}
+
+func TestFreqFromKHzDegradesWhenEmpty(t *testing.T) {
+	if m := freqFromKHz([]string{"0", "bad"}); m.Status != domain.StatusUnavailable {
+		t.Errorf("no readable clock should be Unavailable, got %+v", m)
+	}
+}
+
 func TestBuildFreqDegradesWhenNoClock(t *testing.T) {
 	// Apple Silicon: entries exist but report Mhz 0.
 	if m := buildFreq([]cpu.InfoStat{{Mhz: 0}}, nil); m.Status != domain.StatusUnavailable {
