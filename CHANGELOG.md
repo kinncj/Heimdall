@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-30
+
 ### Added
 - **Full-screen `top` view (Hliðskjálf)** — press `t` on a focused host for a
   mactop/btop-style single-host dashboard: per-core CPU bars, braille sparklines

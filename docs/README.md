@@ -30,6 +30,7 @@ Start here, then jump to the guide for what you want to do.
 | [Metrics Export (Mímir)](guides/09-metrics-export.md) | scrape Heimdall from Prometheus / Grafana |
 | [Alerting (Gjallarhorn)](guides/10-alerting.md) | fire threshold alerts to a webhook |
 | [`heimdall-cli` (programmatic & agents)](guides/11-hub-cli.md) | query the fleet from scripts, CI/CD, or an AI agent |
+| [Top View (Hliðskjálf)](guides/12-top-view.md) | watch one host mactop-style — per-core, power, GPU/NPU, processes |
 
 ## Reference
 

@@ -55,4 +55,6 @@ docs/architecture/NNNN-short-decision-title.md
 | [0018](0018-v2-persistent-socket-mediation.md) | v2: persistent socket mediation (daemon ⇄ hub ⇄ dashboard) | accepted | 2026-06-29 |
 | [0019](0019-v2-log-search-and-top-sorting.md) | v2: log search and top sorting in the detail modals | accepted | 2026-06-29 |
 
+| [0020](0020-hlidskjalf-top-view-and-npu-rename.md) | Hliðskjálf full-screen top view, NPU rename, and screen-aware TUI | accepted | 2026-06-30 |
+
 <!-- Add a row for each ADR as you create them -->
