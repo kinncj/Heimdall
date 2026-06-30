@@ -107,7 +107,7 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if ok && len(logSourcesOf(h)) > 0 {
 				m.modal, m.modalSel = modalLogList, 0
 			}
-		case "t":
+		case "p":
 			if ok && hasProc(h) {
 				m.modal, m.modalScroll = modalTop, 0
 			}
@@ -288,7 +288,7 @@ func (m Model) ModalView() string {
 		if !h.ProcessesAt.IsZero() {
 			when = h.ProcessesAt.Format("15:04:05")
 		}
-		title = heading.Style().Render("  TOP — "+dn) +
+		title = heading.Style().Render("  PROCESSES — "+dn) +
 			muted.Style().Render("   sort ") + val.Style().Render(m.activeTopSort().key) +
 			muted.Style().Render("   updated "+when)
 		body = m.topBody(h, w)

@@ -144,7 +144,7 @@ func (m Model) detailFooter(h domain.HostView) string {
 		footer += keys.Style().Render("l") + muted.Style().Render(" logs   ")
 	}
 	if hasProc(h) {
-		footer += keys.Style().Render("t") + muted.Style().Render(" top   ")
+		footer += keys.Style().Render("p") + muted.Style().Render(" proc   ")
 	}
 	if hasCmd(h) && m.runCmd != nil {
 		footer += keys.Style().Render("c") + muted.Style().Render(" cmd   ")
