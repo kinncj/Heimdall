@@ -79,3 +79,45 @@ func TestSparklineClampsToWidth(t *testing.T) {
 		t.Errorf("clamped sparkline = %q, want tail %q", got, want)
 	}
 }
+
+func TestBrailleSparklineRampAndBounds(t *testing.T) {
+	m := darkMode(t)
+	got := []rune(strip(BrailleSparkline(m, []float64{0, 50, 100}, 0)))
+	if len(got) != 3 {
+		t.Fatalf("braille len = %d, want 3 (%q)", len(got), string(got))
+	}
+	lo, hi := got[0], got[2]
+	// Lowest sample uses the lowest ramp glyph, highest uses the fullest.
+	if i := runeIndex(brailleRunes, lo); i != 0 {
+		t.Errorf("min sample glyph %q at ramp index %d, want 0", lo, i)
+	}
+	if i := runeIndex(brailleRunes, hi); i != len(brailleRunes)-1 {
+		t.Errorf("max sample glyph %q at ramp index %d, want top", hi, i)
+	}
+	// All glyphs must come from the braille ramp (display-width 1, NO_COLOR safe).
+	for _, r := range got {
+		if runeIndex(brailleRunes, r) < 0 {
+			t.Errorf("glyph %q is not in the braille ramp", r)
+		}
+	}
+}
+
+func TestBrailleSparklineEmptyAndClamp(t *testing.T) {
+	m := darkMode(t)
+	if got := BrailleSparkline(m, nil, 8); got != "" {
+		t.Errorf("empty history should render empty, got %q", got)
+	}
+	history := []float64{0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
+	if n := len([]rune(strip(BrailleSparkline(m, history, 4)))); n != 4 {
+		t.Errorf("clamped braille len = %d, want 4", n)
+	}
+}
+
+func runeIndex(rs []rune, r rune) int {
+	for i, x := range rs {
+		if x == r {
+			return i
+		}
+	}
+	return -1
+}
