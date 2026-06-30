@@ -22,32 +22,15 @@ import (
 func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	var out []domain.Metric
 	if runtime.GOOS == "darwin" {
-		if cpu, gpu, ane, gpuUtil, ok := ioReportPower(200); ok {
-			total := 0.0
-			if cpu > 0 {
-				out = append(out, powerMetric("power.cpu", cpu))
-				total += cpu
-			}
-			if gpu > 0 {
-				out = append(out, powerMetric("power.gpu", gpu))
-				total += gpu
-			}
-			if ane > 0 {
-				out = append(out, powerMetric("power.ane", ane))
-				total += ane
-			}
-			if total > 0 {
-				out = append(out, powerMetric("power.pkg", total))
-			}
-			if gpuUtil >= 0 {
-				out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: gpuUtil})
-			}
-		}
-		// powermetrics (root only) adds GPU utilisation and any power the energy
-		// counters did not expose; existing IOReport readings win.
+		cpu, gpu, ane, gpuUtil, ioOK := ioReportPower(200)
+		smcPkg, smcOK := smcSystemPower()
+		// powermetrics (root only) fills GPU utilisation and any power the energy
+		// counters did not expose.
+		var pm []domain.Metric
 		if text, err := runPowermetrics(ctx); err == nil {
-			out = mergeByName(out, parsePowermetrics(text))
+			pm = parsePowermetrics(text)
 		}
+		out = append(out, assembleApplePower(cpu, gpu, ane, gpuUtil, ioOK, smcPkg, smcOK, pm)...)
 	}
 	// Linux privileged sources (RAPL power, hwmon temps); no-op off Linux.
 	out = mergeByName(out, linuxPrivileged(ctx))
@@ -67,6 +50,64 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 
 func powerMetric(name string, w float64) domain.Metric {
 	return domain.Metric{Name: name, Unit: "watts", Status: domain.StatusOK, Gauge: w}
+}
+
+// assembleApplePower builds the macOS power/util metrics from the available
+// sources. Per-domain CPU/GPU/ANE power and GPU utilisation come from the
+// IOReport energy counters when present. Package power has a strict precedence:
+// SMC PSTR ("System Total Power") first, then powermetrics, then the IOReport
+// per-domain sum as a last resort. The ordering matters: on Apple Silicon
+// Pro/Max chips IOReport reports 0 for CPU/ANE and only a sub-watt GPU figure,
+// so the energy-sum is a phantom — it must never shadow a real SMC or
+// powermetrics reading. pm is the parsed powermetrics output (may be nil).
+func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float64, smcOK bool, pm []domain.Metric) []domain.Metric {
+	var out []domain.Metric
+	if ioOK {
+		if cpu > 0 {
+			out = append(out, powerMetric("power.cpu", cpu))
+		}
+		if gpu > 0 {
+			out = append(out, powerMetric("power.gpu", gpu))
+		}
+		if ane > 0 {
+			out = append(out, powerMetric("power.ane", ane))
+		}
+		if gpuUtil >= 0 {
+			out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: gpuUtil})
+		}
+	}
+	// SMC PSTR is the authoritative whole-system figure and needs no root.
+	if smcOK && smcPkg > 0 {
+		out = append(out, powerMetric("power.pkg", smcPkg))
+	}
+	// powermetrics fills any name not already set (package when SMC is absent,
+	// plus CPU/GPU/util gaps).
+	out = mergeByName(out, pm)
+	// Last resort: the IOReport per-domain sum, only when nothing better gave a
+	// package figure.
+	if !hasName(out, "power.pkg") {
+		sum := 0.0
+		if ioOK {
+			for _, w := range []float64{cpu, gpu, ane} {
+				if w > 0 {
+					sum += w
+				}
+			}
+		}
+		if sum > 0 {
+			out = append(out, powerMetric("power.pkg", sum))
+		}
+	}
+	return out
+}
+
+func hasName(ms []domain.Metric, name string) bool {
+	for _, m := range ms {
+		if m.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // mergeByName appends secondary metrics whose names are not already present.
