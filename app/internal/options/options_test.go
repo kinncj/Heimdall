@@ -119,6 +119,42 @@ func TestWizardAnswersWinAndUseCurrentAsDefault(t *testing.T) {
 	}
 }
 
+func TestWizardSuggestStoredWhenAccepted(t *testing.T) {
+	// Default is the headless fallback (0s/off); the wizard offers 2s. Pressing
+	// Enter must store the suggestion, not the fallback.
+	cat := NewCatalog(
+		Define("process-interval").Of(KindSpan).Default("0s").
+			Help("proc").Ask("Process interval?").Suggest("2s"),
+	)
+	current := NewResolver(cat).With(Builtins(cat)).Resolve()
+
+	prompter := NewPrompter(strings.NewReader("\n"), &strings.Builder{})
+	wiz := RunWizard(cat, current, prompter)
+	if v, ok := wiz.Value("process-interval"); !ok || v != "2s" {
+		t.Fatalf("accepting the prompt should store the 2s suggestion, got %q ok=%v", v, ok)
+	}
+	// And the runtime fallback stays 0s when no wizard runs.
+	if got := current.Raw("process-interval"); got != "0s" {
+		t.Fatalf("runtime fallback should be 0s, got %q", got)
+	}
+}
+
+func TestWizardSavedValueBeatsSuggestion(t *testing.T) {
+	cat := NewCatalog(
+		Define("process-interval").Of(KindSpan).Default("0s").
+			Help("proc").Ask("Process interval?").Suggest("2s"),
+	)
+	// A previously-saved 10s should be shown/kept on re-run, not overridden by 2s.
+	saved := mapSource{values: map[Key]string{"process-interval": "10s"}}
+	current := NewResolver(cat).With(Builtins(cat)).With(saved).Resolve()
+
+	prompter := NewPrompter(strings.NewReader("\n"), &strings.Builder{})
+	wiz := RunWizard(cat, current, prompter)
+	if v, _ := wiz.Value("process-interval"); v != "10s" {
+		t.Fatalf("saved value should win over the suggestion, got %q", v)
+	}
+}
+
 func TestLocateHonorsConfigDirOverride(t *testing.T) {
 	t.Setenv("HEIMDALL_CONFIG_DIR", "/tmp/heimdall-cfg")
 	p, err := Locate("daemon")

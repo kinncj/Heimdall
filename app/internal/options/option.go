@@ -36,6 +36,7 @@ type Option struct {
 	flagName string
 	envVar   string
 	fallback string
+	suggest  string
 	help     string
 	question string
 	kind     Kind
@@ -52,14 +53,22 @@ func (o Option) Help(text string) Option    { o.help = text; return o }
 func (o Option) Of(kind Kind) Option        { o.kind = kind; return o }
 func (o Option) Ask(question string) Option { o.question, o.askable = question, true; return o }
 
-func (o Option) Key() Key         { return o.key }
-func (o Option) FlagName() string { return o.flagName }
-func (o Option) EnvVar() string   { return o.envVar }
-func (o Option) Fallback() string { return o.fallback }
-func (o Option) Summary() string  { return o.help }
-func (o Option) Question() string { return o.question }
-func (o Option) Kind() Kind       { return o.kind }
-func (o Option) Askable() bool    { return o.askable }
+// Suggest sets a wizard-only default shown in the first-run prompt — distinct
+// from Default, which is the runtime fallback for flags/config/env. Use it when
+// the safe non-interactive baseline differs from what an interactive operator
+// most likely wants (e.g. process-interval defaults to 0s/off for a headless
+// service, but the wizard offers 2s so the top view works out of the box).
+func (o Option) Suggest(v string) Option { o.suggest = v; return o }
+
+func (o Option) Key() Key          { return o.key }
+func (o Option) FlagName() string  { return o.flagName }
+func (o Option) EnvVar() string    { return o.envVar }
+func (o Option) Fallback() string  { return o.fallback }
+func (o Option) Summary() string   { return o.help }
+func (o Option) Question() string  { return o.question }
+func (o Option) Kind() Kind        { return o.kind }
+func (o Option) Askable() bool     { return o.askable }
+func (o Option) Suggested() string { return o.suggest }
 
 // Catalog is an immutable, ordered set of options for one binary.
 type Catalog struct{ items []Option }

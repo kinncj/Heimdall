@@ -66,7 +66,15 @@ func RunWizard(catalog Catalog, current Resolved, prompter *Prompter) Wizard {
 		if !o.Askable() {
 			return
 		}
-		answers[o.Key()] = prompter.Ask(o.Question(), current.Raw(o.Key()))
+		// Show the resolved value as the default, except on a first run where it is
+		// still the runtime fallback and the option carries a wizard-only suggestion
+		// (e.g. process-interval: fallback 0s/off, but the wizard offers 2s). A value
+		// the operator already saved wins over the suggestion.
+		def := current.Raw(o.Key())
+		if s := o.Suggested(); s != "" && def == o.Fallback() {
+			def = s
+		}
+		answers[o.Key()] = prompter.Ask(o.Question(), def)
 	})
 	return Wizard{answers: answers}
 }
