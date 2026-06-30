@@ -39,6 +39,10 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	if text, err := runNvidiaSMI(ctx); err == nil {
 		out = mergeByName(out, parseNvidiaSMI(text))
 	}
+	// AMD: amd-smi when present (richer), then amdgpu sysfs fills any gaps. Both
+	// only add names not already set, so an NVIDIA or Apple reading is never
+	// shadowed, and a non-AMD host contributes nothing.
+	out = mergeByName(out, amdGPU(ctx))
 	if !hasOK(out) {
 		return []domain.Metric{
 			{Name: "power.pkg", Status: domain.StatusUnavailable, Detail: "no power source"},
@@ -153,7 +157,28 @@ func runNvidiaSMI(ctx context.Context) (string, error) {
 		return "", err
 	}
 	out, err := exec.CommandContext(ctx, path,
-		"--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw",
+		"--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,"+
+			"clocks.current.graphics,utilization.memory,fan.speed",
 		"--format=csv,noheader,nounits").Output()
+	return string(out), err
+}
+
+// amdGPU collects AMD GPU metrics, preferring amd-smi and falling back to amdgpu
+// sysfs for any name amd-smi did not provide (or when amd-smi is absent).
+func amdGPU(ctx context.Context) []domain.Metric {
+	var out []domain.Metric
+	if text, err := runAmdSMI(ctx); err == nil {
+		out = parseAmdSMICSV(text)
+	}
+	return mergeByName(out, amdGPUSysfs())
+}
+
+func runAmdSMI(ctx context.Context) (string, error) {
+	path, err := exec.LookPath("amd-smi")
+	if err != nil {
+		return "", err
+	}
+	out, err := exec.CommandContext(ctx, path, "metric",
+		"--usage", "--power", "--temperature", "--mem-usage", "--clock", "--csv").Output()
 	return string(out), err
 }

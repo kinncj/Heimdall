@@ -27,7 +27,7 @@ type Helper struct {
 func (Helper) Describe() domain.AdapterInfo {
 	return domain.AdapterInfo{
 		ID:                "privileged",
-		Metrics:           []string{"power.pkg", "power.cpu", "power.gpu", "power.npu", "gpu.util", "gpu.vram", "gpu.temp"},
+		Metrics:           []string{"power.pkg", "power.cpu", "power.gpu", "power.npu", "gpu.util", "gpu.vram", "gpu.temp", "gpu.clock", "gpu.mem.util", "gpu.fan", "npu.util"},
 		RequiresPrivilege: true,
 	}
 }

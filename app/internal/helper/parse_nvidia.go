@@ -13,11 +13,15 @@ import (
 
 // parseNvidiaSMI parses one CSV row produced by:
 //
-//	nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw \
-//	  --format=csv,noheader,nounits
+//	nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,\
+//	  clocks.current.graphics,utilization.memory,fan.speed --format=csv,noheader,nounits
 //
 // Fields, in order: utilization %, memory used (MiB), memory total (MiB),
-// temperature (C), power draw (W). VRAM is reported as a percentage of total.
+// temperature (C), power draw (W), graphics clock (MHz), memory-controller
+// utilisation %, fan speed %. VRAM is reported as a percentage of total. The
+// last three are newer and may read "[N/A]" / "[Not Supported]" on a given SoC
+// (e.g. fan on a passively cooled DGX) — those fields fail to parse and are
+// simply omitted, so a five-field row from an older query still works.
 func parseNvidiaSMI(text string) []domain.Metric {
 	line := firstNonEmptyLine(text)
 	if line == "" {
@@ -45,6 +49,15 @@ func parseNvidiaSMI(text string) []domain.Metric {
 	}
 	if v, ok := parseField(f, 4); ok {
 		out = append(out, domain.Metric{Name: "power.gpu", Unit: "watts", Status: domain.StatusOK, Gauge: v})
+	}
+	if v, ok := parseField(f, 5); ok {
+		out = append(out, domain.Metric{Name: "gpu.clock", Unit: "mhz", Status: domain.StatusOK, Gauge: v})
+	}
+	if v, ok := parseField(f, 6); ok {
+		out = append(out, domain.Metric{Name: "gpu.mem.util", Unit: "percent", Status: domain.StatusOK, Gauge: v})
+	}
+	if v, ok := parseField(f, 7); ok {
+		out = append(out, domain.Metric{Name: "gpu.fan", Unit: "percent", Status: domain.StatusOK, Gauge: v})
 	}
 	return out
 }

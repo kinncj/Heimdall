@@ -195,11 +195,15 @@ func (m Model) gpuPanel(t tier, w int) panelSpec {
 	vram := m.pctVal("gpu.vram")
 	vramDet := m.detailOr("gpu.vram", "")
 	temp := m.numVal("gpu.temp", "°C", "%.0f")
+	clk := m.numVal("gpu.clock", " MHz", "%.0f")
+	memU := m.pctVal("gpu.mem.util")
+	fan := m.pctVal("gpu.fan")
 	nUtil := m.pctVal("npu.util")
 
 	if t == tierNarrow {
 		return panelSpec{title: "GPU / NPU", lines: []string{
 			lab("gpu ") + gUtil + "  " + lab("vram ") + vram + "  " + lab("temp ") + temp,
+			lab("clk ") + clk + "  " + lab("mem ") + memU + "  " + lab("fan ") + fan,
 			lab("npu ") + nUtil + "  " + lab("(NPU)"),
 		}}
 	}
@@ -207,15 +211,18 @@ func (m Model) gpuPanel(t tier, w int) panelSpec {
 		return panelSpec{title: "GPU / NPU", lines: []string{
 			lab("gpu  ") + m.barVal("gpu.util", 10) + "   " + lab("temp ") + temp,
 			lab("vram ") + m.barVal("gpu.vram", 10),
+			lab("clk ") + clk + "  " + lab("mem ") + memU + "  " + lab("fan ") + fan,
 			lab("npu  ") + lab("util ") + nUtil,
 		}}
 	}
-	// WIDE: gauge bars for util and vram (no duplicated vram line), plus a util
-	// trend, so the panel reads at a glance and fills its height.
+	// WIDE: gauge bars for util and vram (no duplicated vram line), plus a clock /
+	// mem / fan line and a util trend, so the panel reads at a glance and fills
+	// its height.
 	muted, _ := m.mode.Role("text_muted")
 	return panelSpec{title: "GPU / NPU", lines: []string{
 		lab("gpu  ") + m.barVal("gpu.util", 12) + "   " + lab("temp ") + temp,
 		lab("vram ") + m.barVal("gpu.vram", 12) + "  " + muted.Style().Render(vramDet),
+		lab("clk  ") + clk + "   " + lab("mem ") + memU + "   " + lab("fan ") + fan,
 		lab("util ") + m.sparkW("gpu.util", w) + "  " + gUtil,
 		lab("npu  ") + lab("util ") + nUtil,
 	}}
