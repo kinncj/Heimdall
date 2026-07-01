@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-07-01
+
+### Fixed
+- **A slow privileged helper no longer blanks every power/GPU metric.** The
+  helper socket call and the in-process fallback shared the adapter's 1 s
+  deadline, so a slow helper — notably macOS `powermetrics`, which can take ~1 s
+  on an M-series Pro/Max — consumed the whole budget and the fallback never ran:
+  the privileged adapter timed out and reported power/GPU/VRAM/NPU as errored.
+  The helper call is now bounded to a slice of the deadline, leaving time for the
+  in-process read, so the helper stays additive under latency. Matters most on
+  Apple Silicon, where the daemon reads SMC/IOReport unprivileged and the helper
+  is optional — running it must never make things worse.
+
 ## [2.4.0] - 2026-07-01
 
 ### Added

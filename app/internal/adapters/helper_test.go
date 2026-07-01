@@ -7,6 +7,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/helper"
@@ -37,6 +38,44 @@ func TestHelperAdapterNeedsHelperWhenAbsent(t *testing.T) {
 		if got[name] != domain.StatusInsufficientPermission {
 			t.Errorf("%s status = %v, want insufficient_permission", name, got[name])
 		}
+	}
+}
+
+// blockingClient models a reachable but slow helper (e.g. macOS powermetrics):
+// it never answers, blocking until its context is cancelled.
+type blockingClient struct{}
+
+func (blockingClient) Collect(ctx context.Context) ([]domain.Metric, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+// A slow helper must not consume the whole adapter deadline and blank every
+// privileged metric — the adapter bounds the helper call and falls back to the
+// in-process reading with time to spare.
+func TestHelperAdapterFallsBackWhenHelperSlow(t *testing.T) {
+	a := Helper{
+		Client: blockingClient{},
+		Direct: func(context.Context) []domain.Metric {
+			return []domain.Metric{{Name: "power.total", Status: domain.StatusOK, Gauge: 42}}
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	ms, err := a.Collect(ctx)
+	if err != nil {
+		t.Fatalf("collect: %v", err)
+	}
+	if time.Since(start) >= 500*time.Millisecond {
+		t.Error("did not fall back before the adapter deadline (helper ate the budget)")
+	}
+	got := make(map[string]domain.Metric, len(ms))
+	for _, m := range ms {
+		got[m.Name] = m
+	}
+	if m := got["power.total"]; m.Status != domain.StatusOK || m.Gauge != 42 {
+		t.Fatalf("power.total = %+v, want the in-process 42W fallback", m)
 	}
 }
 

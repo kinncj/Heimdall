@@ -5,6 +5,7 @@ package adapters
 
 import (
 	"context"
+	"time"
 
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/helper"
@@ -51,7 +52,14 @@ func (h Helper) Collect(ctx context.Context) ([]domain.Metric, error) {
 	// read IOReport) must NOT shadow a working in-process source — otherwise
 	// running the helper on a Mac, where IOReport is unprivileged, blanks out the
 	// power/gpu the daemon was reading itself.
-	if ms, err := client.Collect(ctx); err == nil && anyOK(ms) {
+	//
+	// The helper call is bounded to a slice of the deadline so a *slow* helper
+	// (e.g. macOS powermetrics, which can take ~1s) can't consume the whole
+	// adapter budget and starve the in-process fallback below — the helper stays
+	// additive, never subtractive, even under latency.
+	hctx, cancel := helperCallContext(ctx)
+	defer cancel()
+	if ms, err := client.Collect(hctx); err == nil && anyOK(ms) {
 		return ms, nil
 	}
 	direct := h.Direct
@@ -65,6 +73,23 @@ func (h Helper) Collect(ctx context.Context) ([]domain.Metric, error) {
 		{Name: "power.cpu", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 		{Name: "gpu.util", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 	}, nil
+}
+
+// helperCallContext caps the helper socket call so it leaves budget for the
+// in-process fallback within the adapter deadline. Without a deadline it applies
+// a sane default; when the deadline is already near, the helper still gets a
+// token slice so a healthy helper isn't starved on a tight cycle.
+func helperCallContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	const reserve = 350 * time.Millisecond
+	dl, ok := ctx.Deadline()
+	if !ok {
+		return context.WithTimeout(ctx, 650*time.Millisecond)
+	}
+	remaining := time.Until(dl)
+	if remaining <= reserve {
+		return context.WithTimeout(ctx, remaining/2)
+	}
+	return context.WithTimeout(ctx, remaining-reserve)
 }
 
 func anyOK(ms []domain.Metric) bool {
