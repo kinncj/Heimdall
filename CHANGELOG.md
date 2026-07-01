@@ -7,6 +7,33 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.7] - 2026-06-30
+
+### Fixed
+- **Top view: the GB10 `gpu.vram` detail wrapped and broke the panel box.** The
+  `(shared)` detail was longer than a discrete card's, so lipgloss wrapped the
+  line and mangled the GPU panel. The detail is now clipped to the space left on
+  the line (never wraps) and shortened to `42/122 GB shared` (was
+  `42.6 / 121.6 GB (shared)`).
+- **`heimdall-cli` hid unavailable metrics.** It only emitted OK metrics as
+  `metrics` (name → value), so a metric that is deliberately Unavailable — Apple
+  `gpu.vram`, `npu.util`, anything needing the helper — vanished from CLI output
+  with no reason. A new `unavailable` object (name → `{status, detail}`) now
+  carries them. `metrics` is unchanged, so existing scripts keep working.
+
+### Added
+- **`npu.util` is Unavailable-with-reason everywhere, not a bare dash.** NPUs
+  (Apple ANE, Intel AI Boost, AMD XDNA) expose no utilisation counter; hosts
+  without an NPU source now report `npu.util` Unavailable with
+  `no NPU utilisation counter` (the AMD path keeps its own specific reason).
+
+### Build
+- `scripts/release.sh` now builds macOS with CGO (so IOReport/SMC power is
+  compiled in) and refuses to emit a CGO-free darwin binary when run off a Mac —
+  `make release` on a Mac is no longer a footgun. CI is unaffected.
+- The Makefile stamps `-X main.version` from `git describe`, so `make build-tui`
+  binaries report a real version instead of `dev`.
+
 ## [2.2.6] - 2026-06-30
 
 ### Added

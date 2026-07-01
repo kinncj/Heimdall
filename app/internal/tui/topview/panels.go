@@ -219,9 +219,13 @@ func (m Model) gpuPanel(t tier, w int) panelSpec {
 	// mem / fan line and a util trend, so the panel reads at a glance and fills
 	// its height.
 	muted, _ := m.mode.Role("text_muted")
+	// Clip the vram detail to the space left on its line so a long value (e.g. the
+	// GB10 "42/122 GB shared") can't wrap and break the panel box.
+	vbar := m.barVal("gpu.vram", 12)
+	vramDet = clip(vramDet, w-2-lipgloss.Width(lab("vram ")+vbar+"  "))
 	return panelSpec{title: "GPU / NPU", lines: []string{
 		lab("gpu  ") + m.barVal("gpu.util", 12) + "   " + lab("temp ") + temp,
-		lab("vram ") + m.barVal("gpu.vram", 12) + "  " + muted.Style().Render(vramDet),
+		lab("vram ") + vbar + "  " + muted.Style().Render(vramDet),
 		lab("clk  ") + clk + "   " + lab("mem ") + memU + "   " + lab("fan ") + fan,
 		lab("util ") + m.sparkW("gpu.util", w) + "  " + gUtil,
 		lab("npu  ") + lab("util ") + nUtil,

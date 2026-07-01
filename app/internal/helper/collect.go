@@ -65,6 +65,7 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	// only add names not already set, so an NVIDIA or Apple reading is never
 	// shadowed, and a non-AMD host contributes nothing.
 	out = mergeByName(out, amdGPU(ctx))
+	out = ensureNPUUtil(out)
 	if !hasOK(out) {
 		return []domain.Metric{
 			{Name: "power.pkg", Status: domain.StatusUnavailable, Detail: "no power source"},
@@ -72,6 +73,17 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 		}
 	}
 	return out
+}
+
+// ensureNPUUtil guarantees an npu.util reading. NPUs (Apple ANE, Intel AI Boost,
+// AMD XDNA) expose no utilisation counter, so if no source set it, report it
+// Unavailable-with-reason rather than leaving a bare dash. A reading already set
+// by a platform collector (e.g. the AMD path's own reason) is preserved.
+func ensureNPUUtil(ms []domain.Metric) []domain.Metric {
+	if hasName(ms, "npu.util") {
+		return ms
+	}
+	return append(ms, domain.Metric{Name: "npu.util", Status: domain.StatusUnavailable, Detail: "no NPU utilisation counter"})
 }
 
 func powerMetric(name string, w float64) domain.Metric {

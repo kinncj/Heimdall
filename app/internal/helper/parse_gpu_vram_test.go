@@ -25,8 +25,8 @@ func TestNvidiaVRAMFromComputeApps(t *testing.T) {
 	if m.Gauge < 34 || m.Gauge > 35 {
 		t.Errorf("gpu.vram = %.2f%%, want ~34%%", m.Gauge)
 	}
-	if m.Detail != "41.6 / 121.6 GB (shared)" {
-		t.Errorf("detail = %q, want \"41.6 / 121.6 GB (shared)\"", m.Detail)
+	if m.Detail != "42/122 GB shared" {
+		t.Errorf("detail = %q, want \"42/122 GB shared\"", m.Detail)
 	}
 }
 
@@ -66,6 +66,20 @@ func TestNvidiaErrorMetrics_SurfacesReason(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(m.Detail), "driver/library version mismatch") {
 		t.Fatalf("detail = %q, want the nvidia-smi reason", m.Detail)
+	}
+}
+
+// NPUs (Apple ANE, Intel AI Boost, AMD XDNA) expose no utilisation counter — so
+// npu.util must be reported Unavailable-with-reason, not left as a bare dash. An
+// existing reading (e.g. the AMD path's own reason) must be preserved.
+func TestEnsureNPUUtil(t *testing.T) {
+	got := byName(ensureNPUUtil(nil))
+	if m := got["npu.util"]; m.Status != domain.StatusUnavailable || m.Detail == "" {
+		t.Fatalf("npu.util = %+v, want unavailable with a reason", m)
+	}
+	amd := []domain.Metric{{Name: "npu.util", Status: domain.StatusUnavailable, Detail: "amdxdna exposes no util counter"}}
+	if d := byName(ensureNPUUtil(amd))["npu.util"].Detail; d != "amdxdna exposes no util counter" {
+		t.Errorf("existing npu.util reason must be preserved, got %q", d)
 	}
 }
 

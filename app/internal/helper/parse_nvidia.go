@@ -92,7 +92,7 @@ func nvidiaVRAMFromComputeApps(text string, totalMiB float64) (domain.Metric, bo
 	return domain.Metric{
 		Name: "gpu.vram", Unit: "percent", Status: domain.StatusOK,
 		Gauge:  usedMiB / totalMiB * 100,
-		Detail: fmt.Sprintf("%.1f / %.1f GB (shared)", usedMiB/1024, totalMiB/1024),
+		Detail: fmt.Sprintf("%.0f/%.0f GB shared", usedMiB/1024, totalMiB/1024),
 	}, true
 }
 

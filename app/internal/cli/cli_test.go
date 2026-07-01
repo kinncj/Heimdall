@@ -44,6 +44,30 @@ func TestCLIHostShapeStripsReservedLabels(t *testing.T) {
 	}
 }
 
+func TestCLISurfacesUnavailableMetrics(t *testing.T) {
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	now := time.Unix(1_700_000_000, 0)
+	reg.Enroll(domain.Host{ID: "mac-01", DisplayName: "mac-01"}, now)
+	reg.Observe("mac-01", []domain.Metric{
+		{Name: "gpu.util", Status: domain.StatusOK, Gauge: 18},
+		{Name: "gpu.vram", Status: domain.StatusUnavailable, Detail: "unified memory (no discrete VRAM)"},
+	}, nil, now)
+	reg.Evaluate(now)
+	h, _ := reg.Host("mac-01")
+	j := newJHost(h)
+
+	if _, ok := j.Metrics["gpu.vram"]; ok {
+		t.Error("an unavailable metric must not leak into .metrics")
+	}
+	if j.Metrics["gpu.util"] != 18 {
+		t.Errorf("ok metric still expected in .metrics: %+v", j.Metrics)
+	}
+	u, ok := j.Unavailable["gpu.vram"]
+	if !ok || u.Status != "unavailable" || u.Detail != "unified memory (no discrete VRAM)" {
+		t.Fatalf("gpu.vram unavailable entry = %+v (present=%v)", u, ok)
+	}
+}
+
 func TestCLITopAndLogs(t *testing.T) {
 	h, _ := cliSeed(t).Host("web-01")
 	top := newJTop(h)

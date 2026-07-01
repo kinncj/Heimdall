@@ -367,15 +367,25 @@ func cliEmit(v any) error {
 // ---- JSON shapes (snake_case, stable for agent consumption) ----------------
 
 type jHost struct {
-	ID           string             `json:"id"`
-	State        string             `json:"state"`
-	LastSeenUnix int64              `json:"last_seen_unix"`
-	Labels       map[string]string  `json:"labels,omitempty"`
-	Metrics      map[string]float64 `json:"metrics,omitempty"`
-	Alerts       []string           `json:"alerts,omitempty"`
-	HasLogs      bool               `json:"has_logs"`
-	HasProcesses bool               `json:"has_processes"`
-	LogSources   []string           `json:"log_sources,omitempty"`
+	ID           string                   `json:"id"`
+	State        string                   `json:"state"`
+	LastSeenUnix int64                    `json:"last_seen_unix"`
+	Labels       map[string]string        `json:"labels,omitempty"`
+	Metrics      map[string]float64       `json:"metrics,omitempty"`
+	Unavailable  map[string]jMetricStatus `json:"unavailable,omitempty"`
+	Alerts       []string                 `json:"alerts,omitempty"`
+	HasLogs      bool                     `json:"has_logs"`
+	HasProcesses bool                     `json:"has_processes"`
+	LogSources   []string                 `json:"log_sources,omitempty"`
+}
+
+// jMetricStatus explains a non-OK metric — why a value is missing (e.g. Apple
+// gpu.vram "unified memory (no discrete VRAM)", npu.util "no NPU counter", or a
+// metric that needs the privileged helper). OK metrics stay in Metrics as bare
+// values; this keeps that map backward-compatible for existing scripts.
+type jMetricStatus struct {
+	Status string `json:"status"`
+	Detail string `json:"detail,omitempty"`
 }
 
 type jProc struct {
@@ -431,10 +441,16 @@ func userLabels(labels map[string]string) map[string]string {
 
 func newJHost(h domain.HostView) jHost {
 	metrics := map[string]float64{}
+	var unavailable map[string]jMetricStatus
 	for _, m := range h.LastSnapshot {
 		if m.Status == domain.StatusOK {
 			metrics[m.Name] = m.Gauge
+			continue
 		}
+		if unavailable == nil {
+			unavailable = map[string]jMetricStatus{}
+		}
+		unavailable[m.Name] = jMetricStatus{Status: m.Status.String(), Detail: m.Detail}
 	}
 	var sources []string
 	if v := h.Host.Context.Labels["_logs"]; v != "" {
@@ -446,6 +462,7 @@ func newJHost(h domain.HostView) jHost {
 		LastSeenUnix: h.LastSeen.Unix(),
 		Labels:       userLabels(h.Host.Context.Labels),
 		Metrics:      metrics,
+		Unavailable:  unavailable,
 		Alerts:       h.Alerts,
 		HasLogs:      len(sources) > 0,
 		HasProcesses: h.Host.Context.Labels["_proc"] != "" || len(h.Processes) > 0,
