@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.5] - 2026-06-30
+
 ### Added
 - **GPU VRAM on unified-memory NVIDIA (GB10 Grace-Blackwell).** `nvidia-smi`
   reports `memory.used`/`memory.total` as `[N/A]` on GB10 because there is no

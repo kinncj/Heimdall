@@ -50,6 +50,14 @@ IOReport (and SMC) are reached through cgo. The local `make build-tui` enables
 CGO-free cross-compiled binaries fall back to `powermetrics` (which needs sudo).
 If you want unprivileged GPU/power, **build on the Mac**.
 
+## GPU VRAM
+
+Apple Silicon is unified memory — the GPU has no discrete VRAM to report. Since
+v2.2.5 `gpu.vram` reads `unavailable` with the detail `unified memory (no
+discrete VRAM)`, so the panel explains the dash instead of silently omitting the
+metric. GPU **utilisation** (`gpu.util`) and **power** (`power.gpu`) are still
+reported from IOReport as above.
+
 ## NPU (ANE)
 
 Accelerator power is the vendor-neutral `power.npu` (Apple's ANE). The legacy

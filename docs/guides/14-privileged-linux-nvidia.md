@@ -32,6 +32,39 @@ nvidia-smi -L                                  # confirm the driver sees the GPU
 `gpu.vram` is reported as a percentage of total, with the absolute `used / total
 GB` in the detail view.
 
+### Unified memory (GB10 Grace-Blackwell)
+
+On a GB10 the GPU shares the system LPDDR5X pool — there is no discrete VRAM, so
+`nvidia-smi` reports `memory.used`/`memory.total` as `[N/A]` and the aggregate
+counter is empty. Heimdall falls back to per-process GPU memory over system RAM:
+
+```sh
+nvidia-smi --query-compute-apps=used_memory --format=csv,noheader,nounits
+# sum of these ÷ total system RAM → gpu.vram, e.g. "41.6 / 121.6 GB (shared)"
+```
+
+The detail is tagged `(shared)` to mark it as the unified pool. An idle GPU (no
+resident contexts) reads a stable `0%` rather than dropping the metric. Discrete
+NVIDIA cards keep using the aggregate counter unchanged.
+
+## Troubleshooting — GPU metrics missing
+
+If `gpu.*` is blank but `power.pkg` still reads, run the query by hand:
+
+```sh
+nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits
+```
+
+- **`Failed to initialize NVML: Driver/library version mismatch`** — the driver
+  package was upgraded but the running kernel module is still the old version.
+  **Reboot the host** (or reload the modules). Confirm with
+  `cat /proc/driver/nvidia/version` vs `nvidia-smi --version`; a pending
+  `/var/run/reboot-required` is the tell. Since v2.2.5 the daemon surfaces this
+  as `gpu.util` / `gpu.vram` `unavailable` with the `nvidia-smi` reason in the
+  detail, instead of a silent blank.
+- **`command not found`** — the NVIDIA driver/utilities are not installed, or
+  not on the daemon's `PATH`.
+
 ## CPU package power & temperature (helper)
 
 NVIDIA covers the GPU; **CPU** package power and package temperature still come
