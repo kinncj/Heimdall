@@ -83,6 +83,18 @@ func TestAmdDoesNotShadowExistingSource(t *testing.T) {
 	}
 }
 
+func TestPWMToFanPercent(t *testing.T) {
+	if p, ok := pwmToFanPercent(255); !ok || p != 100 {
+		t.Errorf("pwm 255 -> %v %v, want 100%%", p, ok)
+	}
+	if p, ok := pwmToFanPercent(0); !ok || p != 0 {
+		t.Errorf("pwm 0 -> %v %v, want 0%%", p, ok)
+	}
+	if _, ok := pwmToFanPercent(300); ok {
+		t.Error("out-of-range pwm should be no reading")
+	}
+}
+
 func TestParseMicrowatts(t *testing.T) {
 	if w, ok := parseMicrowatts(" 15000000\n"); !ok || w != 15 {
 		t.Errorf("parseMicrowatts(15000000) = %v %v, want 15W", w, ok)

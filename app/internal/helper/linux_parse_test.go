@@ -23,6 +23,21 @@ func TestRaplWatts(t *testing.T) {
 	}
 }
 
+func TestNPUUtilFromDelta(t *testing.T) {
+	// 100ms of busy time over a 200ms window = 50%.
+	if u, ok := npuUtilFromDelta(0, 100_000, 200*time.Millisecond); !ok || u != 50 {
+		t.Errorf("npuUtilFromDelta = %v %v, want 50%%", u, ok)
+	}
+	// More busy time than the window clamps at 100%.
+	if u, ok := npuUtilFromDelta(0, 500_000, 200*time.Millisecond); !ok || u != 100 {
+		t.Errorf("saturated = %v %v, want 100%%", u, ok)
+	}
+	// A counter reset (cur < prev) is no reading, not a negative util.
+	if _, ok := npuUtilFromDelta(100, 50, time.Second); ok {
+		t.Error("counter reset should yield no reading")
+	}
+}
+
 func TestParseMicrojoulesAndMilliCelsius(t *testing.T) {
 	if v, err := parseMicrojoules("  12345\n"); err != nil || v != 12345 {
 		t.Errorf("parseMicrojoules = %v, %v; want 12345", v, err)

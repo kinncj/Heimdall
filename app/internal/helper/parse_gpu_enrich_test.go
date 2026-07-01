@@ -49,6 +49,33 @@ func TestParseNvidiaSMI_OldFiveFieldRowStillWorks(t *testing.T) {
 	}
 }
 
+// A multi-GPU host emits one nvidia-smi row per card; the metrics aggregate:
+// power is summed (for a correct power.total), util/clock averaged, temp/fan the
+// hottest, and VRAM the pooled used/total.
+func TestParseNvidiaSMI_MultiGPUAggregates(t *testing.T) {
+	text := "40, 2048, 8192, 60, 100, 1400, 50, 30\n" +
+		"60, 4096, 8192, 70, 150, 1500, 70, 40\n"
+	got := byName(parseNvidiaSMI(text))
+	if m := got["power.gpu"]; m.Status != domain.StatusOK || m.Gauge != 250 {
+		t.Errorf("power.gpu = %+v, want 250 (sum of 100+150)", m)
+	}
+	if m := got["gpu.util"]; m.Gauge != 50 {
+		t.Errorf("gpu.util = %+v, want 50 (mean of 40,60)", m)
+	}
+	if m := got["gpu.temp"]; m.Gauge != 70 {
+		t.Errorf("gpu.temp = %+v, want 70 (hottest)", m)
+	}
+	if m := got["gpu.fan"]; m.Gauge != 40 {
+		t.Errorf("gpu.fan = %+v, want 40 (max)", m)
+	}
+	if m := got["gpu.vram"]; m.Gauge != 37.5 { // (2048+4096)/(8192+8192)*100
+		t.Errorf("gpu.vram = %+v, want 37.5%% (pooled)", m)
+	}
+	if m := got["gpu.vram"]; m.Detail != "6.0 / 16.0 GB (2 GPUs)" {
+		t.Errorf("gpu.vram detail = %q, want \"6.0 / 16.0 GB (2 GPUs)\"", m.Detail)
+	}
+}
+
 func TestParseAmdSMICSV_ClockAndMemUtil(t *testing.T) {
 	text := "gpu,gfx_activity,socket_power,edge_temperature,used_vram,total_vram,gfx_clk,umc_activity\n" +
 		"0,37,55.0,48,4096,16384,2100,61\n"

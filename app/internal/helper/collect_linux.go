@@ -31,7 +31,37 @@ func linuxPrivileged(ctx context.Context) []domain.Metric {
 	if c, ok := hwmonPackageTemp(); ok {
 		out = append(out, domain.Metric{Name: "temp.pkg", Unit: "celsius", Status: domain.StatusOK, Gauge: c})
 	}
+	if u, ok := intelNPUUtil(ctx); ok {
+		out = append(out, domain.Metric{Name: "npu.util", Unit: "percent", Status: domain.StatusOK, Gauge: u, Detail: "Intel NPU"})
+	}
 	return out
+}
+
+// intelNPUUtil reports Intel NPU (intel_vpu) utilisation by sampling the driver's
+// cumulative busy-time counter (`npu_busy_time_us`) twice. Absent on hosts with no
+// Intel NPU, or an accel device that doesn't expose that counter (e.g. AMD XDNA,
+// which publishes only generic PCI attributes). Idle reads a legitimate 0%.
+func intelNPUUtil(ctx context.Context) (float64, bool) {
+	matches, _ := filepath.Glob("/sys/class/accel/accel*/device/npu_busy_time_us")
+	if len(matches) == 0 {
+		return 0, false
+	}
+	path := matches[0]
+	b0, err := readMicrojoules(path) // reused as a generic uint64 counter reader
+	if err != nil {
+		return 0, false
+	}
+	const window = 200 * time.Millisecond
+	select {
+	case <-time.After(window):
+	case <-ctx.Done():
+		return 0, false
+	}
+	b1, err := readMicrojoules(path)
+	if err != nil {
+		return 0, false
+	}
+	return npuUtilFromDelta(b0, b1, window)
 }
 
 // raplDomainDirs returns the RAPL domain directories, preferring the intel-rapl

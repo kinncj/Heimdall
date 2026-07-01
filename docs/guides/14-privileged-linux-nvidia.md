@@ -98,5 +98,18 @@ layout in
 
 ## Multi-GPU
 
-`nvidia-smi` returns one row per GPU; the daemon currently reads the first row.
-Multi-GPU per-device breakout is not wired yet.
+`nvidia-smi` returns one row per GPU and the daemon reads them all, aggregating
+into the single `gpu.*` set: `power.gpu` **sums** across cards (so `power.total`
+reflects the whole box), `gpu.util` / `gpu.clock` / `gpu.mem.util` average,
+`gpu.temp` and `gpu.fan` report the hottest card, and `gpu.vram` pools used/total
+with a `(N GPUs)` note in the detail. Per-device breakout (separate rows per GPU)
+is not wired yet — the aggregate is the fleet-level view.
+
+## Intel NPU
+
+On hosts with an Intel NPU (the `intel_vpu` driver — Core Ultra / Arrow Lake and
+later), `npu.util` is a real reading, sampled from the driver's cumulative
+`/sys/class/accel/accel*/device/npu_busy_time_us` counter (unprivileged; idle
+reads 0%). AMD XDNA (`amdxdna`) and Apple's ANE expose no utilisation counter, so
+`npu.util` stays `unavailable` there. No vendor exposes an NPU **power** counter,
+so `power.npu` is `unavailable` unless the SoC surfaces it (Apple ANE).

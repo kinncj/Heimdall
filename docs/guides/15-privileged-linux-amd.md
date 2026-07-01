@@ -40,9 +40,12 @@ installing `amd-smi` only adds richness and cross-version stability.
    | `…/device/mem_info_vram_used` + `…_total` | `gpu.vram` |
    | `…/device/hwmon/hwmon*/power1_average` (µW) | `power.gpu` |
    | `…/device/hwmon/hwmon*/temp1_input` (m°C) | `gpu.temp` |
+   | `…/device/hwmon/hwmon*/freq1_input` (Hz) | `gpu.clock` |
+   | `…/device/hwmon/hwmon*/pwm1` (0–255 duty) | `gpu.fan` (as a percent) |
 
    The daemon picks the first DRM card whose `device/uevent` says
-   `DRIVER=amdgpu`.
+   `DRIVER=amdgpu`. `gpu.fan` is absent on APUs with no dedicated GPU fan (shared
+   cooling) — it shows up on discrete Radeon cards that expose `pwm1`.
 
 ## Install `amd-smi`
 

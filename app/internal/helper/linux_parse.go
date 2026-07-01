@@ -25,6 +25,21 @@ func raplWatts(prev, cur uint64, dt time.Duration) float64 {
 	return joules / dt.Seconds()
 }
 
+// npuUtilFromDelta converts two cumulative NPU busy-time readings in microseconds
+// (the intel_vpu `npu_busy_time_us` counter) into a utilisation percentage over
+// the sampling window. A counter reset (cur < prev) or non-positive window yields
+// no reading; a saturated counter clamps at 100%.
+func npuUtilFromDelta(prev, cur uint64, dt time.Duration) (float64, bool) {
+	if dt <= 0 || cur < prev {
+		return 0, false
+	}
+	util := float64(cur-prev) / float64(dt.Microseconds()) * 100
+	if util > 100 {
+		util = 100
+	}
+	return util, true
+}
+
 // parseMilliCelsius parses a hwmon tempN_input value (thousandths of a degree)
 // into degrees Celsius.
 func parseMilliCelsius(s string) (float64, error) {

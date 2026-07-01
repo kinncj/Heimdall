@@ -7,6 +7,24 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-07-01
+
+### Added
+- **Multi-GPU NVIDIA hosts aggregate across cards.** `nvidia-smi` emits one row
+  per GPU; the collector now reads them all — `power.gpu` **sums** (so
+  `power.total` is right), `gpu.util`/`gpu.clock`/`gpu.mem.util` average,
+  `gpu.temp`/`gpu.fan` take the hottest, and `gpu.vram` pools used/total with a
+  `(N GPUs)` note. Single-GPU hosts are unchanged.
+- **Intel NPU utilisation.** On Intel NPUs (the `intel_vpu` driver, e.g. Core
+  Ultra / Arrow Lake) `npu.util` is now a real reading, derived from the driver's
+  cumulative `npu_busy_time_us` counter (idle reads a legitimate 0%). AMD XDNA and
+  Apple ANE still expose no counter and stay Unavailable-with-reason.
+- **AMD `gpu.fan` from amdgpu sysfs.** Read the `pwm1` duty cycle (0–255) from the
+  amdgpu hwmon and report it as a fan-speed percentage, so a discrete Radeon shows
+  fan speed without `amd-smi`. Absent on APUs with no dedicated GPU fan.
+- **`power.npu` explains its dash** — reported Unavailable-with-reason
+  (`no NPU power counter`) where no source exists, mirroring `npu.util`.
+
 ## [2.3.2] - 2026-07-01
 
 ### Changed

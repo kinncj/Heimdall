@@ -20,6 +20,15 @@ import (
 // by token rather than by a fixed position. Anything we cannot map is ignored,
 // and a missing column simply yields no metric — the caller fills the gap from
 // amdgpu sysfs. Only the first GPU row is read (index 0).
+// pwmToFanPercent converts an amdgpu hwmon `pwm1` duty value (0–255) to a fan
+// speed percentage. Out-of-range input is treated as no reading.
+func pwmToFanPercent(pwm float64) (float64, bool) {
+	if pwm < 0 || pwm > 255 {
+		return 0, false
+	}
+	return pwm / 255 * 100, true
+}
+
 func parseAmdSMICSV(text string) []domain.Metric {
 	lines := nonEmptyLines(text)
 	if len(lines) < 2 {

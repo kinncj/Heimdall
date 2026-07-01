@@ -63,6 +63,13 @@ func amdGPUSysfs() []domain.Metric {
 				out = append(out, domain.Metric{Name: "gpu.clock", Unit: "mhz", Status: domain.StatusOK, Gauge: mhz})
 			}
 		}
+		// pwm1 is the fan duty cycle (0–255); report it as a percentage. Absent on
+		// APUs with no dedicated GPU fan (shared cooling).
+		if v, ok := readSysfsFloat(filepath.Join(hwmon, "pwm1")); ok {
+			if pct, ok := pwmToFanPercent(v); ok {
+				out = append(out, domain.Metric{Name: "gpu.fan", Unit: "percent", Status: domain.StatusOK, Gauge: pct})
+			}
+		}
 	}
 
 	// Best-effort NPU: no stable amdxdna util counter — advertise as Unavailable.

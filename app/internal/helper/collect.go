@@ -67,6 +67,7 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	out = mergeByName(out, amdGPU(ctx))
 	out = withTotalPower(out)
 	out = ensureNPUUtil(out)
+	out = ensureNPUPower(out)
 	if !hasOK(out) {
 		return []domain.Metric{
 			{Name: "power.cpu", Status: domain.StatusUnavailable, Detail: "no power source"},
@@ -114,6 +115,17 @@ func ensureNPUUtil(ms []domain.Metric) []domain.Metric {
 		return ms
 	}
 	return append(ms, domain.Metric{Name: "npu.util", Status: domain.StatusUnavailable, Detail: "no NPU utilisation counter"})
+}
+
+// ensureNPUPower mirrors ensureNPUUtil for the power rail: no vendor exposes an
+// NPU power counter to userspace (Apple ANE reads 0 on Pro/Max; Intel/AMD expose
+// none), so if nothing set power.npu, report it Unavailable-with-reason rather
+// than leaving a silent blank.
+func ensureNPUPower(ms []domain.Metric) []domain.Metric {
+	if hasName(ms, "power.npu") {
+		return ms
+	}
+	return append(ms, domain.Metric{Name: "power.npu", Status: domain.StatusUnavailable, Detail: "no NPU power counter"})
 }
 
 func powerMetric(name string, w float64) domain.Metric {

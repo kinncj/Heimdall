@@ -75,4 +75,4 @@ rather than failing. See [Privileged Metrics](guides/04-privileged-metrics.md).
 | `power.cpu` | W | CPU power — RAPL package (Linux), IOReport CPU (macOS), Scaphandre (Windows, when running); Unavailable-with-reason where no source exists (Apple Pro/Max, Windows without Scaphandre, GB10) |
 | `power.gpu` | W | GPU power |
 | `power.npu` | W | NPU / accelerator power (Apple Silicon ANE today). The legacy `power.ane` key is accepted and normalised to `power.npu` on ingest. |
-| `npu.util` | percent | NPU utilisation (where the platform exposes it; otherwise unavailable) |
+| `npu.util` | percent | NPU utilisation — real on Intel NPUs (`intel_vpu`); Unavailable-with-reason on AMD XDNA and Apple ANE, which expose no counter |

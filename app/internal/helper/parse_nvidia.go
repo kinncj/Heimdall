@@ -23,41 +23,85 @@ import (
 // (e.g. fan on a passively cooled DGX) — those fields fail to parse and are
 // simply omitted, so a five-field row from an older query still works.
 func parseNvidiaSMI(text string) []domain.Metric {
-	line := firstNonEmptyLine(text)
-	if line == "" {
+	var rows [][]string
+	for _, ln := range strings.Split(text, "\n") {
+		ln = strings.TrimSpace(ln)
+		if ln == "" {
+			continue
+		}
+		f := strings.Split(ln, ",")
+		for i := range f {
+			f[i] = strings.TrimSpace(f[i])
+		}
+		rows = append(rows, f)
+	}
+	if len(rows) == 0 {
 		return nil
 	}
-	f := strings.Split(line, ",")
-	for i := range f {
-		f[i] = strings.TrimSpace(f[i])
+
+	// Aggregate across every GPU (one row each): power sums so power.total is
+	// right, util/clock/mem-util average, temp/fan take the hottest, and VRAM is
+	// the pooled used/total. A single-GPU host is just the one-row case.
+	var utilSum, utilN, usedSum, totalSum, clkSum, clkN, memSum, memN float64
+	var powerSum float64
+	var tempMax, fanMax float64
+	var powerOK, tempOK, fanOK bool
+	for _, f := range rows {
+		if v, ok := parseField(f, 0); ok {
+			utilSum, utilN = utilSum+v, utilN+1
+		}
+		used, uok := parseField(f, 1)
+		total, tok := parseField(f, 2)
+		if uok && tok && total > 0 {
+			usedSum, totalSum = usedSum+used, totalSum+total
+		}
+		if v, ok := parseField(f, 3); ok && (!tempOK || v > tempMax) {
+			tempMax, tempOK = v, true
+		}
+		if v, ok := parseField(f, 4); ok {
+			powerSum, powerOK = powerSum+v, true
+		}
+		if v, ok := parseField(f, 5); ok {
+			clkSum, clkN = clkSum+v, clkN+1
+		}
+		if v, ok := parseField(f, 6); ok {
+			memSum, memN = memSum+v, memN+1
+		}
+		if v, ok := parseField(f, 7); ok && (!fanOK || v > fanMax) {
+			fanMax, fanOK = v, true
+		}
 	}
+
+	suffix := ""
+	if len(rows) > 1 {
+		suffix = fmt.Sprintf(" (%d GPUs)", len(rows))
+	}
+
 	var out []domain.Metric
-	if v, ok := parseField(f, 0); ok {
-		out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: v})
+	if utilN > 0 {
+		out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: utilSum / utilN})
 	}
-	used, uok := parseField(f, 1)
-	total, tok := parseField(f, 2)
-	if uok && tok && total > 0 {
+	if totalSum > 0 {
 		out = append(out, domain.Metric{
 			Name: "gpu.vram", Unit: "percent", Status: domain.StatusOK,
-			Gauge:  used / total * 100,
-			Detail: fmt.Sprintf("%.1f / %.1f GB", used/1024, total/1024),
+			Gauge:  usedSum / totalSum * 100,
+			Detail: fmt.Sprintf("%.1f / %.1f GB%s", usedSum/1024, totalSum/1024, suffix),
 		})
 	}
-	if v, ok := parseField(f, 3); ok {
-		out = append(out, domain.Metric{Name: "gpu.temp", Unit: "celsius", Status: domain.StatusOK, Gauge: v})
+	if tempOK {
+		out = append(out, domain.Metric{Name: "gpu.temp", Unit: "celsius", Status: domain.StatusOK, Gauge: tempMax})
 	}
-	if v, ok := parseField(f, 4); ok {
-		out = append(out, domain.Metric{Name: "power.gpu", Unit: "watts", Status: domain.StatusOK, Gauge: v})
+	if powerOK {
+		out = append(out, domain.Metric{Name: "power.gpu", Unit: "watts", Status: domain.StatusOK, Gauge: powerSum})
 	}
-	if v, ok := parseField(f, 5); ok {
-		out = append(out, domain.Metric{Name: "gpu.clock", Unit: "mhz", Status: domain.StatusOK, Gauge: v})
+	if clkN > 0 {
+		out = append(out, domain.Metric{Name: "gpu.clock", Unit: "mhz", Status: domain.StatusOK, Gauge: clkSum / clkN})
 	}
-	if v, ok := parseField(f, 6); ok {
-		out = append(out, domain.Metric{Name: "gpu.mem.util", Unit: "percent", Status: domain.StatusOK, Gauge: v})
+	if memN > 0 {
+		out = append(out, domain.Metric{Name: "gpu.mem.util", Unit: "percent", Status: domain.StatusOK, Gauge: memSum / memN})
 	}
-	if v, ok := parseField(f, 7); ok {
-		out = append(out, domain.Metric{Name: "gpu.fan", Unit: "percent", Status: domain.StatusOK, Gauge: v})
+	if fanOK {
+		out = append(out, domain.Metric{Name: "gpu.fan", Unit: "percent", Status: domain.StatusOK, Gauge: fanMax})
 	}
 	return out
 }
