@@ -10,7 +10,7 @@ Windows specifics.
 |---|---|---|
 | `temp.pkg` | **WMI** `MSAcpi_ThermalZoneTemperature` via PowerShell | sometimes |
 | `gpu.util`, `gpu.vram`, `gpu.temp`, `power.gpu` (NVIDIA) | `nvidia-smi` | no |
-| `power.cpu` | — (RAPL is inaccessible without a kernel driver) | — |
+| `power.cpu` | **Scaphandre** (its driver reads RAPL; scraped over HTTP) | no |
 
 CPU/memory/disk/network/uptime are always available unprivileged, as on every
 platform. The Windows-specific privileged path adds **package temperature** from
@@ -86,6 +86,26 @@ restart `heimdall-daemon` once Scaphandre is up.
 
 When Scaphandre isn't reachable, `power.cpu` reads `unavailable` with
 `no RAPL on Windows — run Scaphandre for CPU power` rather than failing.
+
+## Run the daemon as a service
+
+The daemon is a console program, not a native Windows service, so registering it
+directly with `sc.exe` trips the Service Control Manager (error 1053). Use the
+built-in **Task Scheduler** to run it at boot instead — no third-party wrapper.
+In an **Administrator** PowerShell, substituting your own binary path, hub
+address, and `--name`:
+
+```powershell
+schtasks /create /tn "Heimdall Daemon" `
+  /tr "C:\Heimdall\heimdall-daemon.exe --hub HUB_HOST:9090 --name %COMPUTERNAME% --process-interval 5s" `
+  /sc onstart /ru SYSTEM /rl HIGHEST /f
+schtasks /run /tn "Heimdall Daemon"
+```
+
+`%COMPUTERNAME%` fills in the host name automatically. Running as `SYSTEM` is
+enough — the daemon's Windows sources (`nvidia-smi`, WMI temperature, and the
+Scaphandre scrape) are all unprivileged, so **no `heimdall-helper` is needed on
+Windows**. Add `--log-file C:\Heimdall\daemon.log` if you want a log to tail.
 
 ## How the helper works on Windows
 

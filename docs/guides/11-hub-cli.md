@@ -322,17 +322,17 @@ $ claude -p "check my fleet"
 >
 > | Host | State | CPU | Mem | Disk | GPU | Temp |
 > |------|-------|-----|-----|------|-----|------|
-> | **CaptainCanuck** (this box, strix-halo) | online | 8.2% | 19.6% | 45.4% | — | 61.9°C |
-> | **Kinns-MacBook-Pro.local** | online | 27.5% | **71.8%** | **91.4%** | 9.9% | 51.9°C |
-> | **Kinns-Mac-mini.local** | online | 8.9% | 69.0% | 66.7% | 21.7% | 51.8°C |
-> | **promaxgb10** (hub) | online | 0.2% | 2.4% | 21.5% | 0% | 33°C |
+> | **workstation-01** (this box, strix-halo) | online | 8.2% | 19.6% | 45.4% | — | 61.9°C |
+> | **macbook-01.local** | online | 27.5% | **71.8%** | **91.4%** | 9.9% | 51.9°C |
+> | **mac-mini-01.local** | online | 8.9% | 69.0% | 66.7% | 21.7% | 51.8°C |
+> | **dgx-01** (hub) | online | 0.2% | 2.4% | 21.5% | 0% | 33°C |
 >
 > **Worth watching:**
-> - **Kinns-MacBook-Pro.local** — disk at **91.4% used**, the only host near a real threshold. Mem also high at 71.8%. Worth freeing disk space soon.
-> - **Kinns-Mac-mini.local** — mem 69%, fine but the next-highest.
-> - CaptainCanuck and promaxgb10 are both relaxed. promaxgb10 is essentially idle.
+> - **macbook-01.local** — disk at **91.4% used**, the only host near a real threshold. Mem also high at 71.8%. Worth freeing disk space soon.
+> - **mac-mini-01.local** — mem 69%, fine but the next-highest.
+> - workstation-01 and dgx-01 are both relaxed. dgx-01 is essentially idle.
 >
-> Only CaptainCanuck reports per-process data (`has_processes: true`); none have logs enabled. Want me to pull top processes on CaptainCanuck or dig into the MacBook's disk usage?
+> Only workstation-01 reports per-process data (`has_processes: true`); none have logs enabled. Want me to pull top processes on workstation-01 or dig into the MacBook's disk usage?
 
 ### The `/fleet` slash command
 
@@ -344,23 +344,23 @@ $ claude -p "/fleet"
 
 > Fleet is healthy — all 4 hosts online, none stale or offline.
 >
-> ## Fleet snapshot (hub `promaxgb10-bdd9`)
+> ## Fleet snapshot (hub `dgx-01`)
 >
 > | Host | State | CPU | Mem | Disk | GPU | Temp | Uptime |
 > |------|-------|-----|-----|------|-----|------|--------|
-> | **CaptainCanuck** (strix-halo, AI powerhouse) | 🟢 online | 1.3% | 19.7% | 45.4% | — | 51.4°C | ~4.7d |
-> | **Kinns-MacBook-Pro.local** | 🟢 online | 16.4% | 70.6% | 91.4% ⚠️ | 11.2% | 51.9°C | ~21d |
-> | **Kinns-Mac-mini.local** | 🟢 online | 8.2% | 68.5% | 66.7% | 23.0% | 51.8°C | ~12.7d |
-> | **promaxgb10** (hub) | 🟢 online | 0.2% | 2.4% | 21.5% | 0% | 33°C (GPU) | ~11.3d |
+> | **workstation-01** (strix-halo, AI powerhouse) | 🟢 online | 1.3% | 19.7% | 45.4% | — | 51.4°C | ~4.7d |
+> | **macbook-01.local** | 🟢 online | 16.4% | 70.6% | 91.4% ⚠️ | 11.2% | 51.9°C | ~21d |
+> | **mac-mini-01.local** | 🟢 online | 8.2% | 68.5% | 66.7% | 23.0% | 51.8°C | ~12.7d |
+> | **dgx-01** (hub) | 🟢 online | 0.2% | 2.4% | 21.5% | 0% | 33°C (GPU) | ~11.3d |
 >
 > **Notable:**
 > - **All green** — 4/4 online, last seen within ~1s of the snapshot.
-> - ⚠️ **Kinns-MacBook-Pro** disk is at **91.4%** — the only metric worth watching. It's also the busiest node (CPU 16%, mem 71%, ~21 days uptime).
-> - **CaptainCanuck** (the Strix Halo AI box) is idle and cool — plenty of headroom. Only host exposing process data (`has_processes: true`).
-> - **promaxgb10** (the hub itself) is nearly idle — 0.2% CPU, 2.4% mem.
-> - Network latency is low everywhere (4.9–15.8 ms); power draw is modest (CaptainCanuck pulls the most at ~17.4 W package).
+> - ⚠️ **macbook-01** disk is at **91.4%** — the only metric worth watching. It's also the busiest node (CPU 16%, mem 71%, ~21 days uptime).
+> - **workstation-01** (the Strix Halo AI box) is idle and cool — plenty of headroom. Only host exposing process data (`has_processes: true`).
+> - **dgx-01** (the hub itself) is nearly idle — 0.2% CPU, 2.4% mem.
+> - Network latency is low everywhere (4.9–15.8 ms); power draw is modest (workstation-01 pulls the most at ~17.4 W package).
 >
-> Want me to drill into CaptainCanuck's top processes, or keep an eye on that MacBook disk?
+> Want me to drill into workstation-01's top processes, or keep an eye on that MacBook disk?
 
 ### A targeted risk question → `host` + `top`
 
@@ -368,24 +368,24 @@ The agent pulls the full host record and process table only for the hosts you as
 about, then reasons over what's there *and* what's missing.
 
 ```console
-$ claude -p "any risks for CaptainCanuck or Kinns Macbook Pro on my fleet?"
+$ claude -p "any risks for workstation-01 or the MacBook on my fleet?"
 ```
 
 > Both hosts are online and reachable. Here's the risk assessment:
 >
-> ## CaptainCanuck — ✅ Healthy, no significant risks
+> ## workstation-01 — ✅ Healthy, no significant risks
 > - **Online**, seen seconds ago. Uptime ~4.7 days.
 > - CPU **1%**, memory **20%**, disk **45%**, temp 49°C — all healthy.
 > - Only notable consumer is a Firefox content process (`Isolated Web Co`, 14.6% CPU / 8.1% mem) — normal for an interactive workstation, not a leak or crash loop.
 >
-> ## Kinns MacBook Pro (`Kinns-MacBook-Pro.local`) — ⚠️ Needs attention
+> ## the MacBook (`macbook-01.local`) — ⚠️ Needs attention
 > - **Online**, seen seconds ago. Uptime ~21 days.
 > - 🔴 **HIGH — Disk 91.4% full.** The main actionable risk. Nearing capacity risks write failures, swap pressure, and app instability. Free space soon.
 > - 🟡 **MEDIUM — Memory 73.7%.** Elevated; combined with the near-full disk, swap headroom is thin.
 > - 🟢 LOW — CPU 28.8%, GPU 10%, temp 52°C — fine.
 > - **Observability gap:** this host reports **no process table and no logs** (`has_processes`/`has_logs` both false), so the disk/memory usage can't be attributed and log-based crash detection is blind here. Worth enabling process + log collection on this agent.
 >
-> **Bottom line:** CaptainCanuck is clean. The one real risk on your fleet is the MacBook Pro's nearly-full disk — clear space there, and consider turning on process/log telemetry so it's not a blind spot.
+> **Bottom line:** workstation-01 is clean. The one real risk on your fleet is the MacBook Pro's nearly-full disk — clear space there, and consider turning on process/log telemetry so it's not a blind spot.
 
 A few things to read out of these transcripts:
 
