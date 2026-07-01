@@ -35,7 +35,7 @@ yet exercised on Windows).
 ## CPU package power
 
 `power.cpu` is **not available on Windows**. RAPL is reachable only through a
-signed kernel driver, which Heimdall does not ship — so package power stays
+signed kernel driver, which Heimdall does not ship — so CPU power stays
 `unavailable` rather than failing. This is a platform limit, not a
 misconfiguration.
 

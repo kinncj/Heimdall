@@ -55,7 +55,8 @@ On Linux the helper reads two privileged sources and exposes them to the
 unprivileged daemon:
 
 - **CPU package power** from RAPL (`/sys/class/powercap/intel-rapl`), sampled as
-  an energy counter delta and reported as `power.total`.
+  an energy counter delta and reported as `power.cpu`; the daemon then adds
+  `power.gpu` to it for `power.total`.
 - **Package temperature** from a trusted hwmon chip — Intel `coretemp`, AMD
   `k10temp` or `zenpower` — reported as `temp.pkg`.
 

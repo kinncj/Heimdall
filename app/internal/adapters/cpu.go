@@ -36,7 +36,7 @@ func (CPU) Collect(ctx context.Context) ([]domain.Metric, error) {
 	if len(per) > 0 {
 		out = append(out, domain.Metric{
 			Name: "cpu.cores", Unit: "percent", Status: domain.StatusOK,
-			Kind: domain.KindPerCore, PerCore: per,
+			Kind: domain.KindPerCore, Gauge: avg, PerCore: per,
 		})
 	}
 	return out, nil

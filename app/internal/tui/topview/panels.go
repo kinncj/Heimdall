@@ -165,8 +165,9 @@ func (m Model) powerPanel(t tier, w int) panelSpec {
 	cpu := m.numVal("power.cpu", " W", "%.1f")
 	gpu := m.numVal("power.gpu", " W", "%.1f")
 	npu := m.numVal("power.npu", " W", "%.1f")
-	// Headline the whole-machine total (CPU + GPU, from the collector) so a busy
-	// GPU isn't hidden behind the much smaller CPU figure.
+	// Headline the whole-machine total (CPU + GPU + NPU on non-Apple, or the SMC
+	// whole-system figure on Apple) so a busy GPU isn't hidden behind the much
+	// smaller CPU figure.
 	totalVal := m.numVal("power.total", " W", "%.0f")
 
 	if t == tierNarrow {

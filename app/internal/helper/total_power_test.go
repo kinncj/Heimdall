@@ -35,6 +35,12 @@ func TestWithTotalPower(t *testing.T) {
 		t.Errorf("gb10 total = %+v, want 50", m)
 	}
 
+	// A separate NPU power rail is included in the sum (never silently dropped).
+	got = byName(withTotalPower([]domain.Metric{watts("power.cpu", 30), watts("power.gpu", 60), watts("power.npu", 10)}))
+	if m := got["power.total"]; m.Gauge != 100 {
+		t.Errorf("cpu+gpu+npu total = %+v, want 100", m)
+	}
+
 	// Apple: a total is already present (SMC PSTR) — leave it, never recompute.
 	got = byName(withTotalPower([]domain.Metric{watts("power.total", 26), watts("power.cpu", 3), watts("power.gpu", 1)}))
 	if m := got["power.total"]; m.Gauge != 26 {
