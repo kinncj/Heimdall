@@ -33,8 +33,10 @@ The workflow then, in parallel:
 3. a **publish** job downloads both, writes `SHA256SUMS`, and attaches everything
    to the release with `softprops/action-gh-release`.
 
-> `make release` locally produces CGO-free binaries for every platform (a portable
-> convenience build); the official macOS binaries with IOReport come from CI.
+> `make release` builds Linux + Windows CGO-free and, **when run on a Mac**,
+> builds the darwin binaries with CGO so IOReport is compiled in. Run off a Mac it
+> skips the darwin targets (a CGO-free darwin build would silently lose macOS
+> power) — the official macOS binaries always come from the CI mac runner.
 
 To rebuild assets for an existing release, re-publish it (or re-run the workflow) — the
 upload overwrites in place.

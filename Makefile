@@ -1,6 +1,11 @@
 # Makefile — Unified build/test contract for all agents
 .PHONY: build man screenshots build-tui run-tui run-demo run-daemon run-hub run-helper tui-snapshot dev-certs test-acceptance release test test-integration test-e2e test-contract test-all lint security-scan fmt containers-up containers-down migrate test-features-sync test-features-scaffold sdlc-report sdlc-rotate-logs sdlc-branch-protection sdlc-bootstrap-project-fields help
 
+# Stamp the build version the same way release.sh / release.yml do, so a locally
+# built binary reports a real version (git tag) instead of the "dev" default.
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+GO_LDFLAGS := -X main.version=$(VERSION)
+
 ## Build
 build:
 	go build ./...
@@ -16,12 +21,12 @@ screenshots: build-tui
 ## Build the Heimdall binaries (dashboard + daemon + hub) -> bin/
 build-tui:
 	@mkdir -p bin
-	go build -o bin/heimdall-dashboard ./app/cmd/dashboard
-	go build -o bin/heimdall-daemon ./app/cmd/daemon
-	go build -o bin/heimdall-hub ./app/cmd/hub
-	go build -o bin/heimdall-helper ./app/cmd/helper
-	go build -o bin/heimdall-cli ./app/cmd/cli
-	@echo "built bin/heimdall-{dashboard,daemon,hub,helper,cli}"
+	go build -ldflags "$(GO_LDFLAGS)" -o bin/heimdall-dashboard ./app/cmd/dashboard
+	go build -ldflags "$(GO_LDFLAGS)" -o bin/heimdall-daemon ./app/cmd/daemon
+	go build -ldflags "$(GO_LDFLAGS)" -o bin/heimdall-hub ./app/cmd/hub
+	go build -ldflags "$(GO_LDFLAGS)" -o bin/heimdall-helper ./app/cmd/helper
+	go build -ldflags "$(GO_LDFLAGS)" -o bin/heimdall-cli ./app/cmd/cli
+	@echo "built bin/heimdall-{dashboard,daemon,hub,helper,cli} ($(VERSION))"
 
 ## Run the Heimdall TUI dashboard (subscribes to a hub at localhost:9090)
 run-tui: build-tui

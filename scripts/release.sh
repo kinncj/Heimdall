@@ -5,9 +5,12 @@
 # Cross-compile the Heimdall binaries for all supported platforms into dist/.
 # Used by `make release` and the release GitHub Actions workflow.
 #
-# Release binaries are built CGO-free so they cross-compile cleanly and run with
-# no shared-library dependencies. On macOS this means power/GPU fall back to
-# `powermetrics` (sudo) rather than IOReport — build locally for the no-sudo path.
+# Linux and Windows are built CGO-free so they cross-compile cleanly and run with
+# no shared-library dependencies. macOS is built with CGO=1 so the IOReport/SMC
+# no-sudo power+GPU path is compiled in — that only cross-compiles from a Mac, so
+# a darwin target is refused (loudly) when this script runs off a Mac. In CI the
+# darwin binaries come from the dedicated macOS runner (see release.yml), and this
+# script is invoked there with PLATFORMS limited to linux + windows.
 set -euo pipefail
 
 VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
@@ -18,15 +21,30 @@ COMPONENTS="${COMPONENTS:-dashboard daemon hub helper cli}"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
+HOST_OS="$(uname -s)"
+
 for c in $COMPONENTS; do
   for p in $PLATFORMS; do
     os="${p%/*}"; arch="${p#*/}"
     ext=""; [ "$os" = "windows" ] && ext=".exe"
     bin="heimdall-${c}_${os}_${arch}${ext}"
-    echo "building ${bin}"
-    CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
-      go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
-      -o "$OUT/$bin" "./app/cmd/${c}"
+    if [ "$os" = "darwin" ]; then
+      # macOS needs CGO for the IOReport/SMC no-sudo power+GPU path. A CGO-free
+      # darwin binary silently loses that, so refuse to build one off a Mac.
+      if [ "$HOST_OS" != "Darwin" ]; then
+        echo "release: SKIP ${bin} — darwin needs CGO; build on macOS (CI uses a mac runner)" >&2
+        continue
+      fi
+      echo "building ${bin} (CGO)"
+      CGO_ENABLED=1 GOOS="$os" GOARCH="$arch" CC="clang -arch ${arch/amd64/x86_64}" \
+        go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
+        -o "$OUT/$bin" "./app/cmd/${c}"
+    else
+      echo "building ${bin}"
+      CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" \
+        go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
+        -o "$OUT/$bin" "./app/cmd/${c}"
+    fi
   done
 done
 
