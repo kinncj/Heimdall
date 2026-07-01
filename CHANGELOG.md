@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-07-01
+
 ### Changed
 - **Standardized power on three metrics everywhere: `power.cpu`, `power.gpu`,
   `power.total`** — the same CPU / GPU / total split btop, mactop, and top show.
