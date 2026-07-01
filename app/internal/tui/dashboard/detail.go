@@ -75,7 +75,7 @@ func orDash(s string) string {
 // pickMetric returns the first OK metric among keys; if none are OK it returns
 // the first key's metric (possibly absent/non-OK) for the affordance. This lets
 // a row fall back from a package-level signal to a device-level one — e.g. POWER
-// from power.pkg to power.gpu, or TEMP from temp.pkg to gpu.temp — on a host
+// from power.total to power.gpu, or TEMP from temp.pkg to gpu.temp — on a host
 // that only exposes the GPU's figures.
 func pickMetric(byName map[string]domain.Metric, keys ...string) domain.Metric {
 	for _, k := range keys {
@@ -228,7 +228,9 @@ func (m Model) detailBody(h domain.HostView, w int) []string {
 		{[]string{"disk.used"}, "DISK", "%"},
 		{[]string{"gpu.util"}, "GPU", "%"},
 		{[]string{"gpu.vram"}, "VRAM", "%"},
-		{[]string{"power.pkg", "power.gpu"}, "POWER", "W"},
+		{[]string{"power.total"}, "POWER", "W"},
+		{[]string{"power.cpu"}, "CPU W", "W"},
+		{[]string{"power.gpu"}, "GPU W", "W"},
 		{[]string{"temp.pkg", "gpu.temp"}, "TEMP", "°C"},
 	} {
 		lab := label.Style().Render(fmt.Sprintf("  %-6s", d.lab))

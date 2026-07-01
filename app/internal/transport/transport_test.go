@@ -15,7 +15,7 @@ func TestSnapshotRoundTrip(t *testing.T) {
 	in := []domain.Metric{
 		{Name: "cpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: 42.5},
 		{Name: "gpu.util", Status: domain.StatusUnavailable, Detail: "no GPU"},
-		{Name: "power.pkg", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
+		{Name: "power.cpu", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 		{Name: "temp.pkg", Status: domain.StatusError, Detail: "sensor offline"},
 	}
 

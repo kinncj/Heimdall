@@ -9,83 +9,29 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"heimdall/app/internal/domain"
 )
 
-// linuxPrivileged reads CPU power/temperature from RAPL and hwmon. power.pkg is
-// the whole CPU package (cores + uncore) and power.cpu is the cores alone — both
-// are the CPU socket only; a discrete GPU is a separate rail (power.gpu), which
-// is why on a workstation power.pkg can read far below power.gpu. Any source may
-// be absent (no powercap, no core subdomain, no trusted sensor); whatever is
-// found is returned and the rest is omitted, so an unsupported host degrades to
-// the Unavailable fallback rather than failing.
+// linuxPrivileged reads CPU power from RAPL and package temperature from hwmon.
+// power.cpu is the RAPL package (the whole CPU socket — cores + uncore), which is
+// what btop/top report as "CPU power". The GPU is a separate rail (power.gpu) and
+// the two are summed into power.total upstream. When the SoC exposes no RAPL at
+// all (e.g. GB10 Grace/ARM), power.cpu is reported Unavailable-with-reason rather
+// than left blank; a trusted temp sensor is added when present.
 func linuxPrivileged(ctx context.Context) []domain.Metric {
 	var out []domain.Metric
 	if w, ok := raplPackageWatts(ctx); ok {
-		out = append(out, domain.Metric{Name: "power.pkg", Unit: "watts", Status: domain.StatusOK, Gauge: w, Detail: "CPU package"})
+		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: w, Detail: "CPU package"})
 	} else if len(raplDomainDirs()) == 0 {
 		// No powercap tree at all — the SoC exposes no RAPL (e.g. GB10 Grace/ARM).
-		// Say so rather than leaving CPU power a silent blank.
-		out = append(out, domain.Metric{Name: "power.pkg", Status: domain.StatusUnavailable, Detail: "no RAPL power sensor (SoC/ARM)"})
-	}
-	if w, ok := raplCoreWatts(ctx); ok {
-		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: w, Detail: "CPU cores"})
+		out = append(out, domain.Metric{Name: "power.cpu", Status: domain.StatusUnavailable, Detail: "no RAPL power sensor (SoC/ARM)"})
 	}
 	if c, ok := hwmonPackageTemp(); ok {
 		out = append(out, domain.Metric{Name: "temp.pkg", Unit: "celsius", Status: domain.StatusOK, Gauge: c})
 	}
 	return out
-}
-
-// isCoreDomain reports whether a RAPL domain name is the CPU-core (pp0) subdomain
-// that maps to power.cpu — as opposed to the package, uncore, dram, or psys.
-func isCoreDomain(name string) bool {
-	return strings.TrimSpace(name) == "core"
-}
-
-// raplCoreWatts samples the RAPL "core" subdomain to report CPU-core power as
-// power.cpu, distinct from the package power.pkg. It is absent on CPUs that do
-// not expose the core subdomain, in which case power.cpu simply stays unset.
-func raplCoreWatts(ctx context.Context) (float64, bool) {
-	path, ok := raplCoreEnergyPath()
-	if !ok {
-		return 0, false
-	}
-	e0, err := readMicrojoules(path)
-	if err != nil {
-		return 0, false
-	}
-	const window = 200 * time.Millisecond
-	select {
-	case <-time.After(window):
-	case <-ctx.Done():
-		return 0, false
-	}
-	e1, err := readMicrojoules(path)
-	if err != nil {
-		return 0, false
-	}
-	w := raplWatts(e0, e1, window)
-	return w, w > 0
-}
-
-// raplCoreEnergyPath locates the energy counter of the RAPL "core" subdomain,
-// matching by the domain's name file rather than by index.
-func raplCoreEnergyPath() (string, bool) {
-	for _, d := range raplDomainDirs() {
-		name, err := os.ReadFile(filepath.Join(d, "name"))
-		if err != nil || !isCoreDomain(string(name)) {
-			continue
-		}
-		ep := filepath.Join(d, "energy_uj")
-		if _, err := os.Stat(ep); err == nil {
-			return ep, true
-		}
-	}
-	return "", false
 }
 
 // raplDomainDirs returns the RAPL domain directories, preferring the intel-rapl

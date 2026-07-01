@@ -72,7 +72,7 @@ func parsePowermetrics(text string) []domain.Metric {
 		out = append(out, watts("power.gpu", gpu))
 	}
 	if pkgOK {
-		out = append(out, watts("power.pkg", pkg))
+		out = append(out, watts("power.total", pkg))
 	}
 	if util, ok := matchFloat(reGPUResid, text); ok {
 		out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: util})

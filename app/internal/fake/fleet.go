@@ -174,9 +174,16 @@ func metricsFor(h *spec) []domain.Metric {
 		ms = append(ms, domain.Metric{Name: "gpu.util", Status: domain.StatusUnavailable, Detail: "no GPU"})
 	}
 	if h.hasPower {
-		ms = append(ms, domain.Metric{Name: "power.pkg", Unit: "watts", Status: domain.StatusOK, Gauge: h.pwr})
+		ms = append(ms, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: h.pwr, Detail: "CPU package"})
+		total := h.pwr
+		if h.hasGPU {
+			gpuW := h.pwr * 1.5 // demo: a busy GPU pulls more than the CPU package
+			ms = append(ms, domain.Metric{Name: "power.gpu", Unit: "watts", Status: domain.StatusOK, Gauge: gpuW})
+			total += gpuW
+		}
+		ms = append(ms, domain.Metric{Name: "power.total", Unit: "watts", Status: domain.StatusOK, Gauge: total, Detail: "system total"})
 	} else {
-		ms = append(ms, domain.Metric{Name: "power.pkg", Status: domain.StatusInsufficientPermission, Detail: "needs helper"})
+		ms = append(ms, domain.Metric{Name: "power.cpu", Status: domain.StatusInsufficientPermission, Detail: "needs helper"})
 	}
 	return ms
 }

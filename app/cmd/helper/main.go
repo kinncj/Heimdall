@@ -102,7 +102,7 @@ func demoMetrics(context.Context) []domain.Metric {
 	return []domain.Metric{
 		{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: 8.4},
 		{Name: "power.gpu", Unit: "watts", Status: domain.StatusOK, Gauge: 3.1},
-		{Name: "power.pkg", Unit: "watts", Status: domain.StatusOK, Gauge: 12.7},
+		{Name: "power.total", Unit: "watts", Status: domain.StatusOK, Gauge: 11.5},
 		{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: 41},
 		{Name: "gpu.vram", Unit: "percent", Status: domain.StatusOK, Gauge: 36},
 		{Name: "gpu.temp", Unit: "celsius", Status: domain.StatusOK, Gauge: 54},

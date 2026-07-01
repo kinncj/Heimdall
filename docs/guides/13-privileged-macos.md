@@ -9,9 +9,13 @@ guide is the macOS specifics.
 | Metric | Source | Needs root? |
 |---|---|---|
 | `gpu.util`, `power.gpu` | **IOReport** energy counters | no |
-| `power.pkg` (whole-system) | **SMC `PSTR`** ("System Total Power") | no |
+| `power.total` (whole-system) | **SMC `PSTR`** ("System Total Power") | no |
 | `power.cpu`, `power.npu` | IOReport per-domain, where the SoC exposes it | no |
 | full thermal, gaps IOReport misses | `powermetrics` (via the helper) | yes |
+
+Power standardizes on `power.cpu` / `power.gpu` / `power.total` across the fleet.
+On macOS `power.total` is the SMC whole-system figure (it already includes the
+GPU, so it is **not** a sum of the rails).
 
 Apple Silicon is the one platform where GPU power **and** whole-system power are
 available with **no sudo** — IOReport and SMC are both unprivileged. A normal
@@ -19,12 +23,12 @@ daemon reads them in-process:
 
 ```sh
 ./bin/heimdall-daemon --once | grep -E "gpu|power"
-# e.g. power.gpu=1.19W  power.pkg=18.4W  gpu.util=54%
+# e.g. power.gpu=1.19W  power.total=18.4W  gpu.util=54%
 ```
 
-## Source precedence for `power.pkg`
+## Source precedence for `power.total`
 
-`power.pkg` is read in a strict order so a phantom reading never shadows a real
+`power.total` is read in a strict order so a phantom reading never shadows a real
 one:
 
 1. **SMC `PSTR`** — the authoritative whole-system rail (what mactop/btop use).

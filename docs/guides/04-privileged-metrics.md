@@ -42,7 +42,7 @@ IOReport energy counters:
 
 ```sh
 ./bin/heimdall-daemon --once | grep -E "gpu|power"
-# e.g. power.gpu=1.19W  power.pkg=1.19W  gpu.util=54%
+# e.g. power.gpu=1.19W  power.total=1.19W  gpu.util=54%
 ```
 
 > IOReport requires a **CGO build**. The local `make build-tui` enables CGO by
@@ -55,7 +55,8 @@ On Linux the helper reads two privileged sources and exposes them to the
 unprivileged daemon:
 
 - **CPU package power** from RAPL (`/sys/class/powercap/intel-rapl`), sampled as
-  an energy counter delta and reported as `power.pkg`.
+  an energy counter delta and reported as `power.cpu`; the daemon then adds
+  `power.gpu` to it for `power.total`.
 - **Package temperature** from a trusted hwmon chip — Intel `coretemp`, AMD
   `k10temp` or `zenpower` — reported as `temp.pkg`.
 
@@ -211,7 +212,7 @@ sudo systemctl enable --now heimdall-daemon.service
 
 ls -l /run/heimdall/helper.sock          # expect:  srw-rw---- root heimdall
 heimdall-cli --hub YOUR_HUB:9090 host "$(hostname)" \
-  | jq '{state, power: .metrics["power.pkg"], gpu: .metrics["gpu.util"]}'
+  | jq '{state, power: .metrics["power.total"], gpu: .metrics["gpu.util"]}'
 ```
 
 If `power`/`gpu` show `needs-helper`, the daemon isn't reaching the socket — check
@@ -232,7 +233,7 @@ not a per-login LaunchAgent).
 > **Apple Silicon build note**: GPU power/util come from **IOReport**, which needs a
 > **CGO build** (`make build-tui` locally). The CGO-free release binary falls back to
 > `powermetrics` (root). Full thermal and CPU/ANE power come only from the helper.
-> Some M-series SoCs expose no CPU package-power counter at all — `power.pkg` reads
+> Some M-series SoCs expose no CPU package-power counter at all — `power.total` reads
 > `unavailable` there. That is a hardware limit, not a misconfiguration.
 
 **1. Shared group** and a stable socket dir the group can traverse:
@@ -307,7 +308,7 @@ sudo launchctl bootstrap system /Library/LaunchDaemons/com.heimdall.daemon.plist
 ls -l /usr/local/var/heimdall/helper.sock        # expect: srw-rw---- root heimdall
 sudo launchctl print system/com.heimdall.daemon | grep -E 'state|pid'
 heimdall-cli --hub HUB:9090 host my-mac \
-  | jq '{state, power: .metrics["power.pkg"], gpu: .metrics["gpu.util"]}'
+  | jq '{state, power: .metrics["power.total"], gpu: .metrics["gpu.util"]}'
 ```
 
 If `power`/`gpu` show `⚿` (`needs-helper`), either the daemon isn't reaching the

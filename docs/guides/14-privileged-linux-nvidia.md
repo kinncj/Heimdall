@@ -10,7 +10,7 @@ NVIDIA specifics.
 | Metric | Source | Needs root? |
 |---|---|---|
 | `gpu.util`, `gpu.vram`, `gpu.temp`, `power.gpu` | **`nvidia-smi`** | no |
-| `power.pkg` | RAPL (`/sys/class/powercap/intel-rapl`) via the helper | yes |
+| `power.cpu` | RAPL (`/sys/class/powercap/intel-rapl`) via the helper | yes |
 | `temp.pkg` | hwmon (`coretemp` / `k10temp` / `zenpower`) via the helper | yes |
 
 GPU metrics are **unprivileged** — `nvidia-smi` is readable by any user, so a
@@ -49,7 +49,7 @@ NVIDIA cards keep using the aggregate counter unchanged.
 
 ## Troubleshooting — GPU metrics missing
 
-If `gpu.*` is blank but `power.pkg` still reads, run the query by hand:
+If `gpu.*` is blank but `power.cpu` still reads, run the query by hand:
 
 ```sh
 nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits
@@ -68,35 +68,30 @@ nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits
 ## CPU power & temperature (helper)
 
 NVIDIA covers the GPU; **CPU** power and temperature come from the Linux
-privileged sources served by `heimdall-helper`:
+privileged sources served by `heimdall-helper`. Power standardizes on three
+metrics — the same CPU / GPU / total split btop and top show:
 
-- **`power.pkg`** — the CPU **package** (cores + uncore), from the RAPL package
+- **`power.cpu`** — the CPU **package** (whole socket), from the RAPL package
   domain, sampled as an energy-counter delta.
-- **`power.cpu`** — the CPU **cores** alone, from the RAPL `core` (pp0)
-  subdomain. Absent on CPUs that don't expose it; the field then stays blank.
+- **`power.gpu`** — the GPU, from `nvidia-smi` (a separate rail).
+- **`power.total`** — `power.cpu + power.gpu (+ power.npu)`, the whole-machine
+  figure the top view headlines.
 - **`temp.pkg`** from a trusted hwmon chip.
 
-> **Why `power.pkg` can read *below* `power.gpu`.** Both `power.pkg` and
-> `power.cpu` are the **CPU socket only** (`power.cpu` is the cores, a subset of
-> the whole `power.pkg` package). A discrete NVIDIA card is a separate power rail
-> reported as `power.gpu`, so a workstation happily shows e.g. `power.cpu 12W`,
-> `power.pkg 17W`, `power.gpu 61W` — the GPU is not part of the CPU package
-> figure. **`power.total`** is the source-aware whole-machine sum the top view
-> headlines: on a discrete-NVIDIA host it is `pkg + gpu (+ npu)`; on Apple it is
-> `pkg` alone (SMC `PSTR` already covers everything); on an AMD APU it is `pkg`
-> alone (the iGPU is inside the package).
+> **Why `power.cpu` can read *below* `power.gpu`.** They are separate rails: the
+> CPU package vs. a discrete NVIDIA card. A workstation happily shows e.g.
+> `cpu 33W`, `gpu 458W`, `total 491W`. `power.total` is what reflects real draw.
 
 ### GB10 (Grace/ARM) has no CPU power sensor
 
 A GB10 exposes **no** RAPL, INA, or SoC power sensor to the OS — only the GPU
-rail via `nvidia-smi`. So `power.pkg` reads `unavailable` (`no RAPL power sensor
+rail via `nvidia-smi`. So `power.cpu` reads `unavailable` (`no RAPL power sensor
 (SoC/ARM)`) and `power.total` is the GPU power alone. The Grace CPU / module draw
-is simply not measurable from userspace on this platform.
->
-> `power.npu` stays `unavailable` on Intel/AMD hosts — their NPUs expose no
-> power counter yet, same as Apple's ANE.
+is simply not measurable from userspace on this platform. `power.npu` likewise
+stays `unavailable` on Intel/AMD hosts — their NPUs expose no power counter yet,
+same as Apple's ANE.
 
-Either may be absent (no powercap, no recognised sensor) — that metric reads
+Any of these may be absent (no powercap, no recognised sensor); that metric reads
 `unavailable` and the daemon keeps running. Set the helper up with the systemd
 layout in
 [Run both as systemd services](04-privileged-metrics.md#run-both-as-systemd-services-helper-root-daemon-as-you).

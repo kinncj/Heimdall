@@ -7,6 +7,23 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Changed
+- **Standardized power on three metrics everywhere: `power.cpu`, `power.gpu`,
+  `power.total`** — the same CPU / GPU / total split btop, mactop, and top show.
+  `power.pkg` is retired; the CPU rail is always `power.cpu`:
+  - **Linux**: `power.cpu` = the RAPL **package** (whole CPU socket — what btop
+    calls "CPU"); the unreliable RAPL `core` subdomain is dropped.
+  - **macOS**: `power.cpu` = IOReport CPU; `power.total` = SMC `PSTR`
+    (whole-system) — the SMC figure is no longer mislabelled `power.pkg`.
+  - `power.total` = `cpu + gpu + npu` on every non-Apple host (Apple already
+    reports a whole-system total). This fixes **AMD APUs (Strix Halo)**
+    under-counting: RAPL package and amdgpu are separate rails and are now summed
+    (matching btop's CPU + GPU).
+- Both the **top view** and the **host detail view** now show CPU, GPU, and total
+  power.
+- `power.cpu` is reported Unavailable-with-reason where no source exists: GB10
+  (no RAPL on Grace/ARM) and Windows (RAPL inaccessible).
+
 ## [2.2.9] - 2026-07-01
 
 ### Added

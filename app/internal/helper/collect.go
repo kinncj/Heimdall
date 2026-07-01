@@ -39,11 +39,6 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	out = mergeByName(out, linuxPrivileged(ctx))
 	// Windows privileged sources (WMI thermal zones); no-op off Windows.
 	out = mergeByName(out, windowsPrivileged(ctx))
-	// gpuSeparate marks the GPU as its own power rail (a discrete card, or the GB10
-	// superchip where the Blackwell GPU is metered apart from the Grace CPU). Only
-	// nvidia-smi reports such a rail here; an integrated GPU (Apple, AMD APU) is
-	// already inside the CPU package, so its power must not be added to the total.
-	gpuSeparate := false
 	if nv, present, err := runNvidiaSMI(ctx); present {
 		if err != nil {
 			// nvidia-smi is installed but broke (e.g. driver/library mismatch after
@@ -51,9 +46,6 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 			out = mergeByName(out, nvidiaErrorMetrics(nv))
 		} else {
 			ms := parseNvidiaSMI(nv)
-			if hasName(ms, "power.gpu") {
-				gpuSeparate = true
-			}
 			// Unified-memory NVIDIA (GB10 Grace-Blackwell) has no aggregate VRAM
 			// counter — nvidia-smi memory.* reads [N/A]. Derive gpu.vram from the
 			// per-process compute-apps memory over the system RAM total.
@@ -73,38 +65,30 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	// only add names not already set, so an NVIDIA or Apple reading is never
 	// shadowed, and a non-AMD host contributes nothing.
 	out = mergeByName(out, amdGPU(ctx))
-	out = withTotalPower(out, runtime.GOOS, gpuSeparate)
+	out = withTotalPower(out)
 	out = ensureNPUUtil(out)
 	if !hasOK(out) {
 		return []domain.Metric{
-			{Name: "power.pkg", Status: domain.StatusUnavailable, Detail: "no power source"},
+			{Name: "power.cpu", Status: domain.StatusUnavailable, Detail: "no power source"},
 			{Name: "gpu.util", Status: domain.StatusUnavailable, Detail: "no gpu source"},
 		}
 	}
 	return out
 }
 
-// withTotalPower appends a source-aware power.total so the panel can headline
-// real whole-machine draw instead of just the CPU package. It must never
-// double-count: Apple's power.pkg is SMC PSTR (already whole-system), and an
-// integrated GPU is already inside the CPU package — only a separate GPU rail
-// (discrete NVIDIA, or the GB10 Grace+Blackwell split) is added.
-func withTotalPower(ms []domain.Metric, goos string, gpuSeparate bool) []domain.Metric {
-	pkg, hasPkg := okGauge(ms, "power.pkg")
-	gpu, hasGPU := okGauge(ms, "power.gpu")
-	npu, _ := okGauge(ms, "power.npu")
-	var total float64
-	switch {
-	case goos == "darwin":
-		total = pkg // SMC PSTR is already whole-system
-	case gpuSeparate:
-		total = pkg + gpu + npu // CPU package + a discrete/superchip GPU rail
-	default:
-		total = pkg // integrated GPU is already counted inside the package
-		if !hasPkg && hasGPU {
-			total = gpu
-		}
+// withTotalPower appends the whole-machine power.total so the panel can headline
+// real draw. On Apple it is already provided directly (SMC PSTR is whole-system),
+// so this leaves it untouched. Everywhere else power.cpu (the RAPL package) and
+// power.gpu are physically separate rails — the same split btop/top show — so the
+// total is their sum plus any NPU rail.
+func withTotalPower(ms []domain.Metric) []domain.Metric {
+	if hasName(ms, "power.total") {
+		return ms
 	}
+	cpu, _ := okGauge(ms, "power.cpu")
+	gpu, _ := okGauge(ms, "power.gpu")
+	npu, _ := okGauge(ms, "power.npu")
+	total := cpu + gpu + npu
 	if total <= 0 {
 		return ms
 	}
@@ -138,11 +122,11 @@ func powerMetric(name string, w float64) domain.Metric {
 
 // assembleApplePower builds the macOS power/util metrics from the available
 // sources. Per-domain CPU/GPU/ANE power and GPU utilisation come from the
-// IOReport energy counters when present. Package power has a strict precedence:
-// SMC PSTR ("System Total Power") first, then powermetrics, then the IOReport
-// per-domain sum as a last resort. The ordering matters: on Apple Silicon
-// Pro/Max chips IOReport reports 0 for CPU/ANE and only a sub-watt GPU figure,
-// so the energy-sum is a phantom — it must never shadow a real SMC or
+// IOReport energy counters when present. The whole-system total has a strict
+// precedence: SMC PSTR ("System Total Power") first, then powermetrics, then the
+// IOReport per-domain sum as a last resort. The ordering matters: on Apple
+// Silicon Pro/Max chips IOReport reports 0 for CPU/ANE and only a sub-watt GPU
+// figure, so the energy-sum is a phantom — it must never shadow a real SMC or
 // powermetrics reading. pm is the parsed powermetrics output (may be nil).
 func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float64, smcOK bool, pm []domain.Metric) []domain.Metric {
 	var out []domain.Metric
@@ -160,16 +144,16 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 			out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: gpuUtil})
 		}
 	}
-	// SMC PSTR is the authoritative whole-system figure and needs no root.
+	// SMC PSTR is the authoritative whole-system total and needs no root.
 	if smcOK && smcPkg > 0 {
-		out = append(out, powerMetric("power.pkg", smcPkg))
+		out = append(out, powerMetric("power.total", smcPkg))
 	}
-	// powermetrics fills any name not already set (package when SMC is absent,
+	// powermetrics fills any name not already set (the total when SMC is absent,
 	// plus CPU/GPU/util gaps).
 	out = mergeByName(out, pm)
 	// Last resort: the IOReport per-domain sum, only when nothing better gave a
-	// package figure.
-	if !hasName(out, "power.pkg") {
+	// whole-system figure.
+	if !hasName(out, "power.total") {
 		sum := 0.0
 		if ioOK {
 			for _, w := range []float64{cpu, gpu, ane} {
@@ -179,7 +163,7 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 			}
 		}
 		if sum > 0 {
-			out = append(out, powerMetric("power.pkg", sum))
+			out = append(out, powerMetric("power.total", sum))
 		}
 	}
 	// Apple Silicon is unified memory — there is no discrete VRAM to read. Report
