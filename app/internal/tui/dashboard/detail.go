@@ -236,7 +236,13 @@ func (m Model) detailBody(h domain.HostView, w int) []string {
 		lab := label.Style().Render(fmt.Sprintf("  %-6s", d.lab))
 		mm := pickMetric(byName, d.keys...)
 		if mm.Status != domain.StatusOK {
-			b.WriteString(lab + "  " + m.nonOK(mm) + "\n")
+			line := lab + "  " + m.nonOK(mm)
+			// Show why it's dashed (e.g. "Pro/Max: no per-domain CPU power") when
+			// there's room; the whole view is clamped to width, so it can't wrap.
+			if mm.Detail != "" && showDetail {
+				line += "  " + muted.Style().Render(mm.Detail)
+			}
+			b.WriteString(line + "\n")
 			continue
 		}
 		gauge := render.Gauge(m.mode, mm.Gauge, gaugeCells)

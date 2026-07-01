@@ -32,12 +32,20 @@ and the GPU panel works **unprivileged** — same as
 **not** wired (the amdgpu sysfs path is Linux-only, and `amd-smi` parsing is not
 yet exercised on Windows).
 
-## CPU package power
+## CPU power
 
-`power.cpu` is **not available on Windows**. RAPL is reachable only through a
-signed kernel driver, which Heimdall does not ship — so CPU power stays
-`unavailable` rather than failing. This is a platform limit, not a
-misconfiguration.
+Windows exposes no RAPL to user space — reading the CPU energy MSRs needs a
+ring-0 driver, which Heimdall does not ship (that's exactly what tools like
+Scaphandre and WinPowerMonitor install). Rather than sign our own driver,
+Heimdall reads CPU power from a **driver-backed monitor you already run**:
+
+- **[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)**
+  — start it (its signed driver reads the RAPL MSRs on Intel **and** AMD) and
+  leave "Remote Web Server / WMI" enabled. Heimdall queries its WMI provider
+  (`root/LibreHardwareMonitor`) and reports the CPU-package sensor as `power.cpu`.
+
+When no such monitor is running, `power.cpu` reads `unavailable` with
+`no RAPL on Windows — run LibreHardwareMonitor for CPU power` rather than failing.
 
 ## How the helper works on Windows
 
@@ -53,7 +61,7 @@ daemon** can't. Here's what each Windows source needs:
 |---|---|---|
 | `nvidia-smi` (`gpu.util/vram/temp`, `power.gpu`) | normally **no** | richest panel on Windows when an NVIDIA GPU is present |
 | WMI `temp.pkg` (`MSAcpi_ThermalZoneTemperature`) | usually **yes** | only if the firmware exposes an ACPI thermal zone — many laptops don't |
-| `power.cpu` (RAPL) | — | **not available** on Windows, no driver |
+| `power.cpu` | no (reads WMI) | needs **LibreHardwareMonitor** running (its driver reads RAPL); else `unavailable` |
 
 `nvidia-smi` is normally unprivileged, so a daemon running as your user *should*
 collect the GPU panel without the helper. But account/PATH setups vary — don't

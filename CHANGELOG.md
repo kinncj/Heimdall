@@ -7,6 +7,26 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-07-01
+
+### Added
+- **Windows CPU power via LibreHardwareMonitor.** Windows exposes no RAPL to user
+  space (reading the CPU energy MSRs needs a ring-0 driver Heimdall doesn't ship).
+  When **LibreHardwareMonitor** is running, Heimdall now reads the CPU-package
+  power sensor from its WMI provider (`root/LibreHardwareMonitor`) and reports it
+  as `power.cpu` — Intel and AMD, no cgo. Absent, `power.cpu` reads
+  `no RAPL on Windows — run LibreHardwareMonitor for CPU power`.
+
+### Fixed
+- **Apple Pro/Max: `power.cpu` explains the dash.** On Pro/Max dies the CPU/ANE
+  power channels read 0 in *both* IOReport and powermetrics (only the SMC
+  whole-system total is real; base M-series expose the per-domain figure). Instead
+  of a silent blank, `power.cpu` now reads Unavailable with `Pro/Max: no per-domain
+  CPU power`. `power.total` still carries the real whole-machine draw.
+- **Host detail view now shows *why* a metric is dashed** — the Unavailable reason
+  (e.g. the CPU-power notes above) renders next to the dash, clamped to width so it
+  can't wrap or break the layout.
+
 ## [2.3.0] - 2026-07-01
 
 ### Changed

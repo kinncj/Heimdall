@@ -20,8 +20,10 @@ func TestAssembleApplePower_SMCWinsOverPhantomIOReport(t *testing.T) {
 	if m := got["power.gpu"]; m.Status != domain.StatusOK || m.Gauge != 0.1 {
 		t.Errorf("power.gpu = %+v, want 0.1W from IOReport", m)
 	}
-	if _, ok := got["power.cpu"]; ok {
-		t.Errorf("power.cpu should be absent when IOReport CPU energy is 0")
+	// Pro/Max exposes no per-domain CPU power (IOReport and powermetrics both read
+	// 0); say why rather than leaving a silent blank.
+	if m := got["power.cpu"]; m.Status != domain.StatusUnavailable || m.Detail == "" {
+		t.Errorf("power.cpu = %+v, want unavailable-with-reason on Pro/Max", m)
 	}
 	if m := got["gpu.util"]; m.Status != domain.StatusOK || m.Gauge != 5 {
 		t.Errorf("gpu.util = %+v, want 5%%", m)

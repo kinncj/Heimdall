@@ -166,6 +166,16 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 			out = append(out, powerMetric("power.total", sum))
 		}
 	}
+	// Apple Pro/Max SoCs expose no per-domain CPU power — IOReport and powermetrics
+	// both report 0 for the CPU/ANE channels (only the SMC whole-system total is
+	// real). Base M-series populate it. Say why rather than leaving power.cpu a
+	// silent blank; power.total still carries the real whole-machine figure.
+	if ioOK && !hasName(out, "power.cpu") {
+		out = append(out, domain.Metric{
+			Name: "power.cpu", Status: domain.StatusUnavailable,
+			Detail: "Pro/Max: no per-domain CPU power",
+		})
+	}
 	// Apple Silicon is unified memory — there is no discrete VRAM to read. Report
 	// gpu.vram as Unavailable-with-reason so the panel explains the dash instead
 	// of silently omitting the metric.
