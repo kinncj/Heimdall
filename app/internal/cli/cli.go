@@ -372,6 +372,7 @@ type jHost struct {
 	LastSeenUnix int64                    `json:"last_seen_unix"`
 	Labels       map[string]string        `json:"labels,omitempty"`
 	Metrics      map[string]float64       `json:"metrics,omitempty"`
+	Details      map[string]string        `json:"details,omitempty"`
 	Unavailable  map[string]jMetricStatus `json:"unavailable,omitempty"`
 	Alerts       []string                 `json:"alerts,omitempty"`
 	HasLogs      bool                     `json:"has_logs"`
@@ -441,10 +442,20 @@ func userLabels(labels map[string]string) map[string]string {
 
 func newJHost(h domain.HostView) jHost {
 	metrics := map[string]float64{}
+	var details map[string]string
 	var unavailable map[string]jMetricStatus
 	for _, m := range h.LastSnapshot {
 		if m.Status == domain.StatusOK {
 			metrics[m.Name] = m.Gauge
+			// Info metrics (host.version, host.gpu, …) carry their value in Detail
+			// with no gauge, and gauges like gpu.vram carry a used/total note. Expose
+			// those strings so scripts can read them, not just the TUI.
+			if m.Detail != "" {
+				if details == nil {
+					details = map[string]string{}
+				}
+				details[m.Name] = m.Detail
+			}
 			continue
 		}
 		if unavailable == nil {
@@ -462,6 +473,7 @@ func newJHost(h domain.HostView) jHost {
 		LastSeenUnix: h.LastSeen.Unix(),
 		Labels:       userLabels(h.Host.Context.Labels),
 		Metrics:      metrics,
+		Details:      details,
 		Unavailable:  unavailable,
 		Alerts:       h.Alerts,
 		HasLogs:      len(sources) > 0,

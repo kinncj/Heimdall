@@ -68,6 +68,35 @@ func TestCLISurfacesUnavailableMetrics(t *testing.T) {
 	}
 }
 
+func TestCLISurfacesOKMetricDetails(t *testing.T) {
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	now := time.Unix(1_700_000_000, 0)
+	reg.Enroll(domain.Host{ID: "gb10", DisplayName: "gb10"}, now)
+	reg.Observe("gb10", []domain.Metric{
+		{Name: "host.version", Unit: "info", Status: domain.StatusOK, Detail: "v2.2.8"},
+		{Name: "host.gpu", Unit: "info", Status: domain.StatusOK, Detail: "NVIDIA GB10"},
+		{Name: "gpu.vram", Status: domain.StatusOK, Gauge: 34.2, Detail: "43/122 GB shared"},
+		{Name: "gpu.util", Status: domain.StatusOK, Gauge: 95}, // no detail
+	}, nil, now)
+	reg.Evaluate(now)
+	h, _ := reg.Host("gb10")
+	j := newJHost(h)
+
+	if j.Details["host.version"] != "v2.2.8" || j.Details["host.gpu"] != "NVIDIA GB10" {
+		t.Errorf("info-metric details missing: %+v", j.Details)
+	}
+	if j.Details["gpu.vram"] != "43/122 GB shared" {
+		t.Errorf("gpu.vram detail missing: %+v", j.Details)
+	}
+	if _, ok := j.Details["gpu.util"]; ok {
+		t.Error("a metric with no detail must not appear in details")
+	}
+	// The value map is unchanged (backward compatible).
+	if j.Metrics["gpu.vram"] != 34.2 || j.Metrics["gpu.util"] != 95 {
+		t.Errorf("metrics values changed: %+v", j.Metrics)
+	}
+}
+
 func TestCLITopAndLogs(t *testing.T) {
 	h, _ := cliSeed(t).Host("web-01")
 	top := newJTop(h)

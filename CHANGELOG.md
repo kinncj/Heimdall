@@ -7,6 +7,18 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.8] - 2026-06-30
+
+### Added
+- **`heimdall-cli` now exposes OK-metric detail strings.** Info metrics
+  (`host.version`, `host.gpu`, `host.os`, `host.cpu`, `host.kernel`, `host.arch`)
+  carry their human value in the metric detail with a zero gauge, so the CLI
+  previously showed them as `0` and dropped the string entirely. A new `details`
+  object (metric name → detail text) surfaces them, plus notes like `gpu.vram`'s
+  `43/122 GB shared`. `metrics` stays value-only, so existing scripts are
+  unaffected. Now `heimdall-cli host <id> | jq -r '.details["host.version"]'`
+  works.
+
 ## [2.2.7] - 2026-06-30
 
 ### Fixed
