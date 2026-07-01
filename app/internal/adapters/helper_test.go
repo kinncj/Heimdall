@@ -144,20 +144,30 @@ func TestHelperEmptyReplyFallsBackToDirect(t *testing.T) {
 	}
 }
 
-// A reachable helper WITH ok metrics is authoritative — Direct must not run.
-func TestHelperOKReplyIsUsedWithoutDirect(t *testing.T) {
-	directRan := false
+// When the daemon can't read a privileged CPU power rail in-process (an
+// unprivileged Linux daemon: RAPL needs root — note GPU power alone doesn't
+// count, since RAPL still requires the helper), the helper is consulted and its
+// ok reading is used.
+func TestHelperUsedWhenInProcessLacksCPUPower(t *testing.T) {
 	a := Helper{
 		Client: fakeMetricClient{ms: []domain.Metric{
 			{Name: "power.cpu", Unit: "W", Status: domain.StatusOK, Gauge: 15},
+			{Name: "gpu.util", Unit: "%", Status: domain.StatusOK, Gauge: 40},
 		}},
-		Direct: func(context.Context) []domain.Metric { directRan = true; return nil },
+		Direct: func(context.Context) []domain.Metric {
+			// In-process sees the GPU (nvidia) but not the root-only CPU rail.
+			return []domain.Metric{
+				{Name: "gpu.util", Unit: "%", Status: domain.StatusOK, Gauge: 40},
+				{Name: "power.gpu", Unit: "W", Status: domain.StatusOK, Gauge: 60},
+			}
+		},
 	}
 	ms, _ := a.Collect(context.Background())
-	if directRan {
-		t.Fatal("Direct must not run when the helper already has ok metrics")
+	got := make(map[string]domain.Metric, len(ms))
+	for _, m := range ms {
+		got[m.Name] = m
 	}
-	if len(ms) != 1 || ms[0].Name != "power.cpu" || ms[0].Status != domain.StatusOK {
-		t.Fatalf("want helper power.cpu ok, got %+v", ms)
+	if got["power.cpu"].Status != domain.StatusOK || got["power.cpu"].Gauge != 15 {
+		t.Fatalf("want helper power.cpu 15 (in-process had no CPU rail), got %+v", got["power.cpu"])
 	}
 }

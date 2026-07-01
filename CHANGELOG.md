@@ -7,6 +7,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.4.2] - 2026-07-01
+
+### Fixed
+- **macOS: running the helper no longer blanks power/GPU — the real fix.** v2.4.1
+  only bounded the helper call, which still left too little of the 1 s budget for
+  the fallback, so a slow `powermetrics` helper on an M-series Pro/Max kept timing
+  out the whole privileged adapter. The adapter now reads **in-process first** and
+  consults the helper only when the daemon can't read a CPU power rail itself
+  (`power.cpu`/`power.total`/`power.pkg`) — i.e. an unprivileged Linux daemon that
+  needs the root helper for RAPL. On macOS the daemon already has power from
+  SMC/IOReport, so the helper is never on the critical path: running it on Apple
+  Silicon is finally harmless, not destructive. (GPU power alone doesn't count as
+  "has power" — a Linux box with an NVIDIA GPU still needs the helper for RAPL.)
+
 ## [2.4.1] - 2026-07-01
 
 ### Fixed

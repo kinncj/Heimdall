@@ -43,36 +43,59 @@ func (Helper) Describe() domain.AdapterInfo {
 }
 
 func (h Helper) Collect(ctx context.Context) ([]domain.Metric, error) {
+	direct := h.Direct
+	if direct == nil {
+		direct = helper.PrivilegedMetrics
+	}
+
+	// In-process first. Where the daemon can already read a privileged CPU power
+	// rail itself — macOS (SMC/IOReport are unprivileged) or a root daemon reading
+	// RAPL — the helper can only duplicate it, so we return the in-process read and
+	// never call the helper. That's what makes running the helper on Apple Silicon
+	// harmless: the daemon has power without it, so a slow helper (macOS
+	// powermetrics can take ~1s) is never on the critical path.
+	inproc := direct(ctx)
+	if hasOKPower(inproc) {
+		return inproc, nil
+	}
+
+	// Otherwise the daemon is unprivileged and can't read the CPU power rail
+	// (typically a Linux daemon that needs the root helper for RAPL). Consult the
+	// helper, bounded so a slow or hung one can't stall the collection cycle. A
+	// reachable-but-empty helper must never shadow the in-process read, so we only
+	// take the helper's result when it has an ok metric; else we fall back to
+	// whatever in-process produced.
 	var client metricCollector = h.Client
 	if client == nil {
 		client = helper.Client{}
 	}
-	// Use the helper only when it actually produced an ok reading. A reachable
-	// helper that returns nothing ok (e.g. a non-cgo helper, or one that can't
-	// read IOReport) must NOT shadow a working in-process source — otherwise
-	// running the helper on a Mac, where IOReport is unprivileged, blanks out the
-	// power/gpu the daemon was reading itself.
-	//
-	// The helper call is bounded to a slice of the deadline so a *slow* helper
-	// (e.g. macOS powermetrics, which can take ~1s) can't consume the whole
-	// adapter budget and starve the in-process fallback below — the helper stays
-	// additive, never subtractive, even under latency.
 	hctx, cancel := helperCallContext(ctx)
 	defer cancel()
 	if ms, err := client.Collect(hctx); err == nil && anyOK(ms) {
 		return ms, nil
 	}
-	direct := h.Direct
-	if direct == nil {
-		direct = helper.PrivilegedMetrics
-	}
-	if ms := direct(ctx); anyOK(ms) {
-		return ms, nil
+	if anyOK(inproc) {
+		return inproc, nil
 	}
 	return []domain.Metric{
 		{Name: "power.cpu", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 		{Name: "gpu.util", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 	}, nil
+}
+
+// hasOKPower reports whether the metrics already include a privileged CPU power
+// rail the daemon read itself — the signal that the helper would only duplicate.
+func hasOKPower(ms []domain.Metric) bool {
+	for _, m := range ms {
+		if m.Status != domain.StatusOK {
+			continue
+		}
+		switch m.Name {
+		case "power.total", "power.cpu", "power.pkg":
+			return true
+		}
+	}
+	return false
 }
 
 // helperCallContext caps the helper socket call so it leaves budget for the
