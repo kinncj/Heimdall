@@ -65,13 +65,26 @@ nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits
 - **`command not found`** — the NVIDIA driver/utilities are not installed, or
   not on the daemon's `PATH`.
 
-## CPU package power & temperature (helper)
+## CPU power & temperature (helper)
 
-NVIDIA covers the GPU; **CPU** package power and package temperature still come
-from the Linux privileged sources served by `heimdall-helper`:
+NVIDIA covers the GPU; **CPU** power and temperature come from the Linux
+privileged sources served by `heimdall-helper`:
 
-- **`power.pkg`** from RAPL, sampled as an energy-counter delta.
+- **`power.pkg`** — the CPU **package** (cores + uncore), from the RAPL package
+  domain, sampled as an energy-counter delta.
+- **`power.cpu`** — the CPU **cores** alone, from the RAPL `core` (pp0)
+  subdomain. Absent on CPUs that don't expose it; the field then stays blank.
 - **`temp.pkg`** from a trusted hwmon chip.
+
+> **Why `power.pkg` can read *below* `power.gpu`.** Both `power.pkg` and
+> `power.cpu` are the **CPU socket only**. A discrete NVIDIA card is a separate
+> power rail reported as `power.gpu`, so a workstation happily shows e.g.
+> `power.cpu 12W`, `power.pkg 17W`, `power.gpu 61W` — the GPU is not part of the
+> CPU package figure. Unlike macOS (where `power.pkg` is SMC `PSTR`, the true
+> whole-system total), Linux has no single "whole machine" power counter.
+>
+> `power.npu` stays `unavailable` on Intel/AMD hosts — their NPUs expose no
+> power counter yet, same as Apple's ANE.
 
 Either may be absent (no powercap, no recognised sensor) — that metric reads
 `unavailable` and the daemon keeps running. Set the helper up with the systemd

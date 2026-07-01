@@ -7,6 +7,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.6] - 2026-06-30
+
+### Added
+- **`power.cpu` on Linux from the RAPL `core` subdomain.** The Linux privileged
+  path only read the RAPL *package* (`power.pkg`), so the top view's CPU power
+  column was blank while the GPU showed 60W+ and the package ~17W — which read as
+  "where's the CPU, and why is the package below the GPU?". It now also reads the
+  `core` (pp0) subdomain as `power.cpu` (cores only). The two CPU rails are
+  labelled — `power.pkg` = "CPU package", `power.cpu` = "CPU cores" — to make
+  clear they are the CPU socket only; a discrete GPU is a separate rail
+  (`power.gpu`), which is why `power.pkg` can sit well below `power.gpu`. Absent
+  on CPUs with no `core` subdomain. `power.npu` stays unavailable — Intel/AMD
+  NPUs expose no power counter (same posture as Apple ANE / AMD XDNA).
+
 ## [2.2.5] - 2026-06-30
 
 ### Added
