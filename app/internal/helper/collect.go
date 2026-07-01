@@ -9,6 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strings"
+
+	"github.com/shirou/gopsutil/v4/mem"
 
 	"heimdall/app/internal/domain"
 )
@@ -36,8 +39,27 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	out = mergeByName(out, linuxPrivileged(ctx))
 	// Windows privileged sources (WMI thermal zones); no-op off Windows.
 	out = mergeByName(out, windowsPrivileged(ctx))
-	if text, err := runNvidiaSMI(ctx); err == nil {
-		out = mergeByName(out, parseNvidiaSMI(text))
+	if nv, present, err := runNvidiaSMI(ctx); present {
+		if err != nil {
+			// nvidia-smi is installed but broke (e.g. driver/library mismatch after
+			// an un-rebooted driver upgrade) — surface why instead of blanking GPU.
+			out = mergeByName(out, nvidiaErrorMetrics(nv))
+		} else {
+			ms := parseNvidiaSMI(nv)
+			// Unified-memory NVIDIA (GB10 Grace-Blackwell) has no aggregate VRAM
+			// counter — nvidia-smi memory.* reads [N/A]. Derive gpu.vram from the
+			// per-process compute-apps memory over the system RAM total.
+			if !hasName(ms, "gpu.vram") {
+				if apps, ok := runNvidiaComputeApps(ctx); ok {
+					if total, ok := systemMemoryTotalMiB(ctx); ok {
+						if m, ok := nvidiaVRAMFromComputeApps(apps, total); ok {
+							ms = append(ms, m)
+						}
+					}
+				}
+			}
+			out = mergeByName(out, ms)
+		}
 	}
 	// AMD: amd-smi when present (richer), then amdgpu sysfs fills any gaps. Both
 	// only add names not already set, so an NVIDIA or Apple reading is never
@@ -102,6 +124,13 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 			out = append(out, powerMetric("power.pkg", sum))
 		}
 	}
+	// Apple Silicon is unified memory — there is no discrete VRAM to read. Report
+	// gpu.vram as Unavailable-with-reason so the panel explains the dash instead
+	// of silently omitting the metric.
+	out = append(out, domain.Metric{
+		Name: "gpu.vram", Status: domain.StatusUnavailable,
+		Detail: "unified memory (no discrete VRAM)",
+	})
 	return out
 }
 
@@ -151,16 +180,59 @@ func runPowermetrics(ctx context.Context) (string, error) {
 	return string(out), err
 }
 
-func runNvidiaSMI(ctx context.Context) (string, error) {
-	path, err := exec.LookPath("nvidia-smi")
-	if err != nil {
-		return "", err
+// runNvidiaSMI queries the NVIDIA GPU. It distinguishes "not present" (nvidia-smi
+// not on PATH → present=false, contribute nothing) from "present but failed"
+// (present=true, err!=nil, out carries the reason) so the caller can surface a
+// broken driver instead of silently dropping every gpu.* key.
+func runNvidiaSMI(ctx context.Context) (out string, present bool, err error) {
+	path, lookErr := exec.LookPath("nvidia-smi")
+	if lookErr != nil {
+		return "", false, lookErr
 	}
-	out, err := exec.CommandContext(ctx, path,
+	b, runErr := exec.CommandContext(ctx, path,
 		"--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,"+
 			"clocks.current.graphics,utilization.memory,fan.speed",
 		"--format=csv,noheader,nounits").Output()
-	return string(out), err
+	if runErr != nil {
+		reason := strings.TrimSpace(string(b))
+		var ee *exec.ExitError
+		if errors.As(runErr, &ee) {
+			if s := strings.TrimSpace(string(ee.Stderr)); s != "" {
+				reason = s
+			}
+		}
+		if reason == "" {
+			reason = runErr.Error()
+		}
+		return reason, true, runErr
+	}
+	return string(b), true, nil
+}
+
+// runNvidiaComputeApps returns per-process GPU memory (MiB, one per line) for the
+// unified-memory VRAM fallback. Absent or failing nvidia-smi yields ok=false.
+func runNvidiaComputeApps(ctx context.Context) (string, bool) {
+	path, err := exec.LookPath("nvidia-smi")
+	if err != nil {
+		return "", false
+	}
+	out, err := exec.CommandContext(ctx, path,
+		"--query-compute-apps=used_memory", "--format=csv,noheader,nounits").Output()
+	if err != nil {
+		return "", false
+	}
+	return string(out), true
+}
+
+// systemMemoryTotalMiB reports total system RAM, the ceiling of the shared pool
+// on a unified-memory host. Used only as the denominator for the NVIDIA
+// compute-apps VRAM fallback.
+func systemMemoryTotalMiB(ctx context.Context) (float64, bool) {
+	vm, err := mem.VirtualMemoryWithContext(ctx)
+	if err != nil || vm == nil || vm.Total == 0 {
+		return 0, false
+	}
+	return float64(vm.Total) / (1024 * 1024), true
 }
 
 // amdGPU collects AMD GPU metrics, preferring amd-smi and falling back to amdgpu

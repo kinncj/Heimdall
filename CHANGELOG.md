@@ -7,6 +7,29 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- **GPU VRAM on unified-memory NVIDIA (GB10 Grace-Blackwell).** `nvidia-smi`
+  reports `memory.used`/`memory.total` as `[N/A]` on GB10 because there is no
+  discrete VRAM — so hosts like `promaxgb10` showed GPU util but no `gpu.vram`.
+  When the aggregate counter is `[N/A]`, `gpu.vram` is now derived from the sum
+  of per-process GPU memory (`nvidia-smi --query-compute-apps=used_memory`) over
+  the system RAM total, e.g. `gpu.vram  34%  41.6 / 121.6 GB (shared)`. Discrete
+  NVIDIA cards (with a real aggregate counter) are unchanged.
+
+### Fixed
+- **A broken `nvidia-smi` silently blanked GPU instead of saying why.** When
+  `nvidia-smi` is installed but exits non-zero — most often a
+  `Driver/library version mismatch` after the NVIDIA driver is upgraded without a
+  reboot — the collector dropped every `gpu.*` key, so the host looked like
+  Heimdall was failing. `gpu.util` and `gpu.vram` are now reported Unavailable
+  carrying the `nvidia-smi` reason (e.g. `nvidia-smi: Failed to initialize NVML:
+  Driver/library version mismatch`), so the fix (reboot the host) is obvious. The
+  underlying blank on such hosts is a host driver state, not a Heimdall bug.
+- **Apple Silicon `gpu.vram` now explains the dash.** Unified memory has no
+  discrete VRAM, so `gpu.vram` was simply absent on Macs. It is now reported
+  Unavailable with `unified memory (no discrete VRAM)` rather than silently
+  omitted.
+
 ## [2.2.4] - 2026-06-30
 
 ### Fixed

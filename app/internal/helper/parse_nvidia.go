@@ -62,6 +62,53 @@ func parseNvidiaSMI(text string) []domain.Metric {
 	return out
 }
 
+// nvidiaVRAMFromComputeApps derives gpu.vram on unified-memory NVIDIA hosts
+// (GB10 Grace-Blackwell), where nvidia-smi reports memory.used/total as [N/A]
+// because there is no discrete VRAM. It sums the per-process GPU memory from
+// `nvidia-smi --query-compute-apps=used_memory` and expresses it as a percent of
+// the system RAM total — the physical ceiling of the shared LPDDR5X pool. Extra
+// CSV columns (e.g. a pid,used_memory query) are tolerated; the first field is
+// used_memory in MiB.
+// A successful-but-empty query means the GPU is idle (no resident contexts); that
+// is a real 0%, not a missing reading — reporting it keeps gpu.vram stable rather
+// than flickering in and out as workloads come and go. Only a missing system
+// total (the denominator) makes the metric unavailable.
+func nvidiaVRAMFromComputeApps(text string, totalMiB float64) (domain.Metric, bool) {
+	if totalMiB <= 0 {
+		return domain.Metric{}, false
+	}
+	var usedMiB float64
+	for _, ln := range strings.Split(text, "\n") {
+		ln = strings.TrimSpace(ln)
+		if ln == "" {
+			continue
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(strings.Split(ln, ",")[0]), 64)
+		if err != nil {
+			continue
+		}
+		usedMiB += v
+	}
+	return domain.Metric{
+		Name: "gpu.vram", Unit: "percent", Status: domain.StatusOK,
+		Gauge:  usedMiB / totalMiB * 100,
+		Detail: fmt.Sprintf("%.1f / %.1f GB (shared)", usedMiB/1024, totalMiB/1024),
+	}, true
+}
+
+// nvidiaErrorMetrics turns a failed nvidia-smi invocation into a visible reason
+// rather than a silent gap. nvidia-smi is present but exited non-zero — a common
+// cause is a driver/library version mismatch after upgrading the NVIDIA driver
+// without rebooting — so gpu.util and gpu.vram are reported Unavailable carrying
+// the reason instead of disappearing.
+func nvidiaErrorMetrics(reason string) []domain.Metric {
+	detail := "nvidia-smi: " + firstNonEmptyLine(reason)
+	return []domain.Metric{
+		{Name: "gpu.util", Status: domain.StatusUnavailable, Detail: detail},
+		{Name: "gpu.vram", Status: domain.StatusUnavailable, Detail: detail},
+	}
+}
+
 func parseField(f []string, i int) (float64, bool) {
 	if i >= len(f) {
 		return 0, false
