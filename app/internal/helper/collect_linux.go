@@ -26,6 +26,10 @@ func linuxPrivileged(ctx context.Context) []domain.Metric {
 	var out []domain.Metric
 	if w, ok := raplPackageWatts(ctx); ok {
 		out = append(out, domain.Metric{Name: "power.pkg", Unit: "watts", Status: domain.StatusOK, Gauge: w, Detail: "CPU package"})
+	} else if len(raplDomainDirs()) == 0 {
+		// No powercap tree at all — the SoC exposes no RAPL (e.g. GB10 Grace/ARM).
+		// Say so rather than leaving CPU power a silent blank.
+		out = append(out, domain.Metric{Name: "power.pkg", Status: domain.StatusUnavailable, Detail: "no RAPL power sensor (SoC/ARM)"})
 	}
 	if w, ok := raplCoreWatts(ctx); ok {
 		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: w, Detail: "CPU cores"})

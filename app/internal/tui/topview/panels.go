@@ -166,24 +166,27 @@ func (m Model) powerPanel(t tier, w int) panelSpec {
 	cpu := m.numVal("power.cpu", " W", "%.1f")
 	gpu := m.numVal("power.gpu", " W", "%.1f")
 	npu := m.numVal("power.npu", " W", "%.1f")
-	pwrVal := m.numVal("power.pkg", " W", "%.0f")
+	// Headline the whole-machine total (source-aware, from the collector) so a
+	// busy GPU isn't hidden behind the much smaller CPU-package figure.
+	totalVal := m.numVal("power.total", " W", "%.0f")
 
 	if t == tierNarrow {
 		return panelSpec{title: "POWER", lines: []string{
-			lab("pkg ") + pkg + "  " + lab("cpu ") + cpu + "  " + lab("gpu ") + gpu + "  " + lab("npu ") + npu,
-			lab("pwr ") + m.sparkW("power.pkg", w) + "  " + pwrVal,
+			lab("cpu ") + cpu + "  " + lab("gpu ") + gpu + "  " + lab("npu ") + npu,
+			lab("total ") + m.sparkW("power.total", w) + "  " + totalVal,
 		}}
 	}
 	if t == tierMedium {
 		return panelSpec{title: "POWER", lines: []string{
-			lab("pkg ") + pkg + "   " + lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
-			lab("pwr ") + m.sparkW("power.pkg", w) + "  " + pwrVal,
+			lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
+			lab("total ") + m.sparkW("power.total", w) + "  " + totalVal,
+			lab("CPU pkg ") + pkg,
 		}}
 	}
 	return panelSpec{title: "POWER", lines: []string{
-		lab("pkg ") + pkg,
+		lab("total ") + m.sparkW("power.total", w) + "  " + totalVal,
 		lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
-		lab("pwr ") + m.sparkW("power.pkg", w) + "  " + pwrVal,
+		lab("CPU pkg ") + pkg,
 	}}
 }
 

@@ -77,11 +77,21 @@ privileged sources served by `heimdall-helper`:
 - **`temp.pkg`** from a trusted hwmon chip.
 
 > **Why `power.pkg` can read *below* `power.gpu`.** Both `power.pkg` and
-> `power.cpu` are the **CPU socket only**. A discrete NVIDIA card is a separate
-> power rail reported as `power.gpu`, so a workstation happily shows e.g.
-> `power.cpu 12W`, `power.pkg 17W`, `power.gpu 61W` — the GPU is not part of the
-> CPU package figure. Unlike macOS (where `power.pkg` is SMC `PSTR`, the true
-> whole-system total), Linux has no single "whole machine" power counter.
+> `power.cpu` are the **CPU socket only** (`power.cpu` is the cores, a subset of
+> the whole `power.pkg` package). A discrete NVIDIA card is a separate power rail
+> reported as `power.gpu`, so a workstation happily shows e.g. `power.cpu 12W`,
+> `power.pkg 17W`, `power.gpu 61W` — the GPU is not part of the CPU package
+> figure. **`power.total`** is the source-aware whole-machine sum the top view
+> headlines: on a discrete-NVIDIA host it is `pkg + gpu (+ npu)`; on Apple it is
+> `pkg` alone (SMC `PSTR` already covers everything); on an AMD APU it is `pkg`
+> alone (the iGPU is inside the package).
+
+### GB10 (Grace/ARM) has no CPU power sensor
+
+A GB10 exposes **no** RAPL, INA, or SoC power sensor to the OS — only the GPU
+rail via `nvidia-smi`. So `power.pkg` reads `unavailable` (`no RAPL power sensor
+(SoC/ARM)`) and `power.total` is the GPU power alone. The Grace CPU / module draw
+is simply not measurable from userspace on this platform.
 >
 > `power.npu` stays `unavailable` on Intel/AMD hosts — their NPUs expose no
 > power counter yet, same as Apple's ANE.

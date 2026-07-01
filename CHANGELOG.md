@@ -7,6 +7,26 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.2.9] - 2026-07-01
+
+### Added
+- **`power.total` — a source-aware whole-machine power figure**, now headlined by
+  the top-view POWER panel. The headline used to be `power.pkg` (CPU package
+  only), so a workstation pulling 506 W on the GPU read as ~32 W. `power.total`
+  sums the right rails per platform **without double-counting**: Apple =
+  `power.pkg` (SMC `PSTR` is already whole-system); NVIDIA / GB10 =
+  `pkg + gpu + npu` (the GPU is a separate rail); AMD APU / integrated = `pkg`
+  (the iGPU is already inside the package). rtx-pro now reads ~538 W, GB10 ~50 W.
+- **`power.pkg` on a no-RAPL SoC now says why.** GB10 (Grace/ARM) exposes no
+  RAPL, INA, or any CPU/module power sensor, so `power.pkg` reads Unavailable with
+  `no RAPL power sensor (SoC/ARM)` instead of a silent blank; there `power.total`
+  is the GPU rail alone.
+
+### Changed
+- POWER panel layout: a `total` headline, then `cpu / gpu / npu`, then `CPU pkg`
+  — making the CPU-cores (`cpu`) vs CPU-package (`pkg`) distinction explicit
+  (`cpu` is the cores, a subset of the whole `pkg` socket).
+
 ## [2.2.8] - 2026-06-30
 
 ### Added

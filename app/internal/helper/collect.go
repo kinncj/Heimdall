@@ -39,6 +39,11 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	out = mergeByName(out, linuxPrivileged(ctx))
 	// Windows privileged sources (WMI thermal zones); no-op off Windows.
 	out = mergeByName(out, windowsPrivileged(ctx))
+	// gpuSeparate marks the GPU as its own power rail (a discrete card, or the GB10
+	// superchip where the Blackwell GPU is metered apart from the Grace CPU). Only
+	// nvidia-smi reports such a rail here; an integrated GPU (Apple, AMD APU) is
+	// already inside the CPU package, so its power must not be added to the total.
+	gpuSeparate := false
 	if nv, present, err := runNvidiaSMI(ctx); present {
 		if err != nil {
 			// nvidia-smi is installed but broke (e.g. driver/library mismatch after
@@ -46,6 +51,9 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 			out = mergeByName(out, nvidiaErrorMetrics(nv))
 		} else {
 			ms := parseNvidiaSMI(nv)
+			if hasName(ms, "power.gpu") {
+				gpuSeparate = true
+			}
 			// Unified-memory NVIDIA (GB10 Grace-Blackwell) has no aggregate VRAM
 			// counter — nvidia-smi memory.* reads [N/A]. Derive gpu.vram from the
 			// per-process compute-apps memory over the system RAM total.
@@ -65,6 +73,7 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	// only add names not already set, so an NVIDIA or Apple reading is never
 	// shadowed, and a non-AMD host contributes nothing.
 	out = mergeByName(out, amdGPU(ctx))
+	out = withTotalPower(out, runtime.GOOS, gpuSeparate)
 	out = ensureNPUUtil(out)
 	if !hasOK(out) {
 		return []domain.Metric{
@@ -73,6 +82,43 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 		}
 	}
 	return out
+}
+
+// withTotalPower appends a source-aware power.total so the panel can headline
+// real whole-machine draw instead of just the CPU package. It must never
+// double-count: Apple's power.pkg is SMC PSTR (already whole-system), and an
+// integrated GPU is already inside the CPU package — only a separate GPU rail
+// (discrete NVIDIA, or the GB10 Grace+Blackwell split) is added.
+func withTotalPower(ms []domain.Metric, goos string, gpuSeparate bool) []domain.Metric {
+	pkg, hasPkg := okGauge(ms, "power.pkg")
+	gpu, hasGPU := okGauge(ms, "power.gpu")
+	npu, _ := okGauge(ms, "power.npu")
+	var total float64
+	switch {
+	case goos == "darwin":
+		total = pkg // SMC PSTR is already whole-system
+	case gpuSeparate:
+		total = pkg + gpu + npu // CPU package + a discrete/superchip GPU rail
+	default:
+		total = pkg // integrated GPU is already counted inside the package
+		if !hasPkg && hasGPU {
+			total = gpu
+		}
+	}
+	if total <= 0 {
+		return ms
+	}
+	return append(ms, domain.Metric{Name: "power.total", Unit: "watts", Status: domain.StatusOK, Gauge: total, Detail: "system total"})
+}
+
+// okGauge returns the gauge of an OK metric by name.
+func okGauge(ms []domain.Metric, name string) (float64, bool) {
+	for _, m := range ms {
+		if m.Name == name && m.Status == domain.StatusOK {
+			return m.Gauge, true
+		}
+	}
+	return 0, false
 }
 
 // ensureNPUUtil guarantees an npu.util reading. NPUs (Apple ANE, Intel AI Boost,
