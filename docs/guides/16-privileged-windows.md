@@ -64,13 +64,20 @@ Set it up once:
    sc.exe start Scaphandre
    ```
 
-4. Verify:
+4. Verify — **in PowerShell** (the `&` call operator and `Invoke-WebRequest` are
+   PowerShell; don't paste these into `cmd.exe`), one per line:
 
-   ```
-   driverquery /v | findstr capha
+   ```powershell
+   driverquery /v | Select-String capha
    & 'C:\Program Files (x86)\scaphandre\scaphandre.exe' stdout
-   powershell -Command "(Invoke-WebRequest http://127.0.0.1:8080/metrics).Content | Select-String scaph_socket_power"
+   (Invoke-WebRequest http://127.0.0.1:8080/metrics -UseBasicParsing).Content | Select-String scaph_socket_power
    ```
+
+   The cmd.exe equivalents are `driverquery /v | findstr /i capha`,
+   `"C:\Program Files (x86)\scaphandre\scaphandre.exe" stdout`, and
+   `curl http://127.0.0.1:8080/metrics | findstr scaph_socket_power`. If step 2
+   prints `Failed to open device : HANDLE(-1)`, the driver isn't loaded — do the
+   test-signing step above and reboot.
 
 Heimdall scrapes `http://127.0.0.1:8080/metrics` and reports the summed per-socket
 power (`scaph_socket_power_microwatts`) as `power.cpu` — pure Go, no cgo. If
