@@ -41,14 +41,41 @@ which installs the signed Hubblo RAPL driver and runs as a Windows service.
 
 Set it up once:
 
-1. Download **Scaphandre ≥ 1.0.0** for Windows (its installer bundles the Hubblo
-   RAPL driver — Intel and AMD since Ryzen).
-2. Run the Prometheus exporter, e.g. `scaphandre prometheus` (default
-   `http://127.0.0.1:8080/metrics`), ideally as a service so it starts at boot.
+1. **(only if the driver won't load — dev/unsigned builds)** enable test-signing
+   as administrator, then **reboot**:
 
-Heimdall scrapes that endpoint and reports the summed per-socket power
-(`scaph_socket_power_microwatts`) as `power.cpu` — pure Go, no cgo. If Scaphandre
-listens elsewhere, point Heimdall at it with `HEIMDALL_SCAPHANDRE_URL`.
+   ```
+   bcdedit.exe -set TESTSIGNING ON
+   bcdedit.exe -set nointegritychecks on
+   ```
+
+   The tell is `Failed to open device : HANDLE(-1)` from `scaphandre stdout`.
+
+2. Download the latest **Scaphandre** Windows `.exe` installer (≥ 1.0.0) and run
+   it **as administrator** — it installs the Hubblo RAPL driver (Intel and AMD
+   since Ryzen).
+
+3. Register it as a service running the **`prometheus`** exporter (the *pull*
+   exporter that listens locally — **not** `prometheus-push`, which pushes to a
+   remote gateway):
+
+   ```
+   sc.exe create Scaphandre binPath="C:\Program Files (x86)\scaphandre\scaphandre.exe prometheus -a 127.0.0.1 -p 8080" DisplayName=Scaphandre start=auto
+   sc.exe start Scaphandre
+   ```
+
+4. Verify:
+
+   ```
+   driverquery /v | findstr capha
+   & 'C:\Program Files (x86)\scaphandre\scaphandre.exe' stdout
+   powershell -Command "(Invoke-WebRequest http://127.0.0.1:8080/metrics).Content | Select-String scaph_socket_power"
+   ```
+
+Heimdall scrapes `http://127.0.0.1:8080/metrics` and reports the summed per-socket
+power (`scaph_socket_power_microwatts`) as `power.cpu` — pure Go, no cgo. If
+Scaphandre listens elsewhere, point Heimdall at it with `HEIMDALL_SCAPHANDRE_URL`;
+restart `heimdall-daemon` once Scaphandre is up.
 
 When Scaphandre isn't reachable, `power.cpu` reads `unavailable` with
 `no RAPL on Windows — run Scaphandre for CPU power` rather than failing.
