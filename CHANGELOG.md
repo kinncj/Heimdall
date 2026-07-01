@@ -7,6 +7,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-07-01
+
+### Changed
+- **Windows CPU power now comes from Scaphandre, not LibreHardwareMonitor.**
+  Scaphandre installs the signed Hubblo RAPL driver and runs as a Windows service
+  exposing a Prometheus endpoint — a far cleaner install than a GUI monitor.
+  Heimdall scrapes it (`scaph_socket_power_microwatts`, summed) and reports
+  `power.cpu` (Intel + AMD, pure Go, no cgo). Point it at a non-default endpoint
+  with `HEIMDALL_SCAPHANDRE_URL`. Without Scaphandre, `power.cpu` reads
+  `no RAPL on Windows — run Scaphandre for CPU power`. See guide 16.
+
 ## [2.3.1] - 2026-07-01
 
 ### Added

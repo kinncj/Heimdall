@@ -72,7 +72,7 @@ rather than failing. See [Privileged Metrics](guides/04-privileged-metrics.md).
 | `temp.pkg` | °C | CPU package temperature |
 | `gpu.temp` | °C | GPU temperature |
 | `power.total` | W | whole-machine power — `cpu + gpu (+ npu)`, or the SMC whole-system total on macOS |
-| `power.cpu` | W | CPU power (RAPL package on Linux; IOReport CPU on macOS) |
+| `power.cpu` | W | CPU power — RAPL package (Linux), IOReport CPU (macOS), Scaphandre (Windows, when running); Unavailable-with-reason where no source exists (Apple Pro/Max, Windows without Scaphandre, GB10) |
 | `power.gpu` | W | GPU power |
 | `power.npu` | W | NPU / accelerator power (Apple Silicon ANE today). The legacy `power.ane` key is accepted and normalised to `power.npu` on ingest. |
 | `npu.util` | percent | NPU utilisation (where the platform exposes it; otherwise unavailable) |

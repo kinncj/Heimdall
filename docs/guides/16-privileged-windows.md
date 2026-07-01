@@ -35,17 +35,23 @@ yet exercised on Windows).
 ## CPU power
 
 Windows exposes no RAPL to user space — reading the CPU energy MSRs needs a
-ring-0 driver, which Heimdall does not ship (that's exactly what tools like
-Scaphandre and WinPowerMonitor install). Rather than sign our own driver,
-Heimdall reads CPU power from a **driver-backed monitor you already run**:
+ring-0 driver, which Heimdall does not ship. Rather than sign our own driver,
+Heimdall reads CPU power from **[Scaphandre](https://github.com/hubblo-org/scaphandre)**,
+which installs the signed Hubblo RAPL driver and runs as a Windows service.
 
-- **[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)**
-  — start it (its signed driver reads the RAPL MSRs on Intel **and** AMD) and
-  leave "Remote Web Server / WMI" enabled. Heimdall queries its WMI provider
-  (`root/LibreHardwareMonitor`) and reports the CPU-package sensor as `power.cpu`.
+Set it up once:
 
-When no such monitor is running, `power.cpu` reads `unavailable` with
-`no RAPL on Windows — run LibreHardwareMonitor for CPU power` rather than failing.
+1. Download **Scaphandre ≥ 1.0.0** for Windows (its installer bundles the Hubblo
+   RAPL driver — Intel and AMD since Ryzen).
+2. Run the Prometheus exporter, e.g. `scaphandre prometheus` (default
+   `http://127.0.0.1:8080/metrics`), ideally as a service so it starts at boot.
+
+Heimdall scrapes that endpoint and reports the summed per-socket power
+(`scaph_socket_power_microwatts`) as `power.cpu` — pure Go, no cgo. If Scaphandre
+listens elsewhere, point Heimdall at it with `HEIMDALL_SCAPHANDRE_URL`.
+
+When Scaphandre isn't reachable, `power.cpu` reads `unavailable` with
+`no RAPL on Windows — run Scaphandre for CPU power` rather than failing.
 
 ## How the helper works on Windows
 
@@ -61,7 +67,7 @@ daemon** can't. Here's what each Windows source needs:
 |---|---|---|
 | `nvidia-smi` (`gpu.util/vram/temp`, `power.gpu`) | normally **no** | richest panel on Windows when an NVIDIA GPU is present |
 | WMI `temp.pkg` (`MSAcpi_ThermalZoneTemperature`) | usually **yes** | only if the firmware exposes an ACPI thermal zone — many laptops don't |
-| `power.cpu` | no (reads WMI) | needs **LibreHardwareMonitor** running (its driver reads RAPL); else `unavailable` |
+| `power.cpu` | no (scrapes HTTP) | needs **Scaphandre** running (installs the RAPL driver, exposes Prometheus); else `unavailable` |
 
 `nvidia-smi` is normally unprivileged, so a daemon running as your user *should*
 collect the GPU panel without the helper. But account/PATH setups vary — don't
