@@ -10,7 +10,7 @@ Windows specifics.
 |---|---|---|
 | `temp.pkg` | **WMI** `MSAcpi_ThermalZoneTemperature` via PowerShell | sometimes |
 | `gpu.util`, `gpu.vram`, `gpu.temp`, `power.gpu` (NVIDIA) | `nvidia-smi` | no |
-| `power.pkg` | — (RAPL is inaccessible without a kernel driver) | — |
+| `power.cpu` | — (RAPL is inaccessible without a kernel driver) | — |
 
 CPU/memory/disk/network/uptime are always available unprivileged, as on every
 platform. The Windows-specific privileged path adds **package temperature** from
@@ -34,7 +34,7 @@ yet exercised on Windows).
 
 ## CPU package power
 
-`power.pkg` is **not available on Windows**. RAPL is reachable only through a
+`power.cpu` is **not available on Windows**. RAPL is reachable only through a
 signed kernel driver, which Heimdall does not ship — so package power stays
 `unavailable` rather than failing. This is a platform limit, not a
 misconfiguration.
@@ -53,7 +53,7 @@ daemon** can't. Here's what each Windows source needs:
 |---|---|---|
 | `nvidia-smi` (`gpu.util/vram/temp`, `power.gpu`) | normally **no** | richest panel on Windows when an NVIDIA GPU is present |
 | WMI `temp.pkg` (`MSAcpi_ThermalZoneTemperature`) | usually **yes** | only if the firmware exposes an ACPI thermal zone — many laptops don't |
-| `power.pkg` (RAPL) | — | **not available** on Windows, no driver |
+| `power.cpu` (RAPL) | — | **not available** on Windows, no driver |
 
 `nvidia-smi` is normally unprivileged, so a daemon running as your user *should*
 collect the GPU panel without the helper. But account/PATH setups vary — don't
@@ -75,7 +75,7 @@ The helper's one Windows-exclusive contribution is WMI `temp.pkg`, which needs a
 elevated process **and** a firmware thermal zone. If a host shows `gpu.*` but
 never `temp.pkg`, it has no thermal zone and the helper adds nothing there.
 
-> On Linux/macOS the helper does more — RAPL `power.pkg`, hwmon `temp.pkg`, full
+> On Linux/macOS the helper does more — RAPL `power.cpu`, hwmon `temp.pkg`, full
 > Apple thermal — so this "is it redundant?" question is Windows-specific.
 
 ## Run as Windows services
@@ -155,6 +155,6 @@ heimdall-cli --hub YOUR_HUB:9090 host $env:COMPUTERNAME | ConvertFrom-Json
 ```
 
 Expect `gpu.*` if an NVIDIA GPU is present. `temp.pkg` populates only where the
-firmware exposes a thermal zone **and** the helper runs elevated. `power.pkg`
+firmware exposes a thermal zone **and** the helper runs elevated. `power.cpu`
 stays `unavailable`. If `gpu.*` shows but `temp.pkg` does not, that host has no
 ACPI thermal zone and the helper is contributing nothing — you can drop it.

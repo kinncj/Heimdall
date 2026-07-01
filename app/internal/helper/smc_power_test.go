@@ -11,11 +11,11 @@ import (
 
 // On Apple Silicon Pro/Max the IOReport energy channels report 0 for CPU/ANE and
 // only a sub-watt GPU figure. SMC PSTR ("System Total Power") is the real number.
-// power.pkg must come from SMC, not the ~0.1W IOReport sum.
+// power.total must come from SMC, not the ~0.1W IOReport sum.
 func TestAssembleApplePower_SMCWinsOverPhantomIOReport(t *testing.T) {
 	got := byName(assembleApplePower(0, 0.1, 0, 5, true /*ioOK*/, 42.0, true /*smcOK*/, nil))
-	if m := got["power.pkg"]; m.Status != domain.StatusOK || m.Gauge != 42.0 {
-		t.Errorf("power.pkg = %+v, want 42W from SMC", m)
+	if m := got["power.total"]; m.Status != domain.StatusOK || m.Gauge != 42.0 {
+		t.Errorf("power.total = %+v, want 42W from SMC", m)
 	}
 	if m := got["power.gpu"]; m.Status != domain.StatusOK || m.Gauge != 0.1 {
 		t.Errorf("power.gpu = %+v, want 0.1W from IOReport", m)
@@ -31,10 +31,10 @@ func TestAssembleApplePower_SMCWinsOverPhantomIOReport(t *testing.T) {
 // Without SMC, a sub-watt IOReport sum must not shadow a real powermetrics package
 // reading (the old mergeByName poisoning).
 func TestAssembleApplePower_PowermetricsBeatsPhantomIOReport(t *testing.T) {
-	pm := []domain.Metric{{Name: "power.pkg", Unit: "watts", Status: domain.StatusOK, Gauge: 12.7}}
+	pm := []domain.Metric{{Name: "power.total", Unit: "watts", Status: domain.StatusOK, Gauge: 12.7}}
 	got := byName(assembleApplePower(0, 0.1, 0, -1, true, 0, false /*no smc*/, pm))
-	if m := got["power.pkg"]; m.Status != domain.StatusOK || m.Gauge != 12.7 {
-		t.Errorf("power.pkg = %+v, want 12.7W from powermetrics", m)
+	if m := got["power.total"]; m.Status != domain.StatusOK || m.Gauge != 12.7 {
+		t.Errorf("power.total = %+v, want 12.7W from powermetrics", m)
 	}
 }
 
@@ -42,15 +42,15 @@ func TestAssembleApplePower_PowermetricsBeatsPhantomIOReport(t *testing.T) {
 // last resort (back-compat for chips that do expose per-domain energy).
 func TestAssembleApplePower_IOReportSumLastResort(t *testing.T) {
 	got := byName(assembleApplePower(8, 3, 0, -1, true, 0, false, nil))
-	if m := got["power.pkg"]; m.Status != domain.StatusOK || m.Gauge != 11 {
-		t.Errorf("power.pkg = %+v, want 11W from IOReport sum", m)
+	if m := got["power.total"]; m.Status != domain.StatusOK || m.Gauge != 11 {
+		t.Errorf("power.total = %+v, want 11W from IOReport sum", m)
 	}
 }
 
-// No sources at all: no power.pkg emitted (caller renders Unavailable).
+// No sources at all: no power.total emitted (caller renders Unavailable).
 func TestAssembleApplePower_NoSources(t *testing.T) {
 	got := byName(assembleApplePower(0, 0, 0, -1, false, 0, false, nil))
-	if _, ok := got["power.pkg"]; ok {
-		t.Errorf("power.pkg should be absent when no source yields a value")
+	if _, ok := got["power.total"]; ok {
+		t.Errorf("power.total should be absent when no source yields a value")
 	}
 }

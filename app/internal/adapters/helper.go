@@ -36,7 +36,7 @@ type Helper struct {
 func (Helper) Describe() domain.AdapterInfo {
 	return domain.AdapterInfo{
 		ID:                "privileged",
-		Metrics:           []string{"power.pkg", "power.cpu", "power.gpu", "power.npu", "gpu.util", "gpu.vram", "gpu.temp", "gpu.clock", "gpu.mem.util", "gpu.fan", "npu.util"},
+		Metrics:           []string{"power.total", "power.cpu", "power.gpu", "power.npu", "gpu.util", "gpu.vram", "gpu.temp", "gpu.clock", "gpu.mem.util", "gpu.fan", "npu.util"},
 		RequiresPrivilege: true,
 	}
 }
@@ -62,7 +62,7 @@ func (h Helper) Collect(ctx context.Context) ([]domain.Metric, error) {
 		return ms, nil
 	}
 	return []domain.Metric{
-		{Name: "power.pkg", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
+		{Name: "power.cpu", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 		{Name: "gpu.util", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 	}, nil
 }

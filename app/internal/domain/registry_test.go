@@ -121,15 +121,15 @@ func TestNonOKStatusPreserved(t *testing.T) {
 	r := NewRegistry(time.Second)
 	r.Register(okAdapter("gpu", []string{"gpu.util"},
 		Metric{Name: "gpu.util", Status: StatusUnavailable, Detail: "no NVIDIA GPU"}))
-	r.Register(okAdapter("power", []string{"power.pkg"},
-		Metric{Name: "power.pkg", Status: StatusInsufficientPermission, Detail: "needs helper"}))
+	r.Register(okAdapter("power", []string{"power.cpu"},
+		Metric{Name: "power.cpu", Status: StatusInsufficientPermission, Detail: "needs helper"}))
 
 	got := metricsByName(r.Collect(context.Background()))
 	if got["gpu.util"].Status != StatusUnavailable {
 		t.Errorf("Unavailable coerced: %+v", got["gpu.util"])
 	}
-	if got["power.pkg"].Status != StatusInsufficientPermission {
-		t.Errorf("InsufficientPermission coerced: %+v", got["power.pkg"])
+	if got["power.cpu"].Status != StatusInsufficientPermission {
+		t.Errorf("InsufficientPermission coerced: %+v", got["power.cpu"])
 	}
 }
 

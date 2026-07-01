@@ -347,7 +347,7 @@ func gridColumns() []gridColumn {
 		{"TEMP", 7, func(m Model, b map[string]domain.Metric) string { return m.temp(pickMetric(b, "temp.pkg", "gpu.temp")) }},
 		{"GPU", 6, func(m Model, b map[string]domain.Metric) string { return m.plain(b["gpu.util"], "%") }},
 		{"PWR", 6, func(m Model, b map[string]domain.Metric) string {
-			return m.plain(pickMetric(b, "power.pkg", "power.gpu"), "W")
+			return m.plain(pickMetric(b, "power.total", "power.cpu", "power.gpu"), "W")
 		}},
 	}
 }

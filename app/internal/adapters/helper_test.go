@@ -22,7 +22,7 @@ func TestHelperAdapterNeedsHelperWhenAbsent(t *testing.T) {
 	a := Helper{
 		Client: absentClient(t),
 		Direct: func(context.Context) []domain.Metric {
-			return []domain.Metric{{Name: "power.pkg", Status: domain.StatusUnavailable}}
+			return []domain.Metric{{Name: "power.cpu", Status: domain.StatusUnavailable}}
 		},
 	}
 	ms, err := a.Collect(context.Background())
@@ -33,7 +33,7 @@ func TestHelperAdapterNeedsHelperWhenAbsent(t *testing.T) {
 	for _, m := range ms {
 		got[m.Name] = m.Status
 	}
-	for _, name := range []string{"power.pkg", "gpu.util"} {
+	for _, name := range []string{"power.cpu", "gpu.util"} {
 		if got[name] != domain.StatusInsufficientPermission {
 			t.Errorf("%s status = %v, want insufficient_permission", name, got[name])
 		}
@@ -47,7 +47,7 @@ func TestHelperAdapterUsesDirectWhenPrivileged(t *testing.T) {
 		Client: absentClient(t),
 		Direct: func(context.Context) []domain.Metric {
 			return []domain.Metric{
-				{Name: "power.pkg", Unit: "W", Status: domain.StatusOK, Gauge: 12.5},
+				{Name: "power.cpu", Unit: "W", Status: domain.StatusOK, Gauge: 12.5},
 				{Name: "gpu.util", Unit: "%", Status: domain.StatusOK, Gauge: 40},
 			}
 		},
@@ -60,8 +60,8 @@ func TestHelperAdapterUsesDirectWhenPrivileged(t *testing.T) {
 	for _, m := range ms {
 		got[m.Name] = m
 	}
-	if got["power.pkg"].Status != domain.StatusOK || got["power.pkg"].Gauge != 12.5 {
-		t.Errorf("power.pkg = %+v, want 12.5W ok", got["power.pkg"])
+	if got["power.cpu"].Status != domain.StatusOK || got["power.cpu"].Gauge != 12.5 {
+		t.Errorf("power.cpu = %+v, want 12.5W ok", got["power.cpu"])
 	}
 	if got["gpu.util"].Status != domain.StatusOK || got["gpu.util"].Gauge != 40 {
 		t.Errorf("gpu.util = %+v, want 40%% ok", got["gpu.util"])
@@ -82,7 +82,7 @@ func (f fakeMetricClient) Collect(context.Context) ([]domain.Metric, error) { re
 func TestHelperEmptyReplyFallsBackToDirect(t *testing.T) {
 	a := Helper{
 		Client: fakeMetricClient{ms: []domain.Metric{
-			{Name: "power.pkg", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
+			{Name: "power.cpu", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 			{Name: "gpu.util", Status: domain.StatusInsufficientPermission, Detail: "needs helper"},
 		}},
 		Direct: func(context.Context) []domain.Metric {
@@ -110,7 +110,7 @@ func TestHelperOKReplyIsUsedWithoutDirect(t *testing.T) {
 	directRan := false
 	a := Helper{
 		Client: fakeMetricClient{ms: []domain.Metric{
-			{Name: "power.pkg", Unit: "W", Status: domain.StatusOK, Gauge: 15},
+			{Name: "power.cpu", Unit: "W", Status: domain.StatusOK, Gauge: 15},
 		}},
 		Direct: func(context.Context) []domain.Metric { directRan = true; return nil },
 	}
@@ -118,7 +118,7 @@ func TestHelperOKReplyIsUsedWithoutDirect(t *testing.T) {
 	if directRan {
 		t.Fatal("Direct must not run when the helper already has ok metrics")
 	}
-	if len(ms) != 1 || ms[0].Name != "power.pkg" || ms[0].Status != domain.StatusOK {
-		t.Fatalf("want helper power.pkg ok, got %+v", ms)
+	if len(ms) != 1 || ms[0].Name != "power.cpu" || ms[0].Status != domain.StatusOK {
+		t.Fatalf("want helper power.cpu ok, got %+v", ms)
 	}
 }

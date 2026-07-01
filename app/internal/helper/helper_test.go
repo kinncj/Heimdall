@@ -42,8 +42,8 @@ Combined Power (CPU + GPU + ANE): 12700 mW
 	if m := got["power.gpu"]; m.Status != domain.StatusOK || m.Gauge != 3.1 {
 		t.Errorf("power.gpu = %+v, want 3.1W ok", m)
 	}
-	if m := got["power.pkg"]; m.Status != domain.StatusOK || m.Gauge != 12.7 {
-		t.Errorf("power.pkg = %+v, want 12.7W ok", m)
+	if m := got["power.total"]; m.Status != domain.StatusOK || m.Gauge != 12.7 {
+		t.Errorf("power.total = %+v, want 12.7W ok", m)
 	}
 	if m := got["gpu.util"]; m.Status != domain.StatusOK || m.Gauge != 37.5 {
 		t.Errorf("gpu.util = %+v, want 37.5%% ok", m)
@@ -53,8 +53,8 @@ Combined Power (CPU + GPU + ANE): 12700 mW
 func TestParsePowermetricsDerivesPackageFromParts(t *testing.T) {
 	sample := "CPU Power: 5000 mW\nGPU Power: 2000 mW\n"
 	got := byName(parsePowermetrics(sample))
-	if m := got["power.pkg"]; m.Status != domain.StatusOK || m.Gauge != 7.0 {
-		t.Errorf("derived power.pkg = %+v, want 7.0W", m)
+	if m := got["power.total"]; m.Status != domain.StatusOK || m.Gauge != 7.0 {
+		t.Errorf("derived power.total = %+v, want 7.0W", m)
 	}
 }
 
@@ -82,8 +82,8 @@ func TestParsePowermetricsCPUPowerGap(t *testing.T) {
 	if m := got["power.gpu"]; m.Status != domain.StatusOK || m.Gauge != 0.57 {
 		t.Errorf("power.gpu = %+v, want 0.57W", m)
 	}
-	if m := got["power.pkg"]; m.Status != domain.StatusOK || m.Gauge != 0.57 {
-		t.Errorf("power.pkg = %+v, want 0.57W (measured components only)", m)
+	if m := got["power.total"]; m.Status != domain.StatusOK || m.Gauge != 0.57 {
+		t.Errorf("power.total = %+v, want 0.57W (measured components only)", m)
 	}
 	if m := got["gpu.util"]; m.Status != domain.StatusOK || m.Gauge != 24 {
 		t.Errorf("gpu.util = %+v, want 24%%", m)
@@ -109,7 +109,7 @@ func TestParseNvidiaSMI(t *testing.T) {
 func TestServerClientRoundTrip(t *testing.T) {
 	sock := filepath.Join(t.TempDir(), "h.sock")
 	want := []domain.Metric{
-		{Name: "power.pkg", Unit: "W", Status: domain.StatusOK, Gauge: 11.5},
+		{Name: "power.total", Unit: "W", Status: domain.StatusOK, Gauge: 11.5},
 		{Name: "gpu.util", Unit: "%", Status: domain.StatusOK, Gauge: 40},
 	}
 	srv := &Server{SockPath: sock, Collect: func(context.Context) []domain.Metric { return want }}
@@ -131,8 +131,8 @@ func TestServerClientRoundTrip(t *testing.T) {
 		t.Fatalf("collect: %v", err)
 	}
 	g := byName(got)
-	if m := g["power.pkg"]; m.Status != domain.StatusOK || m.Gauge != 11.5 {
-		t.Errorf("power.pkg = %+v", m)
+	if m := g["power.total"]; m.Status != domain.StatusOK || m.Gauge != 11.5 {
+		t.Errorf("power.total = %+v", m)
 	}
 	if m := g["gpu.util"]; m.Status != domain.StatusOK || m.Gauge != 40 {
 		t.Errorf("gpu.util = %+v", m)

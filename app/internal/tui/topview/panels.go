@@ -162,12 +162,11 @@ func (m Model) powerPanel(t tier, w int) panelSpec {
 	label, _ := m.mode.Role("label")
 	lab := func(s string) string { return label.Style().Render(s) }
 
-	pkg := m.numVal("power.pkg", " W", "%.1f")
 	cpu := m.numVal("power.cpu", " W", "%.1f")
 	gpu := m.numVal("power.gpu", " W", "%.1f")
 	npu := m.numVal("power.npu", " W", "%.1f")
-	// Headline the whole-machine total (source-aware, from the collector) so a
-	// busy GPU isn't hidden behind the much smaller CPU-package figure.
+	// Headline the whole-machine total (CPU + GPU, from the collector) so a busy
+	// GPU isn't hidden behind the much smaller CPU figure.
 	totalVal := m.numVal("power.total", " W", "%.0f")
 
 	if t == tierNarrow {
@@ -180,13 +179,11 @@ func (m Model) powerPanel(t tier, w int) panelSpec {
 		return panelSpec{title: "POWER", lines: []string{
 			lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
 			lab("total ") + m.sparkW("power.total", w) + "  " + totalVal,
-			lab("CPU pkg ") + pkg,
 		}}
 	}
 	return panelSpec{title: "POWER", lines: []string{
 		lab("total ") + m.sparkW("power.total", w) + "  " + totalVal,
 		lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
-		lab("CPU pkg ") + pkg,
 	}}
 }
 
@@ -331,7 +328,7 @@ func (m Model) tinyBody() []string {
 		lab("cpu") + m.pctVal("cpu.util"),
 		lab("mem") + m.pctVal("mem.used"),
 		lab("swap") + m.pctVal("mem.swap"),
-		lab("pwr") + m.numVal("power.pkg", " W", "%.0f"),
+		lab("pwr") + m.numVal("power.total", " W", "%.0f"),
 		lab("temp") + m.numVal("temp.pkg", "°C", "%.0f"),
 		lab("gpu") + m.pctVal("gpu.util"),
 		lab("npu") + m.pctVal("npu.util"),

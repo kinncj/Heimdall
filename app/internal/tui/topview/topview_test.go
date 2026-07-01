@@ -56,7 +56,7 @@ func sampleHost() domain.HostView {
 			ok("mem.used", 61, "%", "18.4 / 32 GB"),
 			ok("mem.swap", 2, "%", "0.6 / 8 GB"),
 			ok("mem.bw", 41, "GB/s", "41 GB/s"),
-			ok("power.pkg", 22.4, "W", ""),
+			ok("power.total", 20.1, "W", ""),
 			ok("power.cpu", 14.1, "W", ""),
 			ok("power.gpu", 6.0, "W", ""),
 			{Name: "power.npu", Status: domain.StatusUnavailable, Kind: domain.KindGauge,
@@ -84,14 +84,14 @@ func sampleHost() domain.HostView {
 func sampleHistory() map[string][]float64 {
 	ramp := []float64{10, 20, 35, 50, 60, 72, 65, 58, 70, 72}
 	return map[string][]float64{
-		"cpu.util":   ramp,
-		"mem.bw":     ramp,
-		"power.pkg":  ramp,
-		"gpu.vram":   ramp,
-		"net.rx":     ramp,
-		"net.tx":     ramp,
-		"disk.read":  ramp,
-		"disk.write": ramp,
+		"cpu.util":    ramp,
+		"mem.bw":      ramp,
+		"power.total": ramp,
+		"gpu.vram":    ramp,
+		"net.rx":      ramp,
+		"net.tx":      ramp,
+		"disk.read":   ramp,
+		"disk.write":  ramp,
 	}
 }
 
@@ -137,7 +137,7 @@ func TestNoLineExceedsWidth(t *testing.T) {
 func TestTinyShowsKeyNumbersOnly(t *testing.T) {
 	m := newModel(t, 30, 40)
 	s := strip(m.View())
-	for _, want := range []string{"72", "61", "22", "58"} { // cpu, mem, power, temp
+	for _, want := range []string{"72", "61", "20", "58"} { // cpu, mem, power, temp
 		if !strings.Contains(s, want) {
 			t.Errorf("tiny view missing key number %q\n%s", want, s)
 		}

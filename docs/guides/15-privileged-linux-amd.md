@@ -12,7 +12,7 @@ specifics.
 |---|---|---|
 | `gpu.util`, `gpu.vram`, `gpu.temp`, `power.gpu` | **`amd-smi`** if installed, else **amdgpu sysfs** | no |
 | `npu.util` (XDNA) | — (no stable counter yet) | — |
-| `power.pkg` | RAPL via the helper | yes |
+| `power.cpu` | RAPL via the helper | yes |
 | `temp.pkg` | hwmon (`k10temp` / `zenpower`) via the helper | yes |
 
 Both GPU sources are **unprivileged**, so you get the GPU panel out of the box —
@@ -60,7 +60,7 @@ amd-smi version                                  # confirm it is on PATH
 ```
 
 `amd-smi` needs **no root** for these read-only queries — run the daemon as your
-normal user. The helper is only for the CPU extras (RAPL `power.pkg`, hwmon
+normal user. The helper is only for the CPU extras (RAPL `power.cpu`, hwmon
 `temp.pkg`).
 
 ## Unified memory caveat
