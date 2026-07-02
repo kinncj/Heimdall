@@ -87,7 +87,10 @@ static double smc_read_key(const char *k, int *found) {
 */
 import "C"
 
-import "unsafe"
+import (
+	"math"
+	"unsafe"
+)
 
 // smcReadFloat reads a 4-char AppleSMC float key in watts. ok is true when the
 // key exists and read as a float (value may be 0); false when absent or the wrong
@@ -126,5 +129,11 @@ func smcCPUPower() (watts float64, ok bool) {
 			ok = true
 		}
 	}
-	return watts, ok
+	// Guard against a chip whose key layout differs: if these keys mean something
+	// else there, or a float misreads, refuse an implausible CPU figure (NaN/Inf,
+	// negative, or > 200 W) so we fall back to Unavailable rather than show garbage.
+	if !ok || math.IsNaN(watts) || math.IsInf(watts, 0) || watts < 0 || watts > 200 {
+		return 0, false
+	}
+	return watts, true
 }

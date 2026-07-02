@@ -7,6 +7,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-07-02
+
+### Fixed
+- **Guard the Apple SMC CPU-power read against unmapped chips.** The SMC cluster
+  keys are verified on an M3 Max; on a different Apple die the same keys could
+  mean something else. `power.cpu` from SMC is now rejected if the sum is
+  implausible (NaN/Inf, negative, or > 200 W), so such a chip falls back to
+  Unavailable rather than showing a garbage number. IOReport stays the first
+  source (covers every base die), so this only affects the Pro/Max SMC fallback —
+  no change on Linux (RAPL) or Windows (Scaphandre).
+
 ## [2.5.1] - 2026-07-02
 
 ### Changed
