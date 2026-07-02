@@ -7,8 +7,9 @@
 | `Unauthenticated` on the daemon | Token mismatch | Use the same `--token` / `HEIMDALL_TOKEN` on hub, daemon, and dashboard. |
 | TLS handshake errors | Cert/name mismatch | Ensure clients trust the hub cert (`--tls-ca`) and the name matches (`--tls-server-name` or the cert SAN). |
 | Metrics show `⚿` (needs-helper) | Privileged metric without a source | Run `sudo heimdall-helper` on that host, or ignore if you don't need it. See [Privileged Metrics](guides/04-privileged-metrics.md). |
-| GPU/CPU power blank on macOS | SoC exposes no counter | Expected on some Apple Silicon chips — not a misconfiguration. |
-| Power/GPU only with `sudo` | Using a CGO-free release binary | Build from source on macOS for no-sudo IOReport, or run the helper. |
+| CPU/total power blank on macOS | CGO-free release binary — SMC/IOReport need CGO | Build from source with `make build-tui`. On Pro/Max/Ultra, CPU power comes from SMC cluster keys mapped per die; an unmapped die shows a dash (honest, not a bug). See [ADR-0021](architecture/0021-power-metric-standardization-and-source-layering.md). |
+| CPU power blank on Windows | No Scaphandre running | Windows has no user-space RAPL; run [Scaphandre](https://github.com/hubblo-org/scaphandre) and point `HEIMDALL_SCAPHANDRE_URL` at it. See [Windows guide](guides/16-privileged-windows.md). |
+| Power/GPU only with `sudo` | Using a CGO-free release binary | Build from source on macOS for no-sudo IOReport/SMC, or run the helper. |
 | `dir.list` refused | Path outside an allow-listed root | The control plane only lists `/var/log`, `/tmp`, etc. by design. |
 | Control command refused | Off the allow-list, or bad token | Only built-in keys run; check `--control-token`. |
 

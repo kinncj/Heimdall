@@ -10,7 +10,8 @@ guide is the macOS specifics.
 |---|---|---|
 | `gpu.util`, `power.gpu` | **IOReport** energy counters | no |
 | `power.total` (whole-system) | **SMC `PSTR`** ("System Total Power") | no |
-| `power.cpu`, `power.npu` | IOReport per-domain, where the SoC exposes it | no |
+| `power.cpu` | IOReport per-domain (base dies) or **raw SMC cluster keys** (Pro/Max/Ultra) | no |
+| `power.npu` | IOReport ANE per-domain, where the SoC exposes it | no |
 | full thermal, gaps IOReport misses | `powermetrics` (via the helper) | yes |
 
 Power standardizes on `power.cpu` / `power.gpu` / `power.total` across the fleet.

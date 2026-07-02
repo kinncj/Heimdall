@@ -56,5 +56,6 @@ docs/architecture/NNNN-short-decision-title.md
 | [0019](0019-v2-log-search-and-top-sorting.md) | v2: log search and top sorting in the detail modals | accepted | 2026-06-29 |
 
 | [0020](0020-hlidskjalf-top-view-and-npu-rename.md) | Hliðskjálf full-screen top view, NPU rename, and screen-aware TUI | accepted | 2026-06-30 |
+| [0021](0021-power-metric-standardization-and-source-layering.md) | Power metric standardization (cpu/gpu/total) and per-platform source layering | accepted | 2026-07-02 |
 
 <!-- Add a row for each ADR as you create them -->

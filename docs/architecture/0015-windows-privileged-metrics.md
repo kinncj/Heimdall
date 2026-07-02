@@ -11,6 +11,13 @@ deciders:
 
 # 0015 — Windows privileged metrics
 
+> **Update (2026-07-02, see [ADR-0021](0021-power-metric-standardization-and-source-layering.md)):**
+> the "CPU package power is a permanent non-goal on Windows" conclusion below is
+> **superseded**. Heimdall does not ship a driver, but it now reads CPU power from
+> a user-run **[Scaphandre](https://github.com/hubblo-org/scaphandre)** (which
+> installs the signed Hubblo RAPL driver) over its Prometheus endpoint, reported as
+> `power.cpu`. The WMI temperature path in this ADR still stands.
+
 ## 1. Context
 
 The privileged helper (`app/internal/helper`) gives Heimdall the metrics the

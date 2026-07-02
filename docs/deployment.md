@@ -150,12 +150,15 @@ you want shows `⚿`.
 
 | Platform | GPU / power without helper? | Helper adds |
 |---|---|---|
-| Apple Silicon (macOS) | Yes — GPU power + utilisation via IOReport, no root | Full thermal, CPU/ANE power (where the SoC exposes it) |
-| Linux + NVIDIA | Yes — `nvidia-smi` is readable unprivileged | Vendor-specific extras |
+| Apple Silicon (macOS) | Yes — GPU power + util (IOReport) and CPU/total power (SMC), no root | Full thermal |
+| Linux + NVIDIA | Yes — `nvidia-smi` is readable unprivileged | RAPL CPU power (needs root) |
+| Windows | Yes — `nvidia-smi` GPU | WMI thermal; CPU power via a user-run Scaphandre |
 | Other | Depends on the platform tool | Whatever needs root |
 
-> Note: some Apple Silicon SoCs do not expose a CPU package-power counter at all
-> (neither IOReport nor `powermetrics`); CPU power reads as unavailable there.
+> Note: on Apple Silicon, `power.cpu` and `power.total` are read without root — the
+> daemon reads CPU power from IOReport on base dies and from raw SMC cluster keys on
+> Pro/Max/Ultra dies (where IOReport reports 0). Running the helper adds only thermal.
+> See [ADR-0021](architecture/0021-power-metric-standardization-and-source-layering.md).
 
 ## Networking & ports
 
@@ -230,4 +233,4 @@ graph TB
 | A host never appears | Daemon can't reach the hub | Verify the station IP/port from the host: `nc -vz station 9090`. |
 | Metrics show `⚿` (needs-helper) | Privileged metric without a source | Run `sudo heimdall-helper` on that host, or ignore if you don't need it. |
 | `Unauthenticated` on the daemon | Token mismatch | Use the same `--token` / `HEIMDALL_TOKEN` on hub, daemon, and dashboard. |
-| GPU/CPU power blank on macOS | SoC exposes no counter | Expected on some chips; not a misconfiguration. |
+| CPU power blank on macOS | CGO-free release binary — SMC/IOReport power needs a CGO build | Build locally with `make build-tui`, or check `--version` shows a CGO build. Pro/Max CPU power comes from SMC cluster keys mapped per die; an unmapped die falls back to a dash. |

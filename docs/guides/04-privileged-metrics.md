@@ -31,9 +31,10 @@ deployment. For the GPU/power specifics of your hardware, jump to:
 | **Linux + AMD** (Radeon / Strix Halo) | [Privileged Metrics — Linux + AMD](15-privileged-linux-amd.md) |
 | **Windows** | [Privileged Metrics — Windows](16-privileged-windows.md) |
 
-> **Apple Silicon note**: some M-series SoCs do not expose a CPU package-power
-> counter at all — neither IOReport nor `powermetrics` reports it. CPU power reads
-> as `unavailable` there. That is a hardware limit, not a misconfiguration.
+> **Apple Silicon note**: on Pro/Max/Ultra dies IOReport and `powermetrics` report
+> `0` for CPU, but Heimdall reads the raw SMC per-cluster keys instead, so
+> `power.cpu` is reported there too (see the [macOS guide](13-privileged-macos.md)).
+> It only reads `unavailable` on a chip whose SMC keys aren't mapped yet.
 
 ## Option A — IOReport (Apple Silicon, no sudo)
 
@@ -230,11 +231,11 @@ The macOS equivalent of the layout above: the **helper as a root LaunchDaemon**,
 and a socket under `/usr/local/var/heimdall`. Both start at **boot** (a LaunchDaemon,
 not a per-login LaunchAgent).
 
-> **Apple Silicon build note**: GPU power/util come from **IOReport**, which needs a
-> **CGO build** (`make build-tui` locally). The CGO-free release binary falls back to
-> `powermetrics` (root). Full thermal and CPU/ANE power come only from the helper.
-> Some M-series SoCs expose no CPU package-power counter at all — `power.total` reads
-> `unavailable` there. That is a hardware limit, not a misconfiguration.
+> **Apple Silicon build note**: GPU power/util and CPU power come from **IOReport**
+> and the **SMC**, which need a **CGO build** (`make build-tui` locally). The
+> CGO-free release binary falls back to `powermetrics` (root). `power.total` (SMC
+> `PSTR`) and `power.cpu` (IOReport on base dies, SMC cluster keys on Pro/Max) are
+> always read on Apple Silicon; the helper only adds full thermal.
 
 **1. Shared group** and a stable socket dir the group can traverse:
 

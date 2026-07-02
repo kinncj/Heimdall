@@ -23,7 +23,7 @@ fleet, **`q`** to quit.
 - **CPU** — utilisation, clock, load average, a trend sparkline, and per-core bars
   (coloured by load).
 - **MEMORY** — used and swap gauges, a usage trend, and memory bandwidth.
-- **POWER** — package / CPU / GPU / NPU watts and a power trend.
+- **POWER** — total / CPU / GPU / NPU watts and a power trend (headlined by `power.total`).
 - **GPU / NPU** — utilisation, VRAM, temperature, NPU utilisation.
 - **NET & DISK** — rx/tx and read/write with trends.
 - **PROCESSES** — top by CPU; the list grows to fill the screen.
@@ -52,10 +52,10 @@ panels look different per machine, and that's expected:
 - **swap** — everywhere.
 - **cpu.freq** — `/sys` cpufreq on Linux (real per-core clock); **`—`** where no
   clock is exposed (e.g. Apple Silicon).
-- **GPU** — via `nvidia-smi`; AMD GPUs aren't read yet, so that panel is sparse
-  on non-NVIDIA hosts.
-- **power** — package/CPU power needs RAPL (x86 Linux) or SMC (macOS); ARM and
-  Windows show **`—`**.
+- **GPU** — NVIDIA via `nvidia-smi`; AMD via `amd-smi` / amdgpu sysfs on Linux.
+  AMD on Windows isn't wired yet, so that panel is sparse there.
+- **power** — `power.cpu` needs RAPL (x86 Linux), SMC (macOS), or a running
+  Scaphandre (Windows); ARM/GB10 has no CPU power sensor and shows **`—`**.
 - **npu.util / mem.bw** — not collected yet; they render **`—`** today.
 
 See the [Metrics Reference](../metrics.md) for every metric and its units.
