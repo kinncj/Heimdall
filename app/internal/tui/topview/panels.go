@@ -130,8 +130,8 @@ func (m Model) cpuPanel(t tier, w int) panelSpec {
 			// Hybrid host: group the bars under text headers per core type, in
 			// logical core order, keeping the real core ids.
 			for _, g := range groups {
-				lines = append(lines, lab(fmt.Sprintf("%s-cores (%d):", g.label, len(g.idx))))
-				lines = append(lines, m.coreMatrixIdx(g.idx, cores.PerCore, cols)...)
+				lines = append(lines, lab(fmt.Sprintf("%s-cores (%d):", g.Label, len(g.Indices))))
+				lines = append(lines, m.coreMatrixIdx(g.Indices, cores.PerCore, cols)...)
 			}
 		} else {
 			lines = append(lines, lab(fmt.Sprintf("per-core (%d):", len(cores.PerCore))))
@@ -383,52 +383,17 @@ func (m Model) tinyBody() []string {
 
 // --- per-core ----------------------------------------------------------------
 
-// coreTypeLabels maps cpu.topology type ids to display labels (0 is always the
-// highest-performance tier).
-var coreTypeLabels = []string{"P", "E", "LP"}
-
-// coreGroup is one core-type block of the grid: its display label and the real
-// logical core indices it owns.
-type coreGroup struct {
-	label string
-	idx   []int
-}
-
-// coreGroups reads cpu.topology and buckets core indices by type, ordered by
-// first appearance (logical core order). It returns grouped=false — meaning
-// "render the plain unlabelled grid" — when the metric is absent or non-OK
-// (older daemon), uniform (a single type), length-mismatched with cpu.cores
-// (torn snapshot), or carries a type id it can't label. The distinct-type count
-// comes from the PerCore slice, not the metric's Gauge: per-core metrics ride
-// the proto `per_core` oneof, so Gauge is dropped on the wire and arrives as 0.
-func (m Model) coreGroups(total int) ([]coreGroup, bool) {
-	topo, ok := m.ok("cpu.topology")
-	if !ok || len(topo.PerCore) != total {
+// coreGroups asks the domain for the standardized P/E grouping of the focused
+// host's cores; the view only renders what it's handed. grouped=false means
+// "draw the plain unlabelled grid" (uniform CPU, older daemon with no topology,
+// or a torn snapshot) — see domain.CoreGroups.
+func (m Model) coreGroups(total int) ([]domain.CoreGroup, bool) {
+	cores, okC := m.ok("cpu.cores")
+	topo, okT := m.ok("cpu.topology")
+	if !okC || !okT || len(cores.PerCore) != total {
 		return nil, false
 	}
-	byType := map[int]*coreGroup{}
-	var order []*coreGroup
-	for i, tv := range topo.PerCore {
-		t := int(tv)
-		if t < 0 || t >= len(coreTypeLabels) || float64(t) != tv {
-			return nil, false
-		}
-		g, seen := byType[t]
-		if !seen {
-			g = &coreGroup{label: coreTypeLabels[t]}
-			byType[t] = g
-			order = append(order, g)
-		}
-		g.idx = append(g.idx, i)
-	}
-	if len(order) < 2 {
-		return nil, false
-	}
-	out := make([]coreGroup, len(order))
-	for i, g := range order {
-		out[i] = *g
-	}
-	return out, true
+	return domain.CoreGroups(cores.PerCore, topo.PerCore)
 }
 
 // coreMatrix renders per-core bars in rows of `cols`: "c0 ███▌71  c1 ...".
@@ -475,12 +440,12 @@ func (m Model) coresAggregate() string {
 		var parts []string
 		for _, g := range groups {
 			var sum float64
-			for _, i := range g.idx {
+			for _, i := range g.Indices {
 				sum += cores.PerCore[i]
 			}
-			avg := sum / float64(len(g.idx))
+			avg := sum / float64(len(g.Indices))
 			parts = append(parts,
-				label.Style().Render(fmt.Sprintf("%s (%d) ", g.label, len(g.idx)))+
+				label.Style().Render(fmt.Sprintf("%s (%d) ", g.Label, len(g.Indices)))+
 					render.Gauge(m.mode, avg, 5)+" "+
 					val.Style().Render(fmt.Sprintf("%.0f%%", avg)))
 		}

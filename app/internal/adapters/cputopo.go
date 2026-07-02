@@ -4,7 +4,6 @@
 package adapters
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,15 +11,14 @@ import (
 	"heimdall/app/internal/domain"
 )
 
-// Core-type ids carried in cpu.topology's PerCore slice. The renderer maps them
-// to labels; lower id = higher-performance tier so 0 is always "P".
+// Core-type ids are the standardized, platform-neutral taxonomy — defined once
+// in the domain (domain.CorePerf/CoreEff/CoreLP). The probes below translate
+// each platform's own scheme into these ids; nothing here re-defines them.
 const (
-	corePerf = 0 // performance (P) core
-	coreEff  = 1 // efficiency (E) core
-	coreLP   = 2 // low-power efficiency core (e.g. Intel LP E-cores)
+	corePerf = domain.CorePerf
+	coreEff  = domain.CoreEff
+	coreLP   = domain.CoreLP
 )
-
-var coreTypeLabels = []string{"P", "E", "LP"}
 
 // topoOnce caches the probe: core topology cannot change while the daemon runs,
 // and the sysctl/sysfs/syscall reads don't need repeating every collect.
@@ -44,33 +42,19 @@ func coreTopologyMetric(total int) (domain.Metric, bool) {
 }
 
 // topologyMetric encodes a core-type slice as the cpu.topology metric:
-// PerCore[i] is the type id of logical core i, Gauge is the distinct type
-// count, Detail is the human summary ("12P + 4E", "16 cores (uniform)").
+// PerCore[i] is the type id of logical core i, Detail is the standardized human
+// summary. Gauge is deliberately left 0 — per-core metrics ride the proto
+// per_core oneof, so a Gauge would be dropped on the wire anyway; consumers read
+// the type layout from PerCore via domain.CoreGroups.
 func topologyMetric(types []int) domain.Metric {
-	counts := map[int]int{}
-	for _, t := range types {
-		counts[t]++
-	}
 	per := make([]float64, len(types))
 	for i, t := range types {
 		per[i] = float64(t)
 	}
-	detail := ""
-	if len(counts) <= 1 {
-		detail = fmt.Sprintf("%d cores (uniform)", len(types))
-	} else {
-		var parts []string
-		for id, label := range coreTypeLabels {
-			if counts[id] > 0 {
-				parts = append(parts, fmt.Sprintf("%d%s", counts[id], label))
-			}
-		}
-		detail = strings.Join(parts, " + ")
-	}
 	return domain.Metric{
 		Name: "cpu.topology", Unit: "type", Status: domain.StatusOK,
-		Kind: domain.KindPerCore, Gauge: float64(len(counts)), PerCore: per,
-		Detail: detail,
+		Kind: domain.KindPerCore, PerCore: per,
+		Detail: domain.CoreTypeSummary(per),
 	}
 }
 
@@ -178,8 +162,8 @@ func typesFromEfficiencyClasses(classes []int) ([]int, bool) {
 	out := make([]int, len(classes))
 	for i, c := range classes {
 		t := max - c
-		if t >= len(coreTypeLabels) {
-			// more tiers than we can label — refuse rather than mislabel
+		if domain.CoreTypeLabel(t) == "" {
+			// more tiers than the standard taxonomy labels — refuse rather than mislabel
 			return nil, false
 		}
 		out[i] = t

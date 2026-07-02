@@ -103,8 +103,10 @@ func TestTopologyMetric(t *testing.T) {
 	if m.PerCore[0] != float64(coreEff) || m.PerCore[2] != float64(corePerf) {
 		t.Fatalf("percore values wrong: %v", m.PerCore)
 	}
-	if m.Gauge != 2 {
-		t.Errorf("gauge (distinct types) = %v, want 2", m.Gauge)
+	// Gauge is deliberately unset: per-core metrics ride the proto per_core oneof,
+	// so a Gauge would be dropped on the wire. The layout lives in PerCore + Detail.
+	if m.Gauge != 0 {
+		t.Errorf("gauge = %v, want 0 (unused for per-core metrics)", m.Gauge)
 	}
 	if m.Detail != "4P + 2E" {
 		t.Errorf("detail = %q, want \"4P + 2E\"", m.Detail)
@@ -114,9 +116,6 @@ func TestTopologyMetric(t *testing.T) {
 func TestTopologyMetricUniform(t *testing.T) {
 	types := []int{corePerf, corePerf, corePerf, corePerf}
 	m := topologyMetric(types)
-	if m.Gauge != 1 {
-		t.Errorf("gauge = %v, want 1", m.Gauge)
-	}
 	if m.Detail != "4 cores (uniform)" {
 		t.Errorf("detail = %q, want \"4 cores (uniform)\"", m.Detail)
 	}

@@ -97,6 +97,52 @@ func TestCLISurfacesOKMetricDetails(t *testing.T) {
 	}
 }
 
+// The CLI surfaces the standardized P/E core grouping (domain.CoreGroups), so an
+// agent reads structured groups — not just the "12P + 4E" detail string.
+func TestCLISurfacesCoreGroups(t *testing.T) {
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	now := time.Unix(1_700_000_000, 0)
+	reg.Enroll(domain.Host{ID: "hybrid", DisplayName: "hybrid"}, now)
+	reg.Observe("hybrid", []domain.Metric{
+		{Name: "cpu.cores", Status: domain.StatusOK, Kind: domain.KindPerCore,
+			PerCore: []float64{5, 6, 80, 70}},
+		{Name: "cpu.topology", Status: domain.StatusOK, Kind: domain.KindPerCore,
+			PerCore: []float64{domain.CoreEff, domain.CoreEff, domain.CorePerf, domain.CorePerf},
+			Detail:  "2P + 2E"},
+	}, nil, now)
+	reg.Evaluate(now)
+	h, _ := reg.Host("hybrid")
+	j := newJHost(h)
+
+	if len(j.CoreGroups) != 2 {
+		t.Fatalf("core_groups = %+v, want 2 groups", j.CoreGroups)
+	}
+	if j.CoreGroups[0].Type != "E" || len(j.CoreGroups[0].Cores) != 2 {
+		t.Errorf("group 0 = %+v, want E with 2 cores (logical order)", j.CoreGroups[0])
+	}
+	if j.CoreGroups[1].Type != "P" {
+		t.Errorf("group 1 = %+v, want P", j.CoreGroups[1])
+	}
+}
+
+// A uniform CPU emits no core_groups — nothing to group.
+func TestCLIUniformCPUHasNoCoreGroups(t *testing.T) {
+	reg := domain.NewHostRegistry(10*time.Second, 30*time.Second)
+	now := time.Unix(1_700_000_000, 0)
+	reg.Enroll(domain.Host{ID: "amd", DisplayName: "amd"}, now)
+	reg.Observe("amd", []domain.Metric{
+		{Name: "cpu.cores", Status: domain.StatusOK, Kind: domain.KindPerCore,
+			PerCore: []float64{10, 20, 30, 40}},
+		{Name: "cpu.topology", Status: domain.StatusOK, Kind: domain.KindPerCore,
+			PerCore: []float64{0, 0, 0, 0}, Detail: "4 cores (uniform)"},
+	}, nil, now)
+	reg.Evaluate(now)
+	h, _ := reg.Host("amd")
+	if j := newJHost(h); j.CoreGroups != nil {
+		t.Errorf("uniform CPU must emit no core_groups, got %+v", j.CoreGroups)
+	}
+}
+
 func TestCLITopAndLogs(t *testing.T) {
 	h, _ := cliSeed(t).Host("web-01")
 	top := newJTop(h)

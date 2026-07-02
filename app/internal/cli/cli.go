@@ -373,11 +373,21 @@ type jHost struct {
 	Labels       map[string]string        `json:"labels,omitempty"`
 	Metrics      map[string]float64       `json:"metrics,omitempty"`
 	Details      map[string]string        `json:"details,omitempty"`
+	CoreGroups   []jCoreGroup             `json:"core_groups,omitempty"`
 	Unavailable  map[string]jMetricStatus `json:"unavailable,omitempty"`
 	Alerts       []string                 `json:"alerts,omitempty"`
 	HasLogs      bool                     `json:"has_logs"`
 	HasProcesses bool                     `json:"has_processes"`
 	LogSources   []string                 `json:"log_sources,omitempty"`
+}
+
+// jCoreGroup is a standardized CPU core-type block (P/E/LP) with the real
+// logical core ids and their utilisations — the same domain.CoreGroups the TUI
+// renders. Absent on uniform CPUs and daemons that report no topology.
+type jCoreGroup struct {
+	Type    string    `json:"type"`  // "P", "E", "LP"
+	Cores   []int     `json:"cores"` // logical core ids in this group
+	UtilPct []float64 `json:"util_pct,omitempty"`
 }
 
 // jMetricStatus explains a non-OK metric — why a value is missing (e.g. Apple
@@ -444,6 +454,7 @@ func newJHost(h domain.HostView) jHost {
 	metrics := map[string]float64{}
 	var details map[string]string
 	var unavailable map[string]jMetricStatus
+	var coreUtil, coreType []float64
 	for _, m := range h.LastSnapshot {
 		if m.Status == domain.StatusOK {
 			metrics[m.Name] = m.Gauge
@@ -455,6 +466,12 @@ func newJHost(h domain.HostView) jHost {
 					details = map[string]string{}
 				}
 				details[m.Name] = m.Detail
+			}
+			switch m.Name {
+			case "cpu.cores":
+				coreUtil = m.PerCore
+			case "cpu.topology":
+				coreType = m.PerCore
 			}
 			continue
 		}
@@ -474,12 +491,29 @@ func newJHost(h domain.HostView) jHost {
 		Labels:       userLabels(h.Host.Context.Labels),
 		Metrics:      metrics,
 		Details:      details,
+		CoreGroups:   coreGroupsJSON(coreUtil, coreType),
 		Unavailable:  unavailable,
 		Alerts:       h.Alerts,
 		HasLogs:      len(sources) > 0,
 		HasProcesses: h.Host.Context.Labels["_proc"] != "" || len(h.Processes) > 0,
 		LogSources:   sources,
 	}
+}
+
+// coreGroupsJSON renders the standardized P/E core grouping for the CLI. It
+// delegates to domain.CoreGroups — the same one source of truth the TUI uses —
+// so the CLI reports groups without any of its own bucketing logic. Returns nil
+// on a uniform CPU or a daemon that reports no topology.
+func coreGroupsJSON(coreUtil, coreType []float64) []jCoreGroup {
+	groups, ok := domain.CoreGroups(coreUtil, coreType)
+	if !ok {
+		return nil
+	}
+	out := make([]jCoreGroup, len(groups))
+	for i, g := range groups {
+		out[i] = jCoreGroup{Type: g.Label, Cores: g.Indices, UtilPct: g.Util}
+	}
+	return out
 }
 
 func newJProcs(rows []domain.ProcessRow) []jProc {
