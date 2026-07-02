@@ -143,15 +143,19 @@ func powerMetric(name string, w float64) domain.Metric {
 func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float64, smcOK bool, pm []domain.Metric) []domain.Metric {
 	var out []domain.Metric
 	if ioOK {
+		// CPU and ANE: a 0 reading means the channel is *unavailable* on Pro/Max
+		// (verified — powermetrics also reports 0 there), so only report a real
+		// value; the caller fills the Unavailable-with-reason otherwise.
 		if cpu > 0 {
 			out = append(out, powerMetric("power.cpu", cpu))
-		}
-		if gpu > 0 {
-			out = append(out, powerMetric("power.gpu", gpu))
 		}
 		if ane > 0 {
 			out = append(out, powerMetric("power.npu", ane))
 		}
+		// GPU: the energy channel is always valid on Apple Silicon, so report it
+		// even at idle (~0 W) rather than dropping the rail — otherwise a base M4,
+		// whose GPU idles at a few mW, looks like it "has no GPU".
+		out = append(out, powerMetric("power.gpu", gpu))
 		if gpuUtil >= 0 {
 			out = append(out, domain.Metric{Name: "gpu.util", Unit: "percent", Status: domain.StatusOK, Gauge: gpuUtil})
 		}

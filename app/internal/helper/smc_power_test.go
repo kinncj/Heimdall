@@ -30,6 +30,16 @@ func TestAssembleApplePower_SMCWinsOverPhantomIOReport(t *testing.T) {
 	}
 }
 
+// GPU power is always a valid IOReport channel on Apple Silicon, so it must be
+// reported even at idle (~0 W) — dropping it made a base M4 look like it "has no
+// GPU" while a Pro/Max (whose CPU/ANE channels genuinely read 0) showed the GPU.
+func TestAssembleApplePower_ShowsIdleGPU(t *testing.T) {
+	got := byName(assembleApplePower(0.5, 0 /*gpu idle*/, 0, 3, true /*ioOK*/, 20, true, nil))
+	if m, ok := got["power.gpu"]; !ok || m.Status != domain.StatusOK || m.Gauge != 0 {
+		t.Fatalf("power.gpu = %+v (present=%v), want a 0 W reading at idle", m, ok)
+	}
+}
+
 // Without SMC, a sub-watt IOReport sum must not shadow a real powermetrics package
 // reading (the old mergeByName poisoning).
 func TestAssembleApplePower_PowermetricsBeatsPhantomIOReport(t *testing.T) {

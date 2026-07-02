@@ -47,6 +47,36 @@ This ordering exists because of the Pro/Max quirk below.
 > counter at all — neither IOReport nor `powermetrics` reports it. `power.cpu`
 > reads `unavailable` there. A hardware limit, not a misconfiguration.
 
+## Why a base M4 shows CPU power but an M3 Max doesn't (and both show GPU)
+
+This trips people up, so to be explicit — it's **the chip tier, not the macOS
+version, and not a Heimdall bug**:
+
+| Rail | Base (M1–M4) | Pro / Max / Ultra |
+|---|---|---|
+| `power.cpu` | **reported** — IOReport exposes per-domain CPU energy | **`unavailable`** — the CPU (and ANE) energy channels read **0** |
+| `power.gpu` | reported (idles at a few mW) | reported |
+| `power.total` | SMC `PSTR`, whole-system | SMC `PSTR`, whole-system |
+
+On **Pro/Max/Ultra** dies the SoC's "Energy Model" simply does not surface
+per-domain **CPU** or **ANE** power — both IOReport *and* `powermetrics` return
+`CPU Power: 0 mW` even with the cores pegged. So `power.cpu` is honestly
+`unavailable` (`Pro/Max: no per-domain CPU power`), while the true whole-machine
+draw still comes through `power.total` (SMC). Base dies expose the per-domain CPU
+figure, so they show a real `power.cpu`.
+
+**GPU** power is a valid IOReport channel on *every* Apple Silicon SoC, so it is
+always reported — including a few milliwatts at idle. (Heimdall used to drop a
+zero-valued GPU rail, which made an idle base M4 look like it "had no GPU"; since
+v2.4.3 the idle GPU shows as `0 W` instead.)
+
+Verified across two SoCs and macOS builds:
+
+| Machine | SoC | macOS (Darwin) | `power.cpu` | `power.gpu` |
+|---|---|---|---|---|
+| Mac mini | Apple **M4** (base) | 26.6 / Darwin 25.6 | real (~0.5 W idle) | reported (idle → 0 W) |
+| MacBook Pro | Apple **M3 Max** | 27.0 / Darwin 27.0 | `unavailable` (Pro/Max) | reported |
+
 ## Build note — IOReport needs CGO
 
 IOReport (and SMC) are reached through cgo. The local `make build-tui` enables

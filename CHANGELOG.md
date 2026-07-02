@@ -7,6 +7,18 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.4.3] - 2026-07-02
+
+### Fixed
+- **Apple GPU power is reported at idle instead of dropped.** The collector
+  skipped a zero-valued GPU rail, so a base M4 — whose GPU idles at a few mW —
+  looked like it "had no GPU", while a Pro/Max (with a small non-zero idle GPU)
+  showed one. The GPU energy channel is always valid on Apple Silicon, so
+  `power.gpu` is now reported even at ~0 W. The CPU asymmetry is *real* and
+  unchanged: base M-series expose per-domain CPU power, Pro/Max/Ultra do not
+  (verified — `powermetrics` also reports `CPU Power: 0 mW`), so `power.cpu`
+  stays Unavailable-with-reason there. Documented in the macOS guide.
+
 ## [2.4.2] - 2026-07-01
 
 ### Fixed
