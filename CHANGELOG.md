@@ -7,6 +7,17 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.6.2] - 2026-07-02
+
+### Fixed
+- **Top view showed the plain per-core grid instead of the P/E grouping.** The
+  grouping keyed off `cpu.topology`'s Gauge (the distinct-core-type count), but
+  per-core metrics ride the proto `per_core` oneof, so the Gauge is dropped on the
+  wire and the dashboard received it as 0 — every host fell back to the unlabelled
+  grid. It now derives the count from the PerCore slice, which does cross the wire.
+  Worked locally (`--once`) and in unit tests because the Gauge is set in-process;
+  only the wire round-trip lost it. The `cpu clusters:` power line was unaffected.
+
 ## [2.6.1] - 2026-07-02
 
 ### Fixed

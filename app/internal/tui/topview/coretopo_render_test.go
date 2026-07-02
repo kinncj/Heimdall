@@ -17,8 +17,12 @@ import (
 func hybridHost() domain.HostView {
 	h := sampleHost()
 	h.LastSnapshot = append(h.LastSnapshot,
+		// Gauge is deliberately 0: per-core metrics ride the proto `per_core` oneof
+		// arm, so the Gauge (distinct-type count) is dropped on the wire and the
+		// dashboard receives it as 0. The grouping must derive the count from the
+		// PerCore slice, not the Gauge.
 		domain.Metric{Name: "cpu.topology", Status: domain.StatusOK, Kind: domain.KindPerCore,
-			Gauge:   2,
+			Gauge:   0,
 			PerCore: []float64{1, 1, 1, 1, 0, 0, 0, 0, 0, 0}, // 0=P, 1=E
 			Detail:  "6P + 4E"},
 		domain.Metric{Name: "power.cpu.pcluster", Unit: "watts", Status: domain.StatusOK, Kind: domain.KindGauge, Gauge: 15.0},
@@ -123,7 +127,7 @@ func TestUniformTopologyRendersPlainGrid(t *testing.T) {
 	h := sampleHost()
 	h.LastSnapshot = append(h.LastSnapshot, domain.Metric{
 		Name: "cpu.topology", Status: domain.StatusOK, Kind: domain.KindPerCore,
-		Gauge:   1,
+		Gauge:   0, // wire drops Gauge for per-core metrics
 		PerCore: []float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		Detail:  "10 cores (uniform)",
 	})

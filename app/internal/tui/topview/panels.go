@@ -398,10 +398,12 @@ type coreGroup struct {
 // first appearance (logical core order). It returns grouped=false — meaning
 // "render the plain unlabelled grid" — when the metric is absent or non-OK
 // (older daemon), uniform (a single type), length-mismatched with cpu.cores
-// (torn snapshot), or carries a type id it can't label.
+// (torn snapshot), or carries a type id it can't label. The distinct-type count
+// comes from the PerCore slice, not the metric's Gauge: per-core metrics ride
+// the proto `per_core` oneof, so Gauge is dropped on the wire and arrives as 0.
 func (m Model) coreGroups(total int) ([]coreGroup, bool) {
 	topo, ok := m.ok("cpu.topology")
-	if !ok || len(topo.PerCore) != total || topo.Gauge < 2 {
+	if !ok || len(topo.PerCore) != total {
 		return nil, false
 	}
 	byType := map[int]*coreGroup{}
