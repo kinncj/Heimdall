@@ -7,6 +7,19 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-07-02
+
+### Fixed
+- **CPU power came back blank on every Linux/AMD host with a GPU.** The daemon's
+  in-process-first gate treated `power.total` as proof it already had CPU power,
+  but `power.total` is synthesised from `power.gpu` on any GPU-equipped host — so
+  the daemon short-circuited and never consulted the root helper for RAPL
+  `power.cpu`. The gate now checks for an actual CPU rail (`power.cpu`/`power.pkg`),
+  so a non-root Linux daemon with a running helper reads RAPL again. Regression
+  from the v2.5.0 power standardization; Apple (SMC/IOReport in-process) and
+  Windows (Scaphandre in-process) were never affected. ARM hosts with no RAPL
+  (GB10) stay an honest dash.
+
 ## [2.6.0] - 2026-07-02
 
 ### Added

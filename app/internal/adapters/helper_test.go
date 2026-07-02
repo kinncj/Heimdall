@@ -171,3 +171,36 @@ func TestHelperUsedWhenInProcessLacksCPUPower(t *testing.T) {
 		t.Fatalf("want helper power.cpu 15 (in-process had no CPU rail), got %+v", got["power.cpu"])
 	}
 }
+
+// Regression (rtx-pro-workstation): a Linux daemon with a GPU synthesises
+// power.total from power.gpu in-process (withTotalPower). That whole-machine
+// total must NOT be mistaken for "already have CPU power" — the helper still
+// holds the only RAPL power.cpu, so it must be consulted despite power.total
+// reading OK. Before the fix, hasOKPower saw power.total and short-circuited the
+// helper, so power.cpu was never fetched on any GPU-equipped Linux host.
+func TestHelperUsedWhenOnlyGPUDerivedTotalPresent(t *testing.T) {
+	a := Helper{
+		Client: fakeMetricClient{ms: []domain.Metric{
+			{Name: "power.cpu", Unit: "W", Status: domain.StatusOK, Gauge: 24, Detail: "CPU package (RAPL)"},
+			{Name: "power.gpu", Unit: "W", Status: domain.StatusOK, Gauge: 60},
+			{Name: "power.total", Unit: "W", Status: domain.StatusOK, Gauge: 84},
+		}},
+		Direct: func(context.Context) []domain.Metric {
+			// Unprivileged Linux + NVIDIA: GPU power is readable, RAPL is not, and
+			// withTotalPower has already made power.total = power.gpu.
+			return []domain.Metric{
+				{Name: "power.gpu", Unit: "W", Status: domain.StatusOK, Gauge: 60},
+				{Name: "power.total", Unit: "W", Status: domain.StatusOK, Gauge: 60, Detail: "system total"},
+				{Name: "gpu.util", Unit: "%", Status: domain.StatusOK, Gauge: 55},
+			}
+		},
+	}
+	ms, _ := a.Collect(context.Background())
+	got := make(map[string]domain.Metric, len(ms))
+	for _, m := range ms {
+		got[m.Name] = m
+	}
+	if got["power.cpu"].Status != domain.StatusOK || got["power.cpu"].Gauge != 24 {
+		t.Fatalf("want helper RAPL power.cpu 24 despite a GPU-derived power.total, got %+v", got["power.cpu"])
+	}
+}

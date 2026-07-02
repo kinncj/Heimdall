@@ -55,7 +55,7 @@ func (h Helper) Collect(ctx context.Context) ([]domain.Metric, error) {
 	// harmless: the daemon has power without it, so a slow helper (macOS
 	// powermetrics can take ~1s) is never on the critical path.
 	inproc := direct(ctx)
-	if hasOKPower(inproc) {
+	if hasOKCPUPower(inproc) {
 		return inproc, nil
 	}
 
@@ -83,15 +83,19 @@ func (h Helper) Collect(ctx context.Context) ([]domain.Metric, error) {
 	}, nil
 }
 
-// hasOKPower reports whether the metrics already include a privileged CPU power
-// rail the daemon read itself — the signal that the helper would only duplicate.
-func hasOKPower(ms []domain.Metric) bool {
+// hasOKCPUPower reports whether the in-process read already produced the CPU
+// power rail the helper would supply (RAPL package on Linux, SMC/IOReport on
+// Apple). power.total deliberately does NOT count: on any host with a GPU,
+// withTotalPower synthesises power.total from power.gpu alone, so treating the
+// whole-machine total as "have CPU power" would short-circuit the helper and
+// lose the only RAPL power.cpu on a GPU-equipped Linux box.
+func hasOKCPUPower(ms []domain.Metric) bool {
 	for _, m := range ms {
 		if m.Status != domain.StatusOK {
 			continue
 		}
 		switch m.Name {
-		case "power.total", "power.cpu", "power.pkg":
+		case "power.cpu", "power.pkg":
 			return true
 		}
 	}
