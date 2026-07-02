@@ -7,6 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-07-02
+
+### Changed
+- **Apple Pro/Max `power.cpu` now covers the whole CPU complex, not just the
+  P-cores.** The SMC CPU sum was `PC02+PC42` (the two P-clusters only); it now also
+  includes the E-core / cluster rails that scale with CPU load (`PC03+PC43`) — the
+  full CPU consumption, ~18–20 W under a 16-core load on an M3 Max (was ~18 W
+  P-cores-only). GPU (`PC1x/PC2x`) and memory (`PC32`) keys stay excluded. The
+  rail is now labelled `CPU complex (SMC)`.
+
 ## [2.5.0] - 2026-07-02
 
 ### Added

@@ -187,7 +187,7 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 	// per-cluster keys still carry it (the source Stats reads) — try those before
 	// giving up. Base M-series already set power.cpu above from IOReport.
 	if smcCPUOK && !hasName(out, "power.cpu") {
-		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: smcCPU, Detail: "P-cores (SMC)"})
+		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: smcCPU, Detail: "CPU complex (SMC)"})
 	}
 	// If neither IOReport nor the SMC keys yielded CPU power, say why rather than
 	// leaving a silent blank; power.total still carries the whole-machine figure.

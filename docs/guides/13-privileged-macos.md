@@ -57,10 +57,9 @@ Heimdall reads Apple power from two unprivileged sources and layers them:
    **0** (both IOReport *and* `powermetrics` return `CPU Power: 0 mW` with the
    cores pegged) — so IOReport alone can't give CPU power there.
 2. **Raw SMC keys** — the same source Stats reads. Pro/Max dies still expose CPU
-   power under the per-cluster power keys (`PC02` + `PC42` = the two 6-core
-   P-clusters on an M3 Max), even though the energy model reports 0. When IOReport
+   power under the per-cluster power keys (the P-clusters `PC02`+`PC42` plus the E-core/fabric rails `PC03`+`PC43` on an M3 Max), even though the energy model reports 0. When IOReport
    gives no CPU figure, Heimdall sums those SMC cluster keys and reports
-   `power.cpu` tagged `P-cores (SMC)`.
+   `power.cpu` tagged `CPU complex (SMC)`.
 
 So `power.cpu` is **real on both tiers** now — from IOReport on base dies, from
 the SMC cluster keys on Pro/Max. It only falls back to
@@ -78,7 +77,7 @@ Verified live across two SoCs and macOS builds:
 | Machine | SoC | macOS (Darwin) | `power.cpu` source | value |
 |---|---|---|---|---|
 | Mac mini | Apple **M4** (base) | 26.6 / Darwin 25.6 | IOReport | ~0.5 W idle |
-| MacBook Pro | Apple **M3 Max** | 27.0 / Darwin 27.0 | **SMC `PC02`+`PC42`** | ~11 W under load |
+| MacBook Pro | Apple **M3 Max** | 27.0 / Darwin 27.0 | **SMC `PC02+PC42+PC03+PC43`** | ~18–20 W under full load |
 
 ## Build note — IOReport needs CGO
 

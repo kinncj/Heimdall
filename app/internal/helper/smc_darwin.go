@@ -111,14 +111,16 @@ func smcSystemPower() (watts float64, ok bool) {
 	return w, true
 }
 
-// smcCPUPower sums the raw SMC P-core cluster power keys, which carry CPU power
-// on Apple Silicon Pro/Max even where the IOReport energy model reports 0. On the
-// M3 Max these are PC02 + PC42 (the two 6-core P-clusters) — verified live; the
-// aggregate keys (PCPC/PCTR) that exist on some chips are absent there. Returns
-// the cluster sum when at least one key is present (0 at idle is a real reading);
-// absent on chips that expose none, so the caller falls back to Unavailable.
+// smcCPUPower sums the raw SMC CPU-cluster power keys — the whole CPU complex,
+// not just the P-cores — which carry CPU power on Apple Silicon Pro/Max even
+// where the IOReport energy model reports 0. On the M3 Max these are the two
+// 6-core P-clusters (PC02, PC42) plus the E-core / cluster rails that scale with
+// CPU load (PC03, PC43); GPU (PC1x/PC2x) and memory (PC32) keys are deliberately
+// excluded. Verified live: ~20 W under a full 16-core load. Returns the sum when
+// at least one key is present (0 at idle is a real reading); absent on chips
+// whose keys aren't mapped, so the caller falls back to Unavailable.
 func smcCPUPower() (watts float64, ok bool) {
-	for _, k := range []string{"PC02", "PC42"} {
+	for _, k := range []string{"PC02", "PC03", "PC42", "PC43"} {
 		if w, found := smcReadFloat(k); found {
 			watts += w
 			ok = true
