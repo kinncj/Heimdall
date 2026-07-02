@@ -7,6 +7,29 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.6.3] - 2026-07-02
+
+### Changed
+- **Moved the P/E core-grouping out of the dashboard into the `domain` core.** The
+  standardization boundary is now explicit (ADR-0022): adapters translate platform
+  specifics into neutral metrics, the framework-free `domain` core turns them into
+  display-ready structures (`domain.CoreGroups`, `domain.CoreTypeSummary`), and the
+  TUI and CLI render only. The dashboard no longer buckets cores or reads a metric's
+  `Gauge` — which is what let a wire-encoding detail blank the grid before.
+- **The CLI now reports core groups.** `heimdall-cli host <id>` gains a `core_groups`
+  field (standardized P/E/LP with real core ids and utilisation), so an agent reads
+  structured groups instead of parsing the `12P + 4E` string. Absent on uniform CPUs.
+
+### Security
+- Bump `golang.org/x/net` 0.51.0 → 0.55.0 for a medium-severity HTML-parser DoS
+  (Dependabot #1 / PR #6). `golang.org/x/sys` and `golang.org/x/term` came along.
+
+### Docs
+- New [ADR-0022](docs/architecture/0022-metric-standardization-boundary.md) and
+  contributor guide (`docs/guides/17-standardization-and-adapters.md`); the
+  standardization rule is now in CLAUDE.md, AGENTS.md, the Copilot instructions, a
+  Cursor rule, and the architect agent across all harnesses.
+
 ## [2.6.2] - 2026-07-02
 
 ### Fixed

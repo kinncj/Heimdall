@@ -59,7 +59,17 @@ All agents use: `make build`, `make test`, `make test-integration`, `make test-e
 `make test-contract`, `make test-all`, `make lint`, `make security-scan`, `make fmt`,
 `make containers-up`, `make containers-down`, `make migrate`.
 
+## Coding Standards (all implementing agents)
+- **Clean Architecture + SOLID.** Domain logic imports no framework/transport/UI.
+- **Metric standardization boundary** ([ADR-0022](docs/architecture/0022-metric-standardization-boundary.md)):
+  adapters translate platform specifics into **neutral** metrics; the framework-free
+  `domain` core turns neutral metrics into display-ready structures; consumers
+  (TUI, CLI, dashboard) **render only** — no bucketing, classification, or platform
+  branching. Per-core metrics carry data in `PerCore`, not the wire-dropped `Gauge`.
+  New cross-platform metric → follow `docs/guides/17-standardization-and-adapters.md`.
+
 ## Git Conventions
 - Conventional Commits: `feat:`, `fix:`, `test:`, `docs:`, `infra:`, `refactor:`
 - Branch naming: `feat/{slug}`, `fix/{slug}`
 - Squash merge to main
+- Humanized commit messages; **no `Co-Authored-By` lines**.

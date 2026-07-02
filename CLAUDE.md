@@ -123,6 +123,30 @@ Makefile    # all CI/CD calls Makefile targets
 - Composition over inheritance
 - Testability, observability, reliability, security by default
 
+### Metric Standardization Boundary (mandatory — see [ADR-0022](docs/architecture/0022-metric-standardization-boundary.md))
+
+Heimdall watches a mixed fleet; a metric must mean the same thing on every OS,
+chip, and vendor. Knowledge flows **one way**: platform → adapter → neutral
+metric → `domain` → consumer.
+
+- **Adapters** (`app/internal/adapters`, `app/internal/helper`) translate each
+  platform's own scheme (SMC, RAPL, sysctl, sysfs, EfficiencyClass, Scaphandre)
+  into a **neutral** metric. Platform names and vendor branching stop here.
+- **`domain`** (framework-free core) turns neutral metrics into display-ready
+  structures — the taxonomy plus pure functions (e.g. `domain.CoreGroups`,
+  `domain.CoreTypeSummary`). Standardization logic lives here, tested once.
+- **Consumers** (TUI, CLI, dashboard, hub) **render only**. No bucketing, no
+  classification, no `switch` on platform. If a renderer needs a computed view,
+  add a `domain` function and call it — never inline the logic.
+- **Per-core metrics**: data travels in `PerCore` (the proto `per_core` oneof);
+  the scalar `Gauge` is **dropped on the wire**. Never key logic off a per-core
+  metric's `Gauge`; carry summaries in `Detail`. Add a transport round-trip test.
+- A platform that can't supply a metric returns `Unavailable`-with-reason
+  (ADR-0003), never a fabricated value.
+
+New cross-platform metric? Follow the checklist in
+[docs/guides/17-standardization-and-adapters.md](docs/guides/17-standardization-and-adapters.md).
+
 ---
 
 ## Code Review Standard (Staff+)

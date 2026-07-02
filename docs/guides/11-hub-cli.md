@@ -66,6 +66,11 @@ heimdall-cli --hub "$HUB" hosts | jq -r '.[] | select(.state=="offline").id'
 # one host's CPU%
 heimdall-cli --hub "$HUB" host web-01 | jq -r '.metrics["cpu.util"]'
 
+# performance vs efficiency cores (standardized P/E/LP, works on Apple/Intel/AMD)
+heimdall-cli --hub "$HUB" host web-01 | jq '.core_groups'
+# -> [{"type":"E","cores":[0,1,2,3],"util_pct":[...]},{"type":"P","cores":[4,...],...}]
+# absent on uniform CPUs; the human summary is also in .details["cpu.topology"]
+
 # top 5 processes by CPU on a host
 heimdall-cli --hub "$HUB" top dgx-spark | jq '.processes | sort_by(-.cpu_pct)[:5]'
 

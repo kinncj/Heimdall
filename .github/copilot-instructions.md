@@ -89,6 +89,7 @@ Read skills from `.claude/skills/` before executing tasks:
 5. **Conventional Commits.** All commits use `feat:`, `fix:`, `test:`, `docs:`, `infra:`, `refactor:`.
 6. **`make test-all` must pass** before any PR is created (Phase 8 gate).
 7. **Karpathy principles enforced at Phase 5→6 gate.** After IMPLEMENT, `/karpathy-audit` scores code; <70 blocks Phase 6. Never bypass.
+8. **Metric standardization boundary** ([ADR-0022](../docs/architecture/0022-metric-standardization-boundary.md)). Adapters translate platform specifics into **neutral** metrics; the framework-free `domain` core standardizes them into display-ready structures; consumers (TUI, CLI, dashboard) **render only** — no bucketing, classification, or platform `switch` in a renderer. Per-core metrics carry data in `PerCore`, never the wire-dropped `Gauge`. New cross-platform metric → follow `docs/guides/17-standardization-and-adapters.md`.
 
 ## Karpathy Principles (Phase 5 → Phase 6 Gate)
 
