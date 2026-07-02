@@ -86,7 +86,7 @@ func TestEnsureNPUUtil(t *testing.T) {
 // Apple Silicon has unified memory and no discrete VRAM to report; gpu.vram must
 // be Unavailable with a reason rather than absent, so the panel explains the dash.
 func TestAssembleApplePower_VRAMUnavailableWithReason(t *testing.T) {
-	got := byName(assembleApplePower(5, 2, 0, 30, true, 22, true, nil))
+	got := byName(assembleApplePower(5, 2, 0, 30, true, 22, true, 0, false, nil))
 	m, ok := got["gpu.vram"]
 	if !ok || m.Status != domain.StatusUnavailable {
 		t.Fatalf("gpu.vram = %+v, want unavailable", m)

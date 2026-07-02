@@ -7,6 +7,20 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-07-02
+
+### Added
+- **Apple Silicon Pro/Max CPU power, via raw SMC keys.** On Pro/Max/Ultra dies
+  the IOReport energy model reports `0` for CPU (verified — `powermetrics` does
+  too), so `power.cpu` used to read Unavailable there. But the per-domain power is
+  still in the SMC under the per-cluster keys (`PC02` + `PC42` on an M3 Max — the
+  same source Stats reads). Heimdall now sums those and reports a real `power.cpu`
+  tagged `P-cores (SMC)` — **~11 W under load, verified live on an M3 Max**.
+  IOReport stays the first source, so base dies (e.g. M4) are unchanged; the SMC
+  keys fill Pro/Max, and only a chip whose keys aren't mapped yet falls back to
+  `no per-domain CPU power (IOReport + SMC)`. The SMC reader was generalized to
+  read any AppleSMC float key.
+
 ## [2.4.3] - 2026-07-02
 
 ### Fixed

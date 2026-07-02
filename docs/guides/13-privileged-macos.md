@@ -43,39 +43,42 @@ This ordering exists because of the Pro/Max quirk below.
 > first is what keeps an M3 Max from reporting 0 W. The variable is the **SoC,
 > not the Heimdall version**. See [ADR 0020](../architecture/0020-hlidskjalf-top-view-and-npu-rename.md).
 
-> **CPU package-power gap**: some M-series SoCs expose no CPU package-power
-> counter at all — neither IOReport nor `powermetrics` reports it. `power.cpu`
-> reads `unavailable` there. A hardware limit, not a misconfiguration.
+> **CPU power on Pro/Max**: IOReport and `powermetrics` report `0` for CPU on
+> Pro/Max/Ultra, but the raw SMC per-cluster keys still carry it — Heimdall reads
+> those (see the next section). `power.cpu` only stays `unavailable` on a chip
+> whose SMC keys aren't mapped yet.
 
-## Why a base M4 shows CPU power but an M3 Max doesn't (and both show GPU)
+## How CPU/GPU power is read on Apple Silicon (base vs Pro/Max)
 
-This trips people up, so to be explicit — it's **the chip tier, not the macOS
-version, and not a Heimdall bug**:
+Heimdall reads Apple power from two unprivileged sources and layers them:
 
-| Rail | Base (M1–M4) | Pro / Max / Ultra |
-|---|---|---|
-| `power.cpu` | **reported** — IOReport exposes per-domain CPU energy | **`unavailable`** — the CPU (and ANE) energy channels read **0** |
-| `power.gpu` | reported (idles at a few mW) | reported |
-| `power.total` | SMC `PSTR`, whole-system | SMC `PSTR`, whole-system |
+1. **IOReport** "Energy Model" — per-domain CPU/GPU/ANE. On **base** dies (M1–M4)
+   this populates `power.cpu`. On **Pro/Max/Ultra** the CPU and ANE channels read
+   **0** (both IOReport *and* `powermetrics` return `CPU Power: 0 mW` with the
+   cores pegged) — so IOReport alone can't give CPU power there.
+2. **Raw SMC keys** — the same source Stats reads. Pro/Max dies still expose CPU
+   power under the per-cluster power keys (`PC02` + `PC42` = the two 6-core
+   P-clusters on an M3 Max), even though the energy model reports 0. When IOReport
+   gives no CPU figure, Heimdall sums those SMC cluster keys and reports
+   `power.cpu` tagged `P-cores (SMC)`.
 
-On **Pro/Max/Ultra** dies the SoC's "Energy Model" simply does not surface
-per-domain **CPU** or **ANE** power — both IOReport *and* `powermetrics` return
-`CPU Power: 0 mW` even with the cores pegged. So `power.cpu` is honestly
-`unavailable` (`Pro/Max: no per-domain CPU power`), while the true whole-machine
-draw still comes through `power.total` (SMC). Base dies expose the per-domain CPU
-figure, so they show a real `power.cpu`.
+So `power.cpu` is **real on both tiers** now — from IOReport on base dies, from
+the SMC cluster keys on Pro/Max. It only falls back to
+`no per-domain CPU power (IOReport + SMC)` when *neither* source responds (a chip
+whose SMC cluster keys we haven't mapped — the keys are reverse-engineered and can
+differ per generation, exactly like the temperature keys). `power.total` (SMC
+`PSTR`) always carries the whole-machine draw regardless.
 
-**GPU** power is a valid IOReport channel on *every* Apple Silicon SoC, so it is
-always reported — including a few milliwatts at idle. (Heimdall used to drop a
-zero-valued GPU rail, which made an idle base M4 look like it "had no GPU"; since
-v2.4.3 the idle GPU shows as `0 W` instead.)
+**GPU** power is a valid IOReport channel on every Apple Silicon SoC, so it is
+always reported — including a few milliwatts at idle (since v2.4.3 the idle GPU
+shows as `0 W` instead of being dropped).
 
-Verified across two SoCs and macOS builds:
+Verified live across two SoCs and macOS builds:
 
-| Machine | SoC | macOS (Darwin) | `power.cpu` | `power.gpu` |
+| Machine | SoC | macOS (Darwin) | `power.cpu` source | value |
 |---|---|---|---|---|
-| Mac mini | Apple **M4** (base) | 26.6 / Darwin 25.6 | real (~0.5 W idle) | reported (idle → 0 W) |
-| MacBook Pro | Apple **M3 Max** | 27.0 / Darwin 27.0 | `unavailable` (Pro/Max) | reported |
+| Mac mini | Apple **M4** (base) | 26.6 / Darwin 25.6 | IOReport | ~0.5 W idle |
+| MacBook Pro | Apple **M3 Max** | 27.0 / Darwin 27.0 | **SMC `PC02`+`PC42`** | ~11 W under load |
 
 ## Build note — IOReport needs CGO
 

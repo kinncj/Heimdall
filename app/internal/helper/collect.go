@@ -27,13 +27,14 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	if runtime.GOOS == "darwin" {
 		cpu, gpu, ane, gpuUtil, ioOK := ioReportPower(200)
 		smcPkg, smcOK := smcSystemPower()
+		smcCPU, smcCPUOK := smcCPUPower()
 		// powermetrics (root only) fills GPU utilisation and any power the energy
 		// counters did not expose.
 		var pm []domain.Metric
 		if text, err := runPowermetrics(ctx); err == nil {
 			pm = parsePowermetrics(text)
 		}
-		out = append(out, assembleApplePower(cpu, gpu, ane, gpuUtil, ioOK, smcPkg, smcOK, pm)...)
+		out = append(out, assembleApplePower(cpu, gpu, ane, gpuUtil, ioOK, smcPkg, smcOK, smcCPU, smcCPUOK, pm)...)
 	}
 	// Linux privileged sources (RAPL power, hwmon temps); no-op off Linux.
 	out = mergeByName(out, linuxPrivileged(ctx))
@@ -140,7 +141,7 @@ func powerMetric(name string, w float64) domain.Metric {
 // Silicon Pro/Max chips IOReport reports 0 for CPU/ANE and only a sub-watt GPU
 // figure, so the energy-sum is a phantom — it must never shadow a real SMC or
 // powermetrics reading. pm is the parsed powermetrics output (may be nil).
-func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float64, smcOK bool, pm []domain.Metric) []domain.Metric {
+func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float64, smcOK bool, smcCPU float64, smcCPUOK bool, pm []domain.Metric) []domain.Metric {
 	var out []domain.Metric
 	if ioOK {
 		// CPU and ANE: a 0 reading means the channel is *unavailable* on Pro/Max
@@ -182,14 +183,18 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 			out = append(out, powerMetric("power.total", sum))
 		}
 	}
-	// Apple Pro/Max SoCs expose no per-domain CPU power — IOReport and powermetrics
-	// both report 0 for the CPU/ANE channels (only the SMC whole-system total is
-	// real). Base M-series populate it. Say why rather than leaving power.cpu a
-	// silent blank; power.total still carries the real whole-machine figure.
+	// On Pro/Max the IOReport energy model reports 0 for CPU, but the raw SMC
+	// per-cluster keys still carry it (the source Stats reads) — try those before
+	// giving up. Base M-series already set power.cpu above from IOReport.
+	if smcCPUOK && !hasName(out, "power.cpu") {
+		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: smcCPU, Detail: "P-cores (SMC)"})
+	}
+	// If neither IOReport nor the SMC keys yielded CPU power, say why rather than
+	// leaving a silent blank; power.total still carries the whole-machine figure.
 	if ioOK && !hasName(out, "power.cpu") {
 		out = append(out, domain.Metric{
 			Name: "power.cpu", Status: domain.StatusUnavailable,
-			Detail: "Pro/Max: no per-domain CPU power",
+			Detail: "no per-domain CPU power (IOReport + SMC)",
 		})
 	}
 	// Apple Silicon is unified memory — there is no discrete VRAM to read. Report

@@ -10,11 +10,13 @@ package helper
 #include <IOKit/IOKitLib.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 // AppleSMC key access. PSTR ("System Total Power", IEEE float, watts) is the
-// whole-system power rail mactop/btop/iStat read without root — and the only
-// power figure populated on Apple Silicon Pro/Max chips, whose IOReport energy
-// channels report 0 for CPU/ANE.
+// whole-system power rail mactop/btop/iStat read without root. The per-domain
+// keys (PCPC "CPU Package", PCTR "CPU Total", PG0C "GPU", …) carry CPU/GPU power
+// even on Apple Silicon Pro/Max, whose IOReport energy channels report 0 — the
+// same raw SMC keys Stats reads. All are IEEE floats in watts.
 typedef struct { char major, minor, build, reserved[1]; uint16_t release; } smc_vers_t;
 typedef struct { uint16_t version, length; uint32_t cpuPLimit, gpuPLimit, memPLimit; } smc_plim_t;
 typedef struct { uint32_t dataSize, dataType; char dataAttributes; } smc_kinfo_t;
@@ -35,11 +37,13 @@ static uint32_t smc_str2key(const char *s) {
 	return ((uint32_t)s[0] << 24) | ((uint32_t)s[1] << 16) | ((uint32_t)s[2] << 8) | (uint32_t)s[3];
 }
 
-// smc_read_pstr opens AppleSMC, reads PSTR as a float, and returns watts. The
-// connection is opened and closed per call; this runs at the collector cadence
-// (hundreds of ms), so the open cost is negligible and we avoid holding a port.
-// Returns 0 on any failure (no AppleSMC, key absent, wrong type).
-static double smc_read_pstr(void) {
+// smc_read_key opens AppleSMC, reads the given 4-char key as a float, and returns
+// watts. *found is set to 1 when the key exists and was read as a float (the
+// value may legitimately be 0), else 0 — so callers can tell an absent key from a
+// genuine zero. The connection is opened/closed per call; at the collector
+// cadence the open cost is negligible and we avoid holding a port.
+static double smc_read_key(const char *k, int *found) {
+	*found = 0;
 	io_service_t svc = IOServiceGetMatchingService(0, IOServiceMatching("AppleSMC"));
 	if (!svc) return 0;
 	io_connect_t conn = 0;
@@ -49,7 +53,7 @@ static double smc_read_pstr(void) {
 	}
 	IOObjectRelease(svc);
 
-	uint32_t key = smc_str2key("PSTR");
+	uint32_t key = smc_str2key(k);
 	double watts = 0;
 
 	smc_kd_t in = {0}, out = {0};
@@ -73,6 +77,7 @@ static double smc_read_pstr(void) {
 				float f;
 				memcpy(&f, ro.bytes, 4);
 				watts = (double)f;
+				*found = 1;
 			}
 		}
 	}
@@ -82,13 +87,42 @@ static double smc_read_pstr(void) {
 */
 import "C"
 
-// smcSystemPower reads the SMC PSTR ("System Total Power") rail in watts. No root
-// required. ok is false when AppleSMC or the key is unavailable, or the reading
-// is non-positive, so callers fall back to IOReport / powermetrics.
+import "unsafe"
+
+// smcReadFloat reads a 4-char AppleSMC float key in watts. ok is true when the
+// key exists and read as a float (value may be 0); false when absent or the wrong
+// type. No root required.
+func smcReadFloat(key string) (float64, bool) {
+	ck := C.CString(key)
+	defer C.free(unsafe.Pointer(ck))
+	var found C.int
+	w := float64(C.smc_read_key(ck, &found))
+	return w, found != 0
+}
+
+// smcSystemPower reads the SMC PSTR ("System Total Power") rail in watts. ok is
+// false when AppleSMC or the key is unavailable, or the reading is non-positive,
+// so callers fall back to IOReport / powermetrics.
 func smcSystemPower() (watts float64, ok bool) {
-	w := float64(C.smc_read_pstr())
-	if w <= 0 {
+	w, found := smcReadFloat("PSTR")
+	if !found || w <= 0 {
 		return 0, false
 	}
 	return w, true
+}
+
+// smcCPUPower sums the raw SMC P-core cluster power keys, which carry CPU power
+// on Apple Silicon Pro/Max even where the IOReport energy model reports 0. On the
+// M3 Max these are PC02 + PC42 (the two 6-core P-clusters) — verified live; the
+// aggregate keys (PCPC/PCTR) that exist on some chips are absent there. Returns
+// the cluster sum when at least one key is present (0 at idle is a real reading);
+// absent on chips that expose none, so the caller falls back to Unavailable.
+func smcCPUPower() (watts float64, ok bool) {
+	for _, k := range []string{"PC02", "PC42"} {
+		if w, found := smcReadFloat(k); found {
+			watts += w
+			ok = true
+		}
+	}
+	return watts, ok
 }
