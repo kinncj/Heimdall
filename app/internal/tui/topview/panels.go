@@ -126,8 +126,17 @@ func (m Model) cpuPanel(t tier, w int) panelSpec {
 		lab("util ") + m.sparkW("cpu.util", w) + "  " + util,
 	}
 	if cores, ok := m.ok("cpu.cores"); ok && len(cores.PerCore) > 0 {
-		lines = append(lines, lab(fmt.Sprintf("per-core (%d):", len(cores.PerCore))))
-		lines = append(lines, m.coreMatrix(cores.PerCore, cols)...)
+		if groups, grouped := m.coreGroups(len(cores.PerCore)); grouped {
+			// Hybrid host: group the bars under text headers per core type, in
+			// logical core order, keeping the real core ids.
+			for _, g := range groups {
+				lines = append(lines, lab(fmt.Sprintf("%s-cores (%d):", g.label, len(g.idx))))
+				lines = append(lines, m.coreMatrixIdx(g.idx, cores.PerCore, cols)...)
+			}
+		} else {
+			lines = append(lines, lab(fmt.Sprintf("per-core (%d):", len(cores.PerCore))))
+			lines = append(lines, m.coreMatrix(cores.PerCore, cols)...)
+		}
 	}
 	return panelSpec{title: "CPU", lines: lines}
 }
@@ -177,15 +186,49 @@ func (m Model) powerPanel(t tier, w int) panelSpec {
 		}}
 	}
 	if t == tierMedium {
-		return panelSpec{title: "POWER", lines: []string{
+		lines := []string{
 			lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
-			lab("total ") + m.sparkW("power.total", w) + "  " + totalVal,
-		}}
+		}
+		if cl, ok := m.clusterLine(); ok {
+			lines = append(lines, cl)
+		}
+		lines = append(lines, lab("total ")+m.sparkW("power.total", w)+"  "+totalVal)
+		return panelSpec{title: "POWER", lines: lines}
 	}
-	return panelSpec{title: "POWER", lines: []string{
+	lines := []string{
 		lab("total ") + m.sparkW("power.total", w) + "  " + totalVal,
 		lab("cpu ") + cpu + "   " + lab("gpu ") + gpu + "   " + lab("npu ") + npu,
-	}}
+	}
+	if cl, ok := m.clusterLine(); ok {
+		lines = append(lines, cl)
+	}
+	return panelSpec{title: "POWER", lines: lines}
+}
+
+// clusterLine decomposes power.cpu into its per-cluster rails when the SMC
+// exposes them (Apple Pro/Max): "cpu clusters: P 15.0 W · E 3.1 W". Only rails
+// that read OK appear; on hosts without cluster rails the line is absent.
+func (m Model) clusterLine() (string, bool) {
+	label, _ := m.mode.Role("label")
+	val, _ := m.mode.Role("value")
+	muted, _ := m.mode.Role("text_muted")
+	var parts []string
+	for _, c := range []struct{ name, tag string }{
+		{"power.cpu.pcluster", "P"},
+		{"power.cpu.ecluster", "E"},
+	} {
+		if mm, ok := m.ok(c.name); ok {
+			parts = append(parts,
+				label.Style().Render(c.tag+" ")+
+					val.Style().Render(fmt.Sprintf("%.1f", mm.Gauge))+
+					label.Style().Render(" W"))
+		}
+	}
+	if len(parts) == 0 {
+		return "", false
+	}
+	return label.Style().Render("cpu clusters: ") +
+		strings.Join(parts, muted.Style().Render(" · ")), true
 }
 
 func (m Model) gpuPanel(t tier, w int) panelSpec {
@@ -340,8 +383,64 @@ func (m Model) tinyBody() []string {
 
 // --- per-core ----------------------------------------------------------------
 
+// coreTypeLabels maps cpu.topology type ids to display labels (0 is always the
+// highest-performance tier).
+var coreTypeLabels = []string{"P", "E", "LP"}
+
+// coreGroup is one core-type block of the grid: its display label and the real
+// logical core indices it owns.
+type coreGroup struct {
+	label string
+	idx   []int
+}
+
+// coreGroups reads cpu.topology and buckets core indices by type, ordered by
+// first appearance (logical core order). It returns grouped=false — meaning
+// "render the plain unlabelled grid" — when the metric is absent or non-OK
+// (older daemon), uniform (a single type), length-mismatched with cpu.cores
+// (torn snapshot), or carries a type id it can't label.
+func (m Model) coreGroups(total int) ([]coreGroup, bool) {
+	topo, ok := m.ok("cpu.topology")
+	if !ok || len(topo.PerCore) != total || topo.Gauge < 2 {
+		return nil, false
+	}
+	byType := map[int]*coreGroup{}
+	var order []*coreGroup
+	for i, tv := range topo.PerCore {
+		t := int(tv)
+		if t < 0 || t >= len(coreTypeLabels) || float64(t) != tv {
+			return nil, false
+		}
+		g, seen := byType[t]
+		if !seen {
+			g = &coreGroup{label: coreTypeLabels[t]}
+			byType[t] = g
+			order = append(order, g)
+		}
+		g.idx = append(g.idx, i)
+	}
+	if len(order) < 2 {
+		return nil, false
+	}
+	out := make([]coreGroup, len(order))
+	for i, g := range order {
+		out[i] = *g
+	}
+	return out, true
+}
+
 // coreMatrix renders per-core bars in rows of `cols`: "c0 ███▌71  c1 ...".
 func (m Model) coreMatrix(cores []float64, cols int) []string {
+	idx := make([]int, len(cores))
+	for i := range idx {
+		idx[i] = i
+	}
+	return m.coreMatrixIdx(idx, cores, cols)
+}
+
+// coreMatrixIdx renders the given cores (by real logical id) in rows of `cols`,
+// so a grouped grid keeps each bar's true core number.
+func (m Model) coreMatrixIdx(idx []int, cores []float64, cols int) []string {
 	muted, _ := m.mode.Role("text_muted")
 	val, _ := m.mode.Role("value")
 	cell := func(i int, v float64) string {
@@ -350,10 +449,10 @@ func (m Model) coreMatrix(cores []float64, cols int) []string {
 			val.Style().Render(fmt.Sprintf("%2.0f", v))
 	}
 	var lines []string
-	for i := 0; i < len(cores); i += cols {
+	for i := 0; i < len(idx); i += cols {
 		var row []string
-		for j := i; j < i+cols && j < len(cores); j++ {
-			row = append(row, cell(j, cores[j]))
+		for j := i; j < i+cols && j < len(idx); j++ {
+			row = append(row, cell(idx[j], cores[idx[j]]))
 		}
 		lines = append(lines, strings.Join(row, "  "))
 	}
@@ -361,13 +460,29 @@ func (m Model) coreMatrix(cores []float64, cols int) []string {
 }
 
 // coresAggregate collapses per-core into a single bar plus a count/avg/max
-// summary (NARROW tier).
+// summary (NARROW tier). On a hybrid host it collapses to one aggregate per
+// core type instead ("P (12) ███▌ 64%  E (4) █▌ 12%").
 func (m Model) coresAggregate() string {
 	label, _ := m.mode.Role("label")
 	val, _ := m.mode.Role("value")
 	cores, ok := m.ok("cpu.cores")
 	if !ok || len(cores.PerCore) == 0 {
 		return label.Style().Render("cores ") + m.dash()
+	}
+	if groups, grouped := m.coreGroups(len(cores.PerCore)); grouped {
+		var parts []string
+		for _, g := range groups {
+			var sum float64
+			for _, i := range g.idx {
+				sum += cores.PerCore[i]
+			}
+			avg := sum / float64(len(g.idx))
+			parts = append(parts,
+				label.Style().Render(fmt.Sprintf("%s (%d) ", g.label, len(g.idx)))+
+					render.Gauge(m.mode, avg, 5)+" "+
+					val.Style().Render(fmt.Sprintf("%.0f%%", avg)))
+		}
+		return strings.Join(parts, "  ")
 	}
 	var sum, max float64
 	for _, v := range cores.PerCore {

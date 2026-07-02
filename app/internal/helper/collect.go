@@ -27,14 +27,14 @@ func PrivilegedMetrics(ctx context.Context) []domain.Metric {
 	if runtime.GOOS == "darwin" {
 		cpu, gpu, ane, gpuUtil, ioOK := ioReportPower(200)
 		smcPkg, smcOK := smcSystemPower()
-		smcCPU, smcCPUOK := smcCPUPower()
+		smcCPU := smcCPUPower()
 		// powermetrics (root only) fills GPU utilisation and any power the energy
 		// counters did not expose.
 		var pm []domain.Metric
 		if text, err := runPowermetrics(ctx); err == nil {
 			pm = parsePowermetrics(text)
 		}
-		out = append(out, assembleApplePower(cpu, gpu, ane, gpuUtil, ioOK, smcPkg, smcOK, smcCPU, smcCPUOK, pm)...)
+		out = append(out, assembleApplePower(cpu, gpu, ane, gpuUtil, ioOK, smcPkg, smcOK, smcCPU, pm)...)
 	}
 	// Linux privileged sources (RAPL power, hwmon temps); no-op off Linux.
 	out = mergeByName(out, linuxPrivileged(ctx))
@@ -133,6 +133,15 @@ func powerMetric(name string, w float64) domain.Metric {
 	return domain.Metric{Name: name, Unit: "watts", Status: domain.StatusOK, Gauge: w}
 }
 
+// smcCPUReading is the raw SMC CPU-cluster power read: the CPU-complex total
+// plus the P/E rail split. Each rail has its own ok flag — a rail that did not
+// read is never reported as a fabricated 0. The zero value means "no SMC CPU
+// keys on this chip".
+type smcCPUReading struct {
+	Total, P, E  float64
+	OK, POK, EOK bool
+}
+
 // assembleApplePower builds the macOS power/util metrics from the available
 // sources. Per-domain CPU/GPU/ANE power and GPU utilisation come from the
 // IOReport energy counters when present. The whole-system total has a strict
@@ -141,7 +150,7 @@ func powerMetric(name string, w float64) domain.Metric {
 // Silicon Pro/Max chips IOReport reports 0 for CPU/ANE and only a sub-watt GPU
 // figure, so the energy-sum is a phantom — it must never shadow a real SMC or
 // powermetrics reading. pm is the parsed powermetrics output (may be nil).
-func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float64, smcOK bool, smcCPU float64, smcCPUOK bool, pm []domain.Metric) []domain.Metric {
+func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float64, smcOK bool, smcCPU smcCPUReading, pm []domain.Metric) []domain.Metric {
 	var out []domain.Metric
 	if ioOK {
 		// CPU and ANE: a 0 reading means the channel is *unavailable* on Pro/Max
@@ -186,8 +195,17 @@ func assembleApplePower(cpu, gpu, ane, gpuUtil float64, ioOK bool, smcPkg float6
 	// On Pro/Max the IOReport energy model reports 0 for CPU, but the raw SMC
 	// per-cluster keys still carry it (the source Stats reads) — try those before
 	// giving up. Base M-series already set power.cpu above from IOReport.
-	if smcCPUOK && !hasName(out, "power.cpu") {
-		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: smcCPU, Detail: "CPU complex (SMC)"})
+	if smcCPU.OK && !hasName(out, "power.cpu") {
+		out = append(out, domain.Metric{Name: "power.cpu", Unit: "watts", Status: domain.StatusOK, Gauge: smcCPU.Total, Detail: "CPU complex (SMC)"})
+	}
+	// The cluster rails were read to build the total either way — surface the
+	// P/E split instead of throwing it away. Only rails that actually answered
+	// are emitted; a silent rail never becomes a fabricated 0.
+	if smcCPU.POK {
+		out = append(out, domain.Metric{Name: "power.cpu.pcluster", Unit: "watts", Status: domain.StatusOK, Gauge: smcCPU.P, Detail: "P-cluster (SMC)"})
+	}
+	if smcCPU.EOK {
+		out = append(out, domain.Metric{Name: "power.cpu.ecluster", Unit: "watts", Status: domain.StatusOK, Gauge: smcCPU.E, Detail: "E-cluster (SMC)"})
 	}
 	// If neither IOReport nor the SMC keys yielded CPU power, say why rather than
 	// leaving a silent blank; power.total still carries the whole-machine figure.

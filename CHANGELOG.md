@@ -7,6 +7,26 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-07-02
+
+### Added
+- **Top view: per-core grid labelled by core type.** On hybrid silicon the
+  per-core bars are grouped under `P-cores (N):` / `E-cores (N):` headers with
+  their real core ids — you can now see *which* cores are pinned. Sources: new
+  unprivileged `cpu.topology` metric — sysctl `hw.perflevel*` on Apple Silicon
+  (E-cluster owns the low ids, verified live on an M3 Max),
+  `/sys/devices/cpu_core|cpu_atom` on Intel hybrid Linux, and
+  `GetLogicalProcessorInformationEx` EfficiencyClass on Windows. Uniform CPUs
+  (AMD, non-hybrid Intel, ARM) and older daemons keep the plain grid — new
+  metric names only, nothing existing changed shape. NARROW tier collapses to
+  one aggregate per type.
+- **Per-cluster CPU power on Apple Pro/Max.** The SMC P/E rails that already
+  fed `power.cpu` are now surfaced as `power.cpu.pcluster` /
+  `power.cpu.ecluster`, and the top view's POWER panel shows
+  `cpu clusters: P … W · E … W` under the CPU figure. Hosts without cluster
+  rails (base dies, Linux RAPL, Windows) simply don't emit them — a rail that
+  didn't read is never a fabricated 0. (story 0028, issue #5)
+
 ## [2.5.2] - 2026-07-02
 
 ### Fixed

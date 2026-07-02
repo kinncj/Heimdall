@@ -15,7 +15,7 @@ import (
 type CPU struct{}
 
 func (CPU) Describe() domain.AdapterInfo {
-	return domain.AdapterInfo{ID: "cpu", Metrics: []string{"cpu.util", "cpu.cores"}}
+	return domain.AdapterInfo{ID: "cpu", Metrics: []string{"cpu.util", "cpu.cores", "cpu.topology"}}
 }
 
 func (CPU) Collect(ctx context.Context) ([]domain.Metric, error) {
@@ -38,6 +38,12 @@ func (CPU) Collect(ctx context.Context) ([]domain.Metric, error) {
 			Name: "cpu.cores", Unit: "percent", Status: domain.StatusOK,
 			Kind: domain.KindPerCore, Gauge: avg, PerCore: per,
 		})
+		// Core-type layout (P/E on Apple Silicon and Intel hybrid; uniform
+		// elsewhere) so the top view can label the per-core grid. Omitted when
+		// no probe answers — the renderer falls back to the unlabelled grid.
+		if topo, ok := coreTopologyMetric(len(per)); ok {
+			out = append(out, topo)
+		}
 	}
 	return out, nil
 }

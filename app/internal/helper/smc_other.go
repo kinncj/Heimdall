@@ -11,4 +11,4 @@ func smcSystemPower() (watts float64, ok bool) { return 0, false }
 
 // smcCPUPower is macOS-only; off Apple Silicon or in CGO-free builds it reports
 // no value.
-func smcCPUPower() (watts float64, ok bool) { return 0, false }
+func smcCPUPower() smcCPUReading { return smcCPUReading{} }

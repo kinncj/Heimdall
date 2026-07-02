@@ -465,6 +465,12 @@ func formatMetric(m domain.Metric) string {
 		return fmt.Sprintf("%s=%s", m.Name, m.Status)
 	}
 	if m.Kind == domain.KindPerCore && len(m.PerCore) > 0 {
+		// cpu.topology carries type ids, not percentages — an avg/max summary
+		// is meaningless there; the detail is the human rendering, compacted
+		// ("12P+4E") because the print line is space-separated.
+		if m.Name == "cpu.topology" && m.Detail != "" {
+			return fmt.Sprintf("%s=%s", m.Name, strings.ReplaceAll(m.Detail, " ", ""))
+		}
 		return fmt.Sprintf("%s=%s", m.Name, perCoreValue(m))
 	}
 	value, ok := unitValue[m.Unit]

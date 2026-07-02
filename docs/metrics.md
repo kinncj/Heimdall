@@ -26,6 +26,7 @@ Gathered once at startup; the value is a string.
 |---|---|---|
 | `cpu.util` | percent | overall CPU utilization |
 | `cpu.cores` | percent (per-core) | per-core utilization; the dashboard shows avg and max |
+| `cpu.topology` | type id (per-core) | core type of each logical core (0=P, 1=E, 2=LP); detail carries the human mix (`12P + 4E`, `16 cores (uniform)`). Sysctl perflevel (macOS), `cpu_core`/`cpu_atom` sysfs (Intel hybrid Linux), `EfficiencyClass` (Windows); uniform elsewhere. Omitted when no probe answers |
 | `cpu.load` | load | 1/5/15-minute load average (macOS/Linux; unavailable on Windows) |
 | `cpu.freq` | MHz | CPU clock; per-core where available. `/sys` cpufreq on Linux; unavailable where no clock is exposed (e.g. Apple Silicon) |
 | `gpu.util` | percent | GPU utilization |
@@ -74,5 +75,7 @@ rather than failing. See [Privileged Metrics](guides/04-privileged-metrics.md).
 | `power.total` | W | whole-machine power — `cpu + gpu (+ npu)`, or the SMC whole-system total on macOS |
 | `power.cpu` | W | CPU power — RAPL package (Linux), IOReport CPU on Apple base dies + SMC cluster keys on Apple Pro/Max/Ultra, Scaphandre (Windows, when running); Unavailable-with-reason where no source exists (Windows without Scaphandre, ARM/GB10 with no RAPL, an unmapped Apple die) |
 | `power.gpu` | W | GPU power |
+| `power.cpu.pcluster` | W | P-cluster rail of the CPU complex — Apple Pro/Max SMC only; absent elsewhere |
+| `power.cpu.ecluster` | W | E-cluster rail of the CPU complex — Apple Pro/Max SMC only; absent elsewhere |
 | `power.npu` | W | NPU / accelerator power (Apple Silicon ANE today). The legacy `power.ane` key is accepted and normalised to `power.npu` on ingest. |
 | `npu.util` | percent | NPU utilisation — real on Intel NPUs (`intel_vpu`); Unavailable-with-reason on AMD XDNA and Apple ANE, which expose no counter |

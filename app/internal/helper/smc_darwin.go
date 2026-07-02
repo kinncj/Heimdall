@@ -114,26 +114,38 @@ func smcSystemPower() (watts float64, ok bool) {
 	return w, true
 }
 
-// smcCPUPower sums the raw SMC CPU-cluster power keys — the whole CPU complex,
+// smcCPUPower reads the raw SMC CPU-cluster power keys — the whole CPU complex,
 // not just the P-cores — which carry CPU power on Apple Silicon Pro/Max even
-// where the IOReport energy model reports 0. On the M3 Max these are the two
-// 6-core P-clusters (PC02, PC42) plus the E-core / cluster rails that scale with
-// CPU load (PC03, PC43); GPU (PC1x/PC2x) and memory (PC32) keys are deliberately
-// excluded. Verified live: ~20 W under a full 16-core load. Returns the sum when
-// at least one key is present (0 at idle is a real reading); absent on chips
-// whose keys aren't mapped, so the caller falls back to Unavailable.
-func smcCPUPower() (watts float64, ok bool) {
-	for _, k := range []string{"PC02", "PC03", "PC42", "PC43"} {
-		if w, found := smcReadFloat(k); found {
-			watts += w
-			ok = true
+// where the IOReport energy model reports 0. On the M3 Max the P rails are the
+// two 6-core P-clusters (PC02, PC42) and the E rails the E-core / cluster keys
+// that scale with CPU load (PC03, PC43); GPU (PC1x/PC2x) and memory (PC32) keys
+// are deliberately excluded. Verified live: ~20 W under a full 16-core load.
+// The P/E split is kept so the caller can surface the per-cluster rails. Total
+// is OK when at least one key is present (0 at idle is a real reading); the
+// zero reading is returned on chips whose keys aren't mapped, so the caller
+// falls back to Unavailable.
+func smcCPUPower() smcCPUReading {
+	var r smcCPUReading
+	sum := func(keys ...string) (float64, bool) {
+		var w float64
+		var any bool
+		for _, k := range keys {
+			if v, found := smcReadFloat(k); found {
+				w += v
+				any = true
+			}
 		}
+		return w, any
 	}
+	r.P, r.POK = sum("PC02", "PC42")
+	r.E, r.EOK = sum("PC03", "PC43")
+	r.Total = r.P + r.E
+	r.OK = r.POK || r.EOK
 	// Guard against a chip whose key layout differs: if these keys mean something
 	// else there, or a float misreads, refuse an implausible CPU figure (NaN/Inf,
 	// negative, or > 200 W) so we fall back to Unavailable rather than show garbage.
-	if !ok || math.IsNaN(watts) || math.IsInf(watts, 0) || watts < 0 || watts > 200 {
-		return 0, false
+	if !r.OK || math.IsNaN(r.Total) || math.IsInf(r.Total, 0) || r.Total < 0 || r.Total > 200 {
+		return smcCPUReading{}
 	}
-	return watts, true
+	return r
 }

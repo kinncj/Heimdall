@@ -73,6 +73,13 @@ differ per generation, exactly like the temperature keys). `power.total` (SMC
 always reported — including a few milliwatts at idle (since v2.4.3 the idle GPU
 shows as `0 W` instead of being dropped).
 
+**Per-cluster split**: where the SMC cluster keys are mapped (Pro/Max), the P/E
+rails are also surfaced as `power.cpu.pcluster` / `power.cpu.ecluster`, and the
+top view shows a `cpu clusters: P … W · E … W` line under the CPU figure. Base
+dies (IOReport CPU power, no mapped cluster keys) simply don't get the line.
+The core layout itself is the unprivileged `cpu.topology` metric (sysctl
+`hw.perflevel*`; the E-cluster owns the low core ids — verified live).
+
 Verified live across two SoCs and macOS builds:
 
 | Machine | SoC | macOS (Darwin) | `power.cpu` source | value |

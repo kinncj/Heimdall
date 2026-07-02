@@ -21,9 +21,13 @@ fleet, **`q`** to quit.
 ## What it shows
 
 - **CPU** — utilisation, clock, load average, a trend sparkline, and per-core bars
-  (coloured by load).
+  (coloured by load). On hybrid silicon (Apple P/E, Intel P/E) the bars are
+  grouped under `P-cores (N):` / `E-cores (N):` headers with their real core
+  ids; uniform CPUs and older daemons keep the plain `per-core (N):` grid.
 - **MEMORY** — used and swap gauges, a usage trend, and memory bandwidth.
-- **POWER** — total / CPU / GPU / NPU watts and a power trend (headlined by `power.total`).
+- **POWER** — total / CPU / GPU / NPU watts and a power trend (headlined by
+  `power.total`). On Apple Pro/Max a `cpu clusters: P … W · E … W` line
+  decomposes the CPU figure into its SMC cluster rails.
 - **GPU / NPU** — utilisation, VRAM, temperature, NPU utilisation.
 - **NET & DISK** — rx/tx and read/write with trends.
 - **PROCESSES** — top by CPU; the list grows to fill the screen.
