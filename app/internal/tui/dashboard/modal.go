@@ -321,6 +321,12 @@ func (m Model) ModalView() string {
 	// Bound the body to the terminal height: header(3) + blank + title + blank +
 	// blank + footer ≈ 7 lines of chrome.
 	maxBody := m.height - (lineCount(header) + 5)
+	// Selection-list modals: keep the highlighted row in view. The selection index
+	// and the scroll offset used to drift apart, so a long command/log/sort list
+	// could move the cursor off-screen. Now the window follows the cursor.
+	if sel := m.selForModal(); sel >= 0 {
+		m.modalScroll = keepSelVisible(m.modalScroll, sel, maxBody, len(body))
+	}
 	windowed, off := scrollWindow(body, m.modalScroll, maxBody)
 	m.modalScroll = off
 	return strings.Join([]string{header, "", title, "", strings.Join(windowed, "\n"), "", footer}, "\n")
@@ -476,6 +482,44 @@ func scrollWindow(lines []string, offset, max int) ([]string, int) {
 		out[len(out)-1] = moreIndicator(len(lines)-offset-max, false)
 	}
 	return out, offset
+}
+
+// selForModal returns the highlighted row for a selection-list modal, or -1 for a
+// scroll-only body (log view, top, cmd result, detail).
+func (m Model) selForModal() int {
+	switch m.modal {
+	case modalLogList:
+		return m.modalSel
+	case modalCmdList:
+		return m.cmdSel
+	case modalTopSort:
+		return m.topSortSel
+	}
+	return -1
+}
+
+// keepSelVisible nudges the scroll offset so row sel stays inside the maxBody-row
+// window, one row clear of the "↑/↓ N more" indicators scrollWindow puts on the
+// scrolled edges. total is the list length.
+func keepSelVisible(offset, sel, maxBody, total int) int {
+	if maxBody < 1 {
+		maxBody = 1
+	}
+	if total <= maxBody {
+		return 0 // everything fits; no indicators, no scroll
+	}
+	if sel <= offset { // at/above the top edge (where ↑ more sits)
+		offset = sel - 1
+	} else if sel >= offset+maxBody-1 { // at/below the bottom edge (↓ more)
+		offset = sel - maxBody + 2
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > total-maxBody {
+		offset = total - maxBody
+	}
+	return offset
 }
 
 func clip(s string, n int) string {
