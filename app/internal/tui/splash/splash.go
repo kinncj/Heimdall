@@ -104,6 +104,19 @@ func resizeImage(img image.Image, w int) image.Image {
 
 func forceASCII() bool { return os.Getenv("HEIMDALL_ASCII") != "" }
 
+// kittyCapable reports whether the terminal speaks the Kitty graphics protocol.
+// rasterm v1.1.2 only recognises Ghostty via TERM_PROGRAM=ghostty, which is dropped
+// over SSH and tmux (and not exported by every Linux Ghostty build) — but TERM is
+// always forwarded, and Ghostty's terminfo sets TERM=xterm-ghostty. Ghostty speaks
+// Kitty graphics, so treat that TERM as capable too. Fixes the ASCII-splash fallback
+// when running over SSH from Ghostty.
+func kittyCapable() bool {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("TERM")), "xterm-ghostty") {
+		return true
+	}
+	return rasterm.IsKittyCapable()
+}
+
 // inlineImage renders LOGO_NO_BG.png with an inline-image protocol at a known
 // cell footprint, centred in width x height. ok=false if the terminal can't
 // display images. The logo already contains the wordmark + tagline, so nothing
@@ -143,7 +156,7 @@ func inlineImage(width, height int) (string, bool) {
 	buf.WriteString(strings.Repeat("\n", top)) // vertical centre
 	buf.WriteString(strings.Repeat(" ", left)) // horizontal centre
 	switch {
-	case rasterm.IsKittyCapable():
+	case kittyCapable():
 		if rasterm.KittyWriteImage(&buf, img, rasterm.KittyImgOpts{DstCols: uint32(cols), DstRows: uint32(rows)}) != nil {
 			return "", false
 		}

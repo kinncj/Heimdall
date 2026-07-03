@@ -7,6 +7,13 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Fixed
+- **Ghostty over SSH now shows the splash image, not the ASCII fallback.** The image
+  detection recognised Ghostty only by `TERM_PROGRAM=ghostty`, which SSH and tmux
+  strip — so a dashboard run over SSH from Ghostty fell back to ASCII even though the
+  terminal can render images. It now also treats `TERM=xterm-ghostty` (always
+  forwarded) as Kitty-graphics-capable.
+
 ### Added
 - **Himinbjörg — one focus + scroll primitive for the TUI (`app/internal/tui/pane`).**
   A `Pane` (scroll, selection-that-follows-the-cursor, `/` filter, sort) and a `Group`
