@@ -13,7 +13,8 @@ Start here, then jump to the guide for what you want to do.
 
 1. [Installation](installation.md) — get the binaries
 2. [Quickstart](guides/01-quickstart.md) — monitor your own machine in ~2 minutes
-3. [Architecture & Operations](deployment.md) — how the pieces fit, with diagrams
+3. [Using the Dashboard](guides/18-using-the-dashboard.md) — drive the TUI: navigation, logs, top, commands, search
+4. [Architecture & Operations](deployment.md) — how the pieces fit, with diagrams
 
 ## Start guides by modality
 
@@ -21,6 +22,7 @@ Start here, then jump to the guide for what you want to do.
 |---|---|
 | [Quickstart](guides/01-quickstart.md) | watch a single machine (all-in-one) |
 | [Monitor a Fleet](guides/02-monitor-a-fleet.md) | watch many hosts from one station |
+| [Using the Dashboard](guides/18-using-the-dashboard.md) | **drive the TUI after setup** — navigation, detail, logs, top, commands, search/filter, every key |
 | [Secure Deployment](guides/03-secure-deployment.md) | require TLS + an enrollment token |
 | [Privileged Metrics](guides/04-privileged-metrics.md) | unlock power, GPU, and full thermal (overview + deployment) |
 | ↳ [macOS / Apple Silicon](guides/13-privileged-macos.md) | IOReport GPU/power, SMC CPU + whole-system power, ANE |

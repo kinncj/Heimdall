@@ -7,6 +7,27 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- **Himinbjörg — one focus + scroll primitive for the TUI (`app/internal/tui/pane`).**
+  A `Pane` (scroll, selection-that-follows-the-cursor, `/` filter, sort) and a `Group`
+  (Tab/Shift-Tab focus with a focus ring, two-level page+pane scroll, pointer-targeted
+  mouse) replace the three divergent scroll implementations the TUI carried. Capability
+  interfaces (`Filterable`/`Sortable`) are opt-in, so static panels get neither. Panes
+  render only (ADR-0022). See [ADR-0023](docs/architecture/0023-tui-focus-scroll-pane-primitive.md).
+- **The full-screen top view (`t`) runs on the pane primitive.** The whole view is the
+  first focus — `↑/↓` and the mouse wheel scroll the entire screen, so it is always
+  scrollable at any resolution — and `Tab` steps the focus ring through each panel and
+  wraps back to the whole-view stop. The mouse wheel/click targets the panel under the
+  pointer (it did nothing in the top view before). The wide two-column panel grid is
+  kept. Dashboard-modal adoption is still in progress on `feature/himinbjorg-focus-scroll`.
+- **The command picker (`c`) filters by name, and its result filters by line.** `/`
+  narrows the command list as you type; after a command runs, `/` in the result view
+  filters the output lines (case-insensitive substring). `esc` clears either filter,
+  the highlighted row stays in view — the same idiom as the log-view search.
+- **The process view (`p`) filters by command.** `/` narrows the process table by
+  command name; it stacks with the `s` sort, so you can filter to a process family
+  and sort it by CPU or memory. `esc` clears the filter.
+
 ## [2.6.3] - 2026-07-02
 
 ### Changed

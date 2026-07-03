@@ -71,6 +71,18 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.modal == modalLogView && m.logSearching {
 		return m.updateLogSearch(msg.String(), msg.Runes), nil
 	}
+	// Likewise the command-picker filter input.
+	if m.modal == modalCmdList && m.cmdSearching {
+		return m.updateCmdSearch(msg.String(), msg.Runes), nil
+	}
+	// …and the command-result output filter input.
+	if m.modal == modalCmdResult && m.cmdOutSearching {
+		return m.updateCmdOutSearch(msg.String(), msg.Runes), nil
+	}
+	// …and the process-view command filter input.
+	if m.modal == modalTop && m.topSearching {
+		return m.updateTopSearch(msg.String(), msg.Runes), nil
+	}
 	// Clamp a scroll offset that may be a "pin to tail" sentinel or stale after the
 	// buffer shrank, so up/down respond immediately.
 	if m.modal == modalLogView || m.modal == modalTop || m.modal == modalCmdResult {
@@ -112,10 +124,12 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "p":
 			if ok && hasProc(h) {
 				m.modal, m.modalScroll = modalTop, 0
+				m.topQuery, m.topSearching = "", false
 			}
 		case "c":
 			if ok && hasCmd(h) && m.runCmd != nil {
 				m.modal, m.cmdSel = modalCmdList, 0
+				m.cmdQuery, m.cmdSearching = "", false
 			}
 		}
 	case modalLogList:
@@ -164,8 +178,14 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			m.topSearching = true
 		case "esc":
-			m.modal = modalNone
+			if m.topQuery != "" {
+				m.topQuery = "" // first esc clears an active filter
+			} else {
+				m.modal = modalNone
+			}
 		case "s":
 			m.modal, m.topSortSel = modalTopSort, m.activeTopSortIndex()
 		case "up", "k":
@@ -202,12 +222,18 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalTop
 		}
 	case modalCmdList:
-		keys := cmdModalKeys()
+		keys := m.filteredCmdKeys()
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			m.cmdSearching = true
 		case "esc":
-			m.modal = modalNone
+			if m.cmdQuery != "" {
+				m.cmdQuery = "" // first esc clears an active filter
+			} else {
+				m.modal = modalNone // then closes the picker
+			}
 		case "up", "k":
 			if m.cmdSel > 0 {
 				m.cmdSel--
@@ -221,14 +247,21 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.cmdReqID = fmt.Sprintf("dash-%d", m.now.UnixNano())
 				m.runCmd(string(h.Host.ID), keys[m.cmdSel], nil, m.cmdReqID)
 				m.modal, m.modalScroll = modalCmdResult, 0
+				m.cmdOutQuery, m.cmdOutSearching = "", false
 			}
 		}
 	case modalCmdResult:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			m.cmdOutSearching = true
 		case "esc":
-			m.modal = modalCmdList // back to the command list
+			if m.cmdOutQuery != "" {
+				m.cmdOutQuery = "" // first esc clears an active output filter
+			} else {
+				m.modal = modalCmdList // then steps back to the command list
+			}
 		case "up", "k":
 			if m.modalScroll > 0 {
 				m.modalScroll--
@@ -293,9 +326,16 @@ func (m Model) ModalView() string {
 		title = heading.Style().Render("  PROCESSES — "+dn) +
 			muted.Style().Render("   sort ") + val.Style().Render(m.activeTopSort().key) +
 			muted.Style().Render("   updated "+when)
+		if q := m.topQuery; q != "" || m.topSearching {
+			if m.topSearching {
+				q += "▏"
+			}
+			title += muted.Style().Render("   filter: ") + val.Style().Render(q)
+		}
 		body = m.topBody(h, w)
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" scroll  ") +
 			keys.Style().Render("s") + muted.Style().Render(" sort  ") +
+			keys.Style().Render("/") + muted.Style().Render(" filter  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" back")
 	case modalTopSort:
 		title = heading.Style().Render("  SORT — top processes")
@@ -305,14 +345,28 @@ func (m Model) ModalView() string {
 			keys.Style().Render("esc") + muted.Style().Render(" cancel")
 	case modalCmdList:
 		title = heading.Style().Render("  COMMAND — " + dn)
+		if q := m.cmdQuery; q != "" || m.cmdSearching {
+			if m.cmdSearching {
+				q += "▏"
+			}
+			title += muted.Style().Render("   filter: ") + val.Style().Render(q)
+		}
 		body = m.cmdListBody()
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" pick  ") +
+			keys.Style().Render("/") + muted.Style().Render(" filter  ") +
 			keys.Style().Render("⏎") + muted.Style().Render(" run  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" back")
 	case modalCmdResult:
 		title = heading.Style().Render("  COMMAND — "+dn+" / ") + keys.Style().Render(m.cmdResultName())
+		if q := m.cmdOutQuery; q != "" || m.cmdOutSearching {
+			if m.cmdOutSearching {
+				q += "▏"
+			}
+			title += muted.Style().Render("   filter: ") + val.Style().Render(q)
+		}
 		body = m.cmdResultBody(h, w)
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" scroll  ") +
+			keys.Style().Render("/") + muted.Style().Render(" filter  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" commands")
 	default:
 		return m.DetailView()
@@ -321,6 +375,12 @@ func (m Model) ModalView() string {
 	// Bound the body to the terminal height: header(3) + blank + title + blank +
 	// blank + footer ≈ 7 lines of chrome.
 	maxBody := m.height - (lineCount(header) + 5)
+	// Selection-list modals: keep the highlighted row in view. The selection index
+	// and the scroll offset used to drift apart, so a long command/log/sort list
+	// could move the cursor off-screen. Now the window follows the cursor.
+	if sel := m.selForModal(); sel >= 0 {
+		m.modalScroll = keepSelVisible(m.modalScroll, sel, maxBody, len(body))
+	}
 	windowed, off := scrollWindow(body, m.modalScroll, maxBody)
 	m.modalScroll = off
 	return strings.Join([]string{header, "", title, "", strings.Join(windowed, "\n"), "", footer}, "\n")
@@ -379,9 +439,17 @@ func (m Model) topBody(h domain.HostView, w int) []string {
 	if len(h.Processes) == 0 {
 		return append(out, muted.Style().Render("  waiting for a process table…"))
 	}
+	matched := 0
 	for _, p := range m.sortedProcesses(h) {
+		if !m.matchesTopRow(p) {
+			continue
+		}
+		matched++
 		out = append(out, val.Style().Render(fmt.Sprintf("  %7d %7d %5.1f%% %5.1f%%  %s",
 			p.PID, p.PPID, p.CPUPct, p.MemPct, clip(p.Command, w-38))))
+	}
+	if matched == 0 {
+		out = append(out, muted.Style().Render("  no processes match the filter"))
 	}
 	return out
 }
@@ -476,6 +544,44 @@ func scrollWindow(lines []string, offset, max int) ([]string, int) {
 		out[len(out)-1] = moreIndicator(len(lines)-offset-max, false)
 	}
 	return out, offset
+}
+
+// selForModal returns the highlighted row for a selection-list modal, or -1 for a
+// scroll-only body (log view, top, cmd result, detail).
+func (m Model) selForModal() int {
+	switch m.modal {
+	case modalLogList:
+		return m.modalSel
+	case modalCmdList:
+		return m.cmdSel
+	case modalTopSort:
+		return m.topSortSel
+	}
+	return -1
+}
+
+// keepSelVisible nudges the scroll offset so row sel stays inside the maxBody-row
+// window, one row clear of the "↑/↓ N more" indicators scrollWindow puts on the
+// scrolled edges. total is the list length.
+func keepSelVisible(offset, sel, maxBody, total int) int {
+	if maxBody < 1 {
+		maxBody = 1
+	}
+	if total <= maxBody {
+		return 0 // everything fits; no indicators, no scroll
+	}
+	if sel <= offset { // at/above the top edge (where ↑ more sits)
+		offset = sel - 1
+	} else if sel >= offset+maxBody-1 { // at/below the bottom edge (↓ more)
+		offset = sel - maxBody + 2
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > total-maxBody {
+		offset = total - maxBody
+	}
+	return offset
 }
 
 func clip(s string, n int) string {

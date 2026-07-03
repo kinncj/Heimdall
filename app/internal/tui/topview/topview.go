@@ -7,8 +7,10 @@
 // dashboard switches into it on `t` and leaves on `esc`/`q`.
 //
 // Responsive behaviour mirrors the established dashboard pattern — layout(width)
-// picks the densest plan that fits, and a self-contained scrollWindow clamps the
-// body between a fixed header and footer so the frame never exceeds the terminal.
+// picks the densest plan that fits. The panels are a pane.Group (Himinbjörg): Tab
+// moves the focus ring between panels, each focused panel scrolls its own overflow,
+// the whole screen page-scrolls when it is taller than the terminal, and the mouse
+// wheel/click targets the panel under the pointer.
 package topview
 
 import (
@@ -19,6 +21,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"heimdall/app/internal/domain"
+	"heimdall/app/internal/tui/pane"
 	"heimdall/app/internal/tui/theme"
 )
 
@@ -46,17 +49,24 @@ func layout(width int) tier {
 	}
 }
 
-// Model is the top view's immutable render state plus the local scroll offset.
+// Model is the top view's render state. The panels live in a pane.Group, which
+// holds the mutable focus/scroll state across ticks.
 type Model struct {
 	host    domain.HostView
 	history map[string][]float64
 	mode    theme.Mode
 	width   int
 	height  int
-	scroll  int
 
 	byName map[string]domain.Metric // host.LastSnapshot indexed by name
+	group  *pane.Group
+	srcs   []*linesSource // panel content, in reading order, updated on refresh
 }
+
+// linesSource is a static pane source: the panel's pre-rendered content lines.
+type linesSource struct{ lines []string }
+
+func (s *linesSource) Rows() []string { return s.lines }
 
 // New builds a top view for one host. history is the per-metric recent-value
 // buffer (each value 0–100 for percentages); the view reads it for sparklines
@@ -66,22 +76,47 @@ func New(host domain.HostView, history map[string][]float64, mode theme.Mode, wi
 	for _, mm := range host.LastSnapshot {
 		bn[mm.Name] = mm
 	}
-	return Model{host: host, history: history, mode: mode, width: width, height: height, byName: bn}
+	m := Model{host: host, history: history, mode: mode, width: width, height: height, byName: bn}
+	m.build()
+	return m
+}
+
+// build assembles the panel panes into a Group for the current width tier.
+func (m *Model) build() {
+	rows := m.specRows(layout(m.width))
+	grid := make([][]*pane.Pane, 0, len(rows))
+	var srcs []*linesSource
+	for _, row := range rows {
+		panes := make([]*pane.Pane, 0, len(row))
+		for _, ps := range row {
+			s := &linesSource{lines: ps.lines}
+			srcs = append(srcs, s)
+			panes = append(panes, pane.New(ps.title, s))
+		}
+		grid = append(grid, panes)
+	}
+	m.srcs = srcs
+	// The whole top view is the first focus: ↑/↓ and the wheel scroll the entire
+	// screen, so it is always scrollable at any resolution. Tab then steps into
+	// each panel and wraps back around to the whole-view stop (Himinbjörg).
+	m.group = pane.NewGrid(grid).EnablePageFocus()
 }
 
 // Refresh returns a copy bound to a newer host snapshot and history while keeping
-// the current scroll offset, so a live tick updates the numbers without jumping
-// the view. The next key press re-clamps scroll against the new content height.
+// focus and scroll where the user left them, so a live tick updates the numbers
+// without jumping the view.
 func (m Model) Refresh(host domain.HostView, history map[string][]float64) Model {
 	n := New(host, history, m.mode, m.width, m.height)
-	n.scroll = m.scroll
+	n.group.TransferStateFrom(m.group)
 	return n
 }
 
-// Resize returns a copy at a new terminal size, preserving scroll.
+// Resize returns a copy at a new terminal size, preserving focus and scroll when
+// the layout shape is unchanged.
 func (m Model) Resize(width, height int) Model {
-	m.width, m.height = width, height
-	return m
+	n := New(m.host, m.history, m.mode, width, height)
+	n.group.TransferStateFrom(m.group)
+	return n
 }
 
 // Action is what the dashboard should do after a key press in the top view.
@@ -94,43 +129,44 @@ const (
 )
 
 // Update handles a key press. esc returns ActBack (leave the view); q and ctrl+c
-// return ActQuit (quit the app), matching the rest of the TUI. All other keys
-// scroll the body in place and return ActNone.
+// return ActQuit (quit the app), matching the rest of the TUI. Everything else —
+// Tab focus, arrow/page scroll — is routed to the focused panel and returns ActNone.
 func (m Model) Update(msg tea.KeyMsg) (Model, Action) {
 	switch msg.String() {
 	case "esc":
 		return m, ActBack
 	case "q", "ctrl+c":
 		return m, ActQuit
-	case "up", "k":
-		m.scroll = clampScroll(m.scroll-1, m.maxScroll())
-	case "down", "j":
-		m.scroll = clampScroll(m.scroll+1, m.maxScroll())
-	case "pgup":
-		m.scroll = clampScroll(m.scroll-m.pageStep(), m.maxScroll())
-	case "pgdown", "pgdn":
-		m.scroll = clampScroll(m.scroll+m.pageStep(), m.maxScroll())
-	case "home":
-		m.scroll = 0
-	case "end":
-		m.scroll = m.maxScroll()
+	}
+	if m.group != nil {
+		m.group.Update(msg, m.bodyHeight())
 	}
 	return m, ActNone
 }
 
-// View renders the fixed header, the scrollable panel body, and the fixed footer,
+// Mouse routes a wheel/click to the panel under the pointer (Himinbjörg). The
+// dashboard forwards mouse events here while the top view is active.
+func (m Model) Mouse(msg tea.MouseMsg) Model {
+	if m.group != nil {
+		m.group.Mouse(msg, m.bodyHeight())
+	}
+	return m
+}
+
+// View renders the fixed header, the pane.Group panel body, and the fixed footer,
 // clamped to the terminal height. Every line is finally bounded to the terminal
 // width so nothing clips past the frame.
 func (m Model) View() string {
 	t := layout(m.width)
 	header := m.header(t)
 	footer := m.footer(t)
-	body := m.body(t)
 
-	windowed, off := scrollWindow(m, body, m.scroll, m.bodyHeight())
-	m.scroll = off
+	body := ""
+	if m.group != nil {
+		body = m.group.View(m.mode, pane.Rect{X: 0, Y: lineCount(header) + 1, W: m.width, H: m.bodyHeight()})
+	}
 
-	out := header + "\n\n" + strings.Join(windowed, "\n") + "\n\n" + footer
+	out := header + "\n\n" + body + "\n\n" + footer
 
 	lines := strings.Split(out, "\n")
 	for i, l := range lines {
@@ -146,24 +182,6 @@ func (m Model) bodyHeight() int {
 	chrome := lineCount(m.header(t)) + lineCount(m.footer(t)) + 2
 	if h := m.height - chrome; h >= 1 {
 		return h
-	}
-	return 1
-}
-
-// maxScroll is the largest valid body scroll offset (0 when everything fits).
-func (m Model) maxScroll() int {
-	body := m.body(layout(m.width))
-	if vis := m.bodyHeight(); len(body) > vis {
-		return len(body) - vis
-	}
-	return 0
-}
-
-// pageStep is one page of body scroll (a near-full screen, minus one row of
-// overlap so context is kept).
-func (m Model) pageStep() int {
-	if s := m.bodyHeight() - 1; s > 1 {
-		return s
 	}
 	return 1
 }
@@ -205,11 +223,11 @@ func (m Model) footer(t tier) string {
 
 	switch t {
 	case tierWide:
-		return k("↑/↓") + x(" scroll · ") + k("pgup/pgdn") + x(" page · ") + k("esc") + x(" back · ") + k("q") + x(" quit")
+		return k("↑/↓") + x(" scroll · ") + k("tab") + x(" panel · ") + k("pgup/pgdn") + x(" page · ") + k("esc") + x(" back · ") + k("q") + x(" quit")
 	case tierMedium:
-		return k("↑/↓") + x(" scroll · ") + k("esc") + x(" back · ") + k("q") + x(" quit")
+		return k("↑/↓") + x(" scroll · ") + k("tab") + x(" panel · ") + k("esc") + x(" back · ") + k("q") + x(" quit")
 	case tierNarrow:
-		return k("↑/↓") + x(" scroll · ") + k("esc") + x(" back")
+		return k("↑/↓") + x(" scroll · ") + k("tab") + x(" panel · ") + k("esc") + x(" back")
 	default: // tierTiny
 		return k("↑/↓") + x(" · ") + k("esc")
 	}
@@ -314,48 +332,3 @@ func joinEnds(left, right string, width int) string {
 }
 
 func lineCount(s string) int { return strings.Count(s, "\n") + 1 }
-
-func clampScroll(v, max int) int {
-	if v < 0 {
-		return 0
-	}
-	if v > max {
-		return max
-	}
-	return v
-}
-
-// scrollWindow clamps lines to a vis-row window around offset, replacing the edge
-// rows with text scroll affordances ("▲ more above" / "▼ more below" + position)
-// so the body stays height-bounded. It returns the clamped offset. Kept local to
-// this package so the view is self-contained.
-func scrollWindow(m Model, lines []string, offset, vis int) ([]string, int) {
-	if vis < 1 {
-		vis = 1
-	}
-	if len(lines) <= vis {
-		return lines, 0
-	}
-	if offset > len(lines)-vis {
-		offset = len(lines) - vis
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	out := append([]string(nil), lines[offset:offset+vis]...)
-	caption, _ := m.mode.Role("caption")
-	pos := func(above bool) string {
-		glyph := "▼ more below"
-		if above {
-			glyph = "▲ more above"
-		}
-		return caption.Style().Render(fmt.Sprintf("%s   scroll %d/%d", glyph, offset+1, len(lines)))
-	}
-	if offset > 0 {
-		out[0] = pos(true)
-	}
-	if offset+vis < len(lines) {
-		out[len(out)-1] = pos(false)
-	}
-	return out, offset
-}
