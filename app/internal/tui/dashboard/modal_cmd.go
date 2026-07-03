@@ -120,23 +120,72 @@ func (m Model) cmdResultBody(h domain.HostView, w int) []string {
 	}
 	out := []string{head, ""}
 
+	matched := 0
 	if s := strings.TrimRight(cr.Stdout, "\n"); s != "" {
 		for _, line := range strings.Split(s, "\n") {
+			if !m.matchesCmdOut(line) {
+				continue
+			}
+			matched++
 			out = append(out, "  "+val.Style().Render(clip(line, w-4)))
 		}
 	}
 	// Keep stderr visually distinct and never merged onto a stdout line.
 	if s := strings.TrimRight(cr.Stderr, "\n"); s != "" {
 		al, _ := m.mode.State("error")
-		out = append(out, "", muted.Style().Render("  stderr:"))
+		var lines []string
 		for _, line := range strings.Split(s, "\n") {
-			out = append(out, "  "+al.Style().Render(clip(line, w-4)))
+			if !m.matchesCmdOut(line) {
+				continue
+			}
+			matched++
+			lines = append(lines, "  "+al.Style().Render(clip(line, w-4)))
 		}
+		if len(lines) > 0 {
+			out = append(out, "", muted.Style().Render("  stderr:"))
+			out = append(out, lines...)
+		}
+	}
+	if matched == 0 && strings.TrimSpace(m.cmdOutQuery) != "" {
+		out = append(out, muted.Style().Render("  no output lines match the filter"))
 	}
 	if cr.Truncated {
 		out = append(out, muted.Style().Render("  [output truncated]"))
 	}
 	return out
+}
+
+// matchesCmdOut reports whether an output line satisfies the result filter (an
+// empty filter matches everything), case-insensitive substring.
+func (m Model) matchesCmdOut(line string) bool {
+	q := strings.ToLower(strings.TrimSpace(m.cmdOutQuery))
+	if q == "" {
+		return true
+	}
+	return strings.Contains(strings.ToLower(line), q)
+}
+
+// updateCmdOutSearch handles keystrokes while the command-result filter input is
+// open: type to narrow, backspace to edit, enter to keep, esc to clear. Mirrors
+// the log-view search.
+func (m Model) updateCmdOutSearch(s string, runes []rune) Model {
+	switch s {
+	case "enter":
+		m.cmdOutSearching = false
+	case "esc":
+		m.cmdOutSearching = false
+		m.cmdOutQuery = ""
+	case "backspace":
+		if r := []rune(m.cmdOutQuery); len(r) > 0 {
+			m.cmdOutQuery = string(r[:len(r)-1])
+		}
+	default:
+		if len(runes) > 0 {
+			m.cmdOutQuery += string(runes)
+		}
+	}
+	m.modalScroll = 0 // re-read from the top as the result set changes
+	return m
 }
 
 func statusWord(s domain.MetricStatus) string {

@@ -75,6 +75,10 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.modal == modalCmdList && m.cmdSearching {
 		return m.updateCmdSearch(msg.String(), msg.Runes), nil
 	}
+	// …and the command-result output filter input.
+	if m.modal == modalCmdResult && m.cmdOutSearching {
+		return m.updateCmdOutSearch(msg.String(), msg.Runes), nil
+	}
 	// Clamp a scroll offset that may be a "pin to tail" sentinel or stale after the
 	// buffer shrank, so up/down respond immediately.
 	if m.modal == modalLogView || m.modal == modalTop || m.modal == modalCmdResult {
@@ -232,14 +236,21 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.cmdReqID = fmt.Sprintf("dash-%d", m.now.UnixNano())
 				m.runCmd(string(h.Host.ID), keys[m.cmdSel], nil, m.cmdReqID)
 				m.modal, m.modalScroll = modalCmdResult, 0
+				m.cmdOutQuery, m.cmdOutSearching = "", false
 			}
 		}
 	case modalCmdResult:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			m.cmdOutSearching = true
 		case "esc":
-			m.modal = modalCmdList // back to the command list
+			if m.cmdOutQuery != "" {
+				m.cmdOutQuery = "" // first esc clears an active output filter
+			} else {
+				m.modal = modalCmdList // then steps back to the command list
+			}
 		case "up", "k":
 			if m.modalScroll > 0 {
 				m.modalScroll--
@@ -329,8 +340,15 @@ func (m Model) ModalView() string {
 			keys.Style().Render("esc") + muted.Style().Render(" back")
 	case modalCmdResult:
 		title = heading.Style().Render("  COMMAND — "+dn+" / ") + keys.Style().Render(m.cmdResultName())
+		if q := m.cmdOutQuery; q != "" || m.cmdOutSearching {
+			if m.cmdOutSearching {
+				q += "▏"
+			}
+			title += muted.Style().Render("   filter: ") + val.Style().Render(q)
+		}
 		body = m.cmdResultBody(h, w)
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" scroll  ") +
+			keys.Style().Render("/") + muted.Style().Render(" filter  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" commands")
 	default:
 		return m.DetailView()

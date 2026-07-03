@@ -6,6 +6,8 @@ package dashboard
 import (
 	"strings"
 	"testing"
+
+	"heimdall/app/internal/domain"
 )
 
 func contains(xs []string, want string) bool {
@@ -66,5 +68,45 @@ func TestUpdateCmdSearchTypingAndClear(t *testing.T) {
 	m = m.updateCmdSearch("esc", nil)
 	if m.cmdQuery != "" || m.cmdSearching {
 		t.Fatalf("esc should clear and close the filter, got q=%q searching=%v", m.cmdQuery, m.cmdSearching)
+	}
+}
+
+func TestMatchesCmdOut(t *testing.T) {
+	var m Model
+	if !m.matchesCmdOut("anything") {
+		t.Error("empty filter should match every line")
+	}
+	m.cmdOutQuery = "ERROR"
+	if !m.matchesCmdOut("some error here") { // case-insensitive
+		t.Error("filter should match case-insensitively")
+	}
+	if m.matchesCmdOut("all good") {
+		t.Error("non-matching line should be filtered out")
+	}
+}
+
+func TestCmdResultBodyFiltersOutput(t *testing.T) {
+	h := domain.HostView{
+		Host: domain.Host{ID: "h"},
+		LastCommand: &domain.CommandResult{
+			RequestID: "r1", Status: domain.StatusOK,
+			Stdout: "alpha line\nbeta line\ngamma line",
+		},
+	}
+	m := Model{mode: darkMode(t), width: 80, runCmd: func(string, string, []string, string) {}, cmdReqID: "r1"}
+
+	m.cmdOutQuery = "beta"
+	body := strings.Join(m.cmdResultBody(h, 80), "\n")
+	if !strings.Contains(body, "beta") {
+		t.Errorf("filtered body should keep the matching line:\n%s", body)
+	}
+	if strings.Contains(body, "alpha") || strings.Contains(body, "gamma") {
+		t.Errorf("filtered body should drop non-matching lines:\n%s", body)
+	}
+
+	m.cmdOutQuery = "nomatch"
+	empty := strings.Join(m.cmdResultBody(h, 80), "\n")
+	if !strings.Contains(empty, "no output lines match") {
+		t.Errorf("a filter matching nothing should show an empty state:\n%s", empty)
 	}
 }

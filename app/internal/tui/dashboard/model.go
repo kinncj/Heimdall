@@ -49,12 +49,14 @@ type Model struct {
 	persistSort  func(string) // persist the chosen top sort to config (injected)
 	// On-demand commands (v2 Phase 2): issue via the injected callback, read the
 	// result back from the registry, matched by the in-flight request id.
-	runCmd       func(host, cmd string, args []string, reqID string)
-	cmdSel       int    // selection in the command picker (index into the filtered list)
-	cmdQuery     string // command-picker name filter
-	cmdSearching bool   // true while the command filter input is open
-	cmdReqID     string // request id of the in-flight command
-	detailScroll int    // scroll offset for the detail-view body (shift+arrows / wheel)
+	runCmd          func(host, cmd string, args []string, reqID string)
+	cmdSel          int    // selection in the command picker (index into the filtered list)
+	cmdQuery        string // command-picker name filter
+	cmdSearching    bool   // true while the command-name filter input is open
+	cmdReqID        string // request id of the in-flight command
+	cmdOutQuery     string // command-result output filter
+	cmdOutSearching bool   // true while the command-result filter input is open
+	detailScroll    int    // scroll offset for the detail-view body (shift+arrows / wheel)
 	// Hliðskjálf (0025): the full-screen single-host top view. Non-nil while open;
 	// topHost is the host it shows so a tick can refresh it in place.
 	top     *topview.Model
