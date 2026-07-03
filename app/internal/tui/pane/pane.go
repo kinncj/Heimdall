@@ -13,7 +13,6 @@
 package pane
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -375,11 +374,10 @@ func (p *Pane) window(m theme.Mode, lines []string, height int) []string {
 	out := append([]string(nil), lines[offset:offset+height]...)
 	out = p.markCursor(m, out, offset)
 	if offset > 0 {
-		out[0] = p.affordance(m, offset, offset+1, total, true)
+		out[0] = affordanceLine(m, offset+1, total, true)
 	}
 	if offset+height < total {
-		below := total - (offset + height)
-		out[len(out)-1] = p.affordance(m, below, offset+height, total, false)
+		out[len(out)-1] = affordanceLine(m, offset+height, total, false)
 	}
 	return out
 }
@@ -402,18 +400,6 @@ func (p *Pane) markCursor(m theme.Mode, win []string, offset int) []string {
 		}
 	}
 	return win
-}
-
-func (p *Pane) affordance(m theme.Mode, n, pos, total int, up bool) string {
-	glyph := "▼ more"
-	if up {
-		glyph = "▲ more"
-	}
-	txt := fmt.Sprintf("  %s · %d/%d", glyph, pos, total)
-	if cap, ok := m.Role("caption"); ok {
-		return cap.Style().Render(txt)
-	}
-	return txt
 }
 
 func (p *Pane) filterLine(m theme.Mode, width int) string {

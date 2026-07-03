@@ -11,6 +11,7 @@ import (
 
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/tui/brand"
+	"heimdall/app/internal/tui/pane"
 )
 
 // modalKind is the host-detail overlay currently open (Heimdallr's sight).
@@ -373,15 +374,11 @@ func (m Model) ModalView() string {
 	}
 
 	// Bound the body to the terminal height: header(3) + blank + title + blank +
-	// blank + footer ≈ 7 lines of chrome.
+	// blank + footer ≈ 7 lines of chrome. Windowing (and keeping a selection-list's
+	// highlighted row in view) is the shared pane.Window — one implementation for the
+	// whole TUI, so the modals scroll exactly like the top view (Himinbjörg).
 	maxBody := m.height - (lineCount(header) + 5)
-	// Selection-list modals: keep the highlighted row in view. The selection index
-	// and the scroll offset used to drift apart, so a long command/log/sort list
-	// could move the cursor off-screen. Now the window follows the cursor.
-	if sel := m.selForModal(); sel >= 0 {
-		m.modalScroll = keepSelVisible(m.modalScroll, sel, maxBody, len(body))
-	}
-	windowed, off := scrollWindow(body, m.modalScroll, maxBody)
+	windowed, off := pane.Window(m.mode, body, m.modalScroll, m.selForModal(), maxBody)
 	m.modalScroll = off
 	return strings.Join([]string{header, "", title, "", strings.Join(windowed, "\n"), "", footer}, "\n")
 }
@@ -520,32 +517,6 @@ func (m Model) modalMaxScroll() int {
 	return bodyLen - maxBody
 }
 
-// scrollWindow clamps lines to max around a scroll offset, replacing edge lines
-// with "↑/↓ N more" indicators so the frame height stays bounded. Returns the
-// clamped offset so the caller can pin to the tail.
-func scrollWindow(lines []string, offset, max int) ([]string, int) {
-	if max < 1 {
-		max = 1
-	}
-	if len(lines) <= max {
-		return lines, 0
-	}
-	if offset > len(lines)-max {
-		offset = len(lines) - max
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	out := append([]string(nil), lines[offset:offset+max]...)
-	if offset > 0 {
-		out[0] = moreIndicator(offset, true)
-	}
-	if offset+max < len(lines) {
-		out[len(out)-1] = moreIndicator(len(lines)-offset-max, false)
-	}
-	return out, offset
-}
-
 // selForModal returns the highlighted row for a selection-list modal, or -1 for a
 // scroll-only body (log view, top, cmd result, detail).
 func (m Model) selForModal() int {
@@ -558,30 +529,6 @@ func (m Model) selForModal() int {
 		return m.topSortSel
 	}
 	return -1
-}
-
-// keepSelVisible nudges the scroll offset so row sel stays inside the maxBody-row
-// window, one row clear of the "↑/↓ N more" indicators scrollWindow puts on the
-// scrolled edges. total is the list length.
-func keepSelVisible(offset, sel, maxBody, total int) int {
-	if maxBody < 1 {
-		maxBody = 1
-	}
-	if total <= maxBody {
-		return 0 // everything fits; no indicators, no scroll
-	}
-	if sel <= offset { // at/above the top edge (where ↑ more sits)
-		offset = sel - 1
-	} else if sel >= offset+maxBody-1 { // at/below the bottom edge (↓ more)
-		offset = sel - maxBody + 2
-	}
-	if offset < 0 {
-		offset = 0
-	}
-	if offset > total-maxBody {
-		offset = total - maxBody
-	}
-	return offset
 }
 
 func clip(s string, n int) string {

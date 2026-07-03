@@ -13,6 +13,7 @@ import (
 
 	"heimdall/app/internal/domain"
 	"heimdall/app/internal/tui/brand"
+	"heimdall/app/internal/tui/pane"
 	"heimdall/app/internal/tui/render"
 )
 
@@ -109,7 +110,7 @@ func (m Model) DetailView() string {
 	// Fixed header + footer; the body sections scroll (detailScroll) so the view
 	// fits short terminals (e.g. SSH from a phone). Chrome = header + 2 blanks +
 	// footer.
-	body, _ := scrollWindow(m.detailBody(h, w), m.detailScroll, m.height-(lineCount(header)+3))
+	body, _ := pane.Window(m.mode, m.detailBody(h, w), m.detailScroll, -1, m.height-(lineCount(header)+3))
 	out := strings.Join([]string{header, "", strings.Join(body, "\n"), "", m.detailFooter(h)}, "\n")
 	// Clamp every line to the terminal width so nothing escapes the frame on a
 	// narrow terminal (the body is laid out responsively above; this is the net).
