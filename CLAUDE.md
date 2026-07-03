@@ -81,9 +81,9 @@ a piece of work (and before you finish it):
 3. **Issue — every change, patches included.** Create a GitHub issue, labelled
    **`bug`** (patch / fix) or **`enhancement`** (feature / minor / major), assigned to
    the target major/minor milestone.
-4. **Project board.** Add the issue to project **124**
-   (`github.project_number` in `project.config.yaml`) and set **Status**
-   (`In progress` while working, `Done` when shipped).
+4. **Project board.** Add the issue to the project board — read its number from
+   `github.project_number` in `project.config.yaml` (never hard-code it) — and set
+   **Status** (`In progress` while working, `Done` when shipped).
 5. **Link & close.** The PR references the issue (`Closes #N`); merging closes it. On
    release the milestone version equals the release tag.
 6. **No Claude/Anthropic attribution** anywhere — commits, PR bodies, issues, releases.

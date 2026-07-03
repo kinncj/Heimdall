@@ -84,8 +84,9 @@ finish it):
    **Patches never get their own milestone** — attach to their minor's `vX.Y.0`.
 3. **Issue — every change, patches included.** Labelled **`bug`** (patch/fix) or
    **`enhancement`** (feature), assigned to the target major/minor milestone.
-4. **Project 124** — add the issue and set **Status** (`In progress` → `Done`).
-   Board id in `project.config.yaml → github`.
+4. **Project board** — add the issue and set **Status** (`In progress` → `Done`).
+   Read the board number from `github.project_number` in `project.config.yaml`
+   (never hard-code it).
 5. **Link & close** — PR says `Closes #N`; on release the milestone == the tag.
 
 Mechanics via the maple skills: `gh-labels-milestones`, `gh-issues`, `gh-projects`.
