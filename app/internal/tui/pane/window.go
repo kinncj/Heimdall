@@ -22,8 +22,20 @@ func Window(m theme.Mode, lines []string, offset, sel, height int) ([]string, in
 	if total <= height {
 		return append([]string(nil), lines...), 0
 	}
-	// Keep the selection clear of the row an affordance will overwrite, so the
-	// cursor never hides under a "▲/▼ more" marker.
+	// A viewport shorter than 3 rows has no room for two "▲/▼ more" markers plus a
+	// content row, so show content only (content wins over the position hint) and
+	// centre it on the selection. This also avoids the edge-marker overwriting the
+	// only visible row on a 1-row body.
+	if height < 3 {
+		start := offset
+		if sel >= 0 {
+			start = sel - height/2
+		}
+		start = clampOffset(start, total, height)
+		return append([]string(nil), lines[start:start+height]...), start
+	}
+	// Keep the selection clear of the rows the affordances overwrite, so the cursor
+	// never hides under a "▲/▼ more" marker.
 	if sel >= 0 {
 		if sel <= offset {
 			offset = sel - 1

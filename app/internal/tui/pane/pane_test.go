@@ -161,6 +161,31 @@ func TestFocusedCursorRowGetsCaret(t *testing.T) {
 	}
 }
 
+// A focused selectable pane's cursor must survive even when it sits at a scrolled
+// edge — Window keeps it clear of the affordance rows, so the ▸ caret is never
+// overwritten. Regression for the markCursor-before-edge-replacement bug.
+func TestFocusedCursorSurvivesAtScrolledEdge(t *testing.T) {
+	m := testMode(t)
+	p := New("L", &listSrc{all: makeRows(20)})
+	p.SetFocused(true)
+	const h = 6
+	// Walk the cursor down past the first window so it rides the bottom edge with
+	// more content below.
+	for i := 0; i < 5; i++ {
+		p.Update(key("down"), h)
+	}
+	out := p.View(m, 40, h)
+	if !strings.Contains(out, "▸") {
+		t.Fatalf("cursor caret must survive at a scrolled edge:\n%s", out)
+	}
+	// And the caret is not sitting on a "more" marker row.
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "▸") && strings.Contains(line, "more") {
+			t.Fatalf("cursor row was overwritten by an affordance: %q", line)
+		}
+	}
+}
+
 func makeRows(n int) []string {
 	out := make([]string, n)
 	for i := range out {
