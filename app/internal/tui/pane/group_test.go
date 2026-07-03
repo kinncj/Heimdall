@@ -72,7 +72,7 @@ func TestFocusingPaneBelowFoldPageScrolls(t *testing.T) {
 		t.Fatal("focusing a pane below the fold should page-scroll the canvas")
 	}
 	// The focused pane's canvas top must be within the visible page window.
-	slots, _ := g.layout(h)
+	slots, _ := g.layout(50, h)
 	top := slots[g.Focus()].top
 	if top < g.PageScroll() || top >= g.PageScroll()+h {
 		// The pane's active row (top+2) is what must be visible; assert that.
@@ -135,6 +135,43 @@ func TestGroupPageAffordanceOnOverflow(t *testing.T) {
 	out := g.View(m, Rect{X: 0, Y: 0, W: 50, H: 12})
 	if !strings.Contains(out, "page") {
 		t.Fatalf("overflowing group should show a page affordance:\n%s", out)
+	}
+}
+
+// A grid row lays panes side by side; Tab flows reading-order (row-major) and each
+// column gets its own on-screen box so the mouse can tell them apart.
+func TestGridReadingOrderAndColumns(t *testing.T) {
+	m := testMode(t)
+	a := New("a", &staticSrc{rows: makeRows(3)})
+	b := New("b", &staticSrc{rows: makeRows(3)})
+	c := New("c", &staticSrc{rows: makeRows(3)})
+	g := NewGrid([][]*Pane{{a, b}, {c}})
+
+	// Reading order: a, b, c.
+	got := g.Panes()
+	if len(got) != 3 || got[0] != a || got[1] != b || got[2] != c {
+		t.Fatalf("reading order wrong: %v", got)
+	}
+	g.Update(key("tab"), 40) // a -> b
+	if g.Focused() != b {
+		t.Fatalf("tab did not move to b")
+	}
+	g.Update(key("tab"), 40) // b -> c
+	if g.Focused() != c {
+		t.Fatalf("tab did not move to c")
+	}
+
+	g.View(m, Rect{X: 0, Y: 0, W: 60, H: 40})
+	if a.Box().W == 0 || b.Box().W == 0 {
+		t.Fatal("row panes should have on-screen boxes")
+	}
+	if b.Box().X <= a.Box().X {
+		t.Fatalf("second column should sit to the right: a.X=%d b.X=%d", a.Box().X, b.Box().X)
+	}
+	// A click in column b focuses b, not a.
+	g.Mouse(click(b.Box().X+1, b.Box().Y+1), 40)
+	if g.Focused() != b {
+		t.Fatalf("click in column b focused %s", g.Focused().Title())
 	}
 }
 

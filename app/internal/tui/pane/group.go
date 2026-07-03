@@ -5,51 +5,80 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"heimdall/app/internal/tui/theme"
 )
 
-// Group stacks panes vertically and adds Tab focus, a focus ring, two-level
-// page+pane scroll, and pointer-targeted mouse routing.
+// Group lays panes out in rows (one or more panes side by side per row) and adds
+// Tab focus, a focus ring, two-level page+pane scroll, and pointer-targeted mouse.
+//
+// Focus is one-dimensional: Tab/Shift-Tab walk the panes in reading order
+// (row-major), so a wide multi-column layout keeps a simple, predictable focus
+// path. Layout is two-dimensional; focus is not.
 //
 // Two-level scroll: each pane scrolls its own overflow inside its box; the Group
 // page-scrolls the whole stack when it is taller than the viewport. Both use the
 // same keepVisible rule, so the focused pane's active row is never hidden.
 type Group struct {
-	panes      []*Pane
-	focus      int
+	rows       [][]*Pane
+	focus      int // index into the row-major flattening
 	pageScroll int
 	box        Rect
 	lastHeight int
 }
 
-// NewGroup builds a group over panes; the first is focused.
+// NewGroup builds a single-column group: one pane per row, stacked vertically.
 func NewGroup(panes ...*Pane) *Group {
-	g := &Group{panes: panes}
+	rows := make([][]*Pane, len(panes))
+	for i, p := range panes {
+		rows[i] = []*Pane{p}
+	}
+	return NewGrid(rows)
+}
+
+// NewGrid builds a group from explicit rows; each row is one or more panes laid
+// side by side. The first pane (row 0, col 0) starts focused.
+func NewGrid(rows [][]*Pane) *Group {
+	g := &Group{rows: rows}
 	g.applyFocus()
 	return g
 }
 
-// Panes returns the group's panes in order.
-func (g *Group) Panes() []*Pane { return g.panes }
+// flat returns the panes in reading order (row-major).
+func (g *Group) flat() []*Pane {
+	var out []*Pane
+	for _, row := range g.rows {
+		out = append(out, row...)
+	}
+	return out
+}
 
-// Focus is the index of the focused pane.
+// Panes returns the panes in reading order.
+func (g *Group) Panes() []*Pane { return g.flat() }
+
+// Focus is the reading-order index of the focused pane.
 func (g *Group) Focus() int { return g.focus }
 
 // Focused returns the focused pane, or nil if the group is empty.
 func (g *Group) Focused() *Pane {
-	if len(g.panes) == 0 {
+	fl := g.flat()
+	if len(fl) == 0 {
 		return nil
 	}
-	return g.panes[g.focus]
+	return fl[g.focus]
 }
 
 // PageScroll is the current page (canvas) scroll offset in rows.
 func (g *Group) PageScroll() int { return g.pageScroll }
 
 func (g *Group) applyFocus() {
-	for i, p := range g.panes {
-		p.SetFocused(i == g.focus)
+	i := 0
+	for _, row := range g.rows {
+		for _, p := range row {
+			p.SetFocused(i == g.focus)
+			i++
+		}
 	}
 }
 
@@ -59,7 +88,7 @@ func (g *Group) FocusNext() { g.setFocus(g.focus + 1) }
 func (g *Group) FocusPrev() { g.setFocus(g.focus - 1) }
 
 func (g *Group) setFocus(i int) {
-	n := len(g.panes)
+	n := len(g.flat())
 	if n == 0 {
 		return
 	}
@@ -84,8 +113,7 @@ func (g *Group) Update(msg tea.KeyMsg, height int) bool {
 	if fp == nil {
 		return false
 	}
-	inner := g.innerHeight(height)
-	handled := fp.Update(msg, inner)
+	handled := fp.Update(msg, g.innerHeight(height))
 	if handled {
 		g.ensureFocusedVisible(height)
 	}
@@ -100,16 +128,17 @@ func (g *Group) Mouse(msg tea.MouseMsg, height int) bool {
 	if idx < 0 {
 		return false
 	}
+	fl := g.flat()
 	inner := g.innerHeight(height)
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
-		g.panes[idx].Wheel(-1, inner)
+		fl[idx].Wheel(-1, inner)
 		if idx == g.focus {
 			g.ensureFocusedVisible(height)
 		}
 		return true
 	case tea.MouseButtonWheelDown:
-		g.panes[idx].Wheel(1, inner)
+		fl[idx].Wheel(1, inner)
 		if idx == g.focus {
 			g.ensureFocusedVisible(height)
 		}
@@ -124,10 +153,10 @@ func (g *Group) Mouse(msg tea.MouseMsg, height int) bool {
 	return false
 }
 
-// paneAt returns the index of the pane whose last-rendered box contains (x,y), or
-// -1. Panes scrolled off the top/bottom of the page have boxes that do not match.
+// paneAt returns the reading-order index of the pane whose last-rendered box
+// contains (x,y), or -1.
 func (g *Group) paneAt(x, y int) int {
-	for i, p := range g.panes {
+	for i, p := range g.flat() {
 		if p.Box().Contains(x, y) {
 			return i
 		}
@@ -142,9 +171,11 @@ const paneChrome = 3 // top border + title row + bottom border
 // slot is one pane's placement on the virtual canvas.
 type slot struct {
 	p     *Pane
-	top   int // canvas row of the pane's top border
-	inner int // content rows allocated to the pane
-	h     int // total pane height (inner + chrome)
+	flat  int // reading-order index
+	x     int // column x offset within the group box
+	w     int // column width
+	top   int // canvas row of the row's top border
+	inner int // content rows allocated to the pane's row
 }
 
 // innerHeight is the largest content area a single pane may occupy — one viewport
@@ -157,38 +188,58 @@ func (g *Group) innerHeight(height int) int {
 	return h
 }
 
-// layout stacks the panes on the canvas, capping each pane's content at one
-// viewport so a single tall pane scrolls internally rather than swallowing the page.
-func (g *Group) layout(height int) ([]slot, int) {
+// layout places every pane on the canvas: rows stack vertically, panes within a
+// row divide the width into equal columns. A row's height is the tallest pane in
+// it, capped at one viewport so a giant pane scrolls internally.
+func (g *Group) layout(width, height int) ([]slot, int) {
 	maxInner := g.innerHeight(height)
-	slots := make([]slot, 0, len(g.panes))
-	top := 0
-	for _, p := range g.panes {
-		natural := len(p.src.Rows())
-		if natural < 1 {
-			natural = 1
+	var slots []slot
+	top, flat := 0, 0
+	for _, row := range g.rows {
+		ncols := len(row)
+		if ncols == 0 {
+			continue
 		}
-		inner := natural
-		if inner > maxInner {
-			inner = maxInner
+		colW := width / ncols
+		if colW < 1 {
+			colW = 1
 		}
-		h := inner + paneChrome
-		slots = append(slots, slot{p: p, top: top, inner: inner, h: h})
-		top += h
+		rowInner := 1
+		for _, p := range row {
+			n := len(p.src.Rows())
+			if n > maxInner {
+				n = maxInner
+			}
+			if n > rowInner {
+				rowInner = n
+			}
+		}
+		for c, p := range row {
+			x := c * colW
+			w := colW
+			if c == ncols-1 {
+				w = width - x // last column takes the remainder
+			}
+			slots = append(slots, slot{p: p, flat: flat, x: x, w: w, top: top, inner: rowInner})
+			flat++
+		}
+		top += rowInner + paneChrome
 	}
-	return slots, top // top == total canvas height
+	return slots, top
 }
 
 // ensureFocusedVisible page-scrolls the canvas so the focused pane's active row is
 // on screen. Same keepVisible rule the panes use for their own cursors.
 func (g *Group) ensureFocusedVisible(height int) {
-	if height < 1 || len(g.panes) == 0 {
+	if height < 1 || len(g.flat()) == 0 {
 		return
 	}
-	slots, total := g.layout(height)
+	w := g.box.W
+	if w < 1 {
+		w = 1
+	}
+	slots, total := g.layout(w, height)
 	s := slots[g.focus]
-	// Row of the focused pane's active row, in canvas coordinates: pane top +
-	// border + title, then the active row's position within the pane's own window.
 	within := s.p.ActiveRow() - s.p.Scroll()
 	if within < 0 {
 		within = 0
@@ -196,58 +247,72 @@ func (g *Group) ensureFocusedVisible(height int) {
 	if within > s.inner-1 {
 		within = s.inner - 1
 	}
-	canvasRow := s.top + 2 + within
+	canvasRow := s.top + 2 + within // +2: top border + title row
 	g.pageScroll = clampOffset(keepVisible(g.pageScroll, canvasRow, height), total, height)
 }
 
 // --- rendering ---------------------------------------------------------------
 
-// View renders the stacked panes into a height-row window at the given origin,
-// page-scrolled so the focused pane's active row is visible, with ▲/▼ page
-// affordances on the edges when the canvas overflows. box origin (x,y) lets the
-// mouse map screen coordinates back to panes.
+// canvasSpan is one pane's column extent on a canvas line.
+type canvasSpan struct{ flat, x, w int }
+
+// canvasLine is one rendered row of the virtual canvas plus the panes it covers.
+type canvasLine struct {
+	line  string
+	spans []canvasSpan
+}
+
+// View renders the rows into a height-row window at the given origin, page-scrolled
+// so the focused pane's active row is visible, with ▲/▼ page affordances on the
+// edges when the canvas overflows. box origin lets the mouse map screen coordinates
+// back to panes.
 func (g *Group) View(m theme.Mode, box Rect) string {
 	g.box = box
 	g.lastHeight = box.H
-	if len(g.panes) == 0 {
+	if len(g.flat()) == 0 {
 		return ""
 	}
-	slots, total := g.layout(box.H)
+	slots, _ := g.layout(box.W, box.H)
 	g.ensureFocusedVisible(box.H)
-	g.pageScroll = clampOffset(g.pageScroll, total, box.H)
 
-	// Render every pane frame to canvas lines, tagging each line's owning pane so
-	// we can set on-screen boxes after page-scrolling.
-	type tagged struct {
-		line string
-		pane int
+	// Render each row (its panes joined horizontally) into canvas lines, tagging
+	// each line's column spans so we can set on-screen boxes after page-scrolling.
+	byRow := map[int][]slot{}
+	var order []int
+	for _, s := range slots {
+		if _, ok := byRow[s.top]; !ok {
+			order = append(order, s.top)
+		}
+		byRow[s.top] = append(byRow[s.top], s)
 	}
-	canvas := make([]tagged, 0, total)
-	for i, s := range slots {
-		frame := s.p.View(m, box.W-2, s.inner) // -2 for the border columns
-		body := s.p.Frame(m, frame, box.W-2)
-		for _, ln := range strings.Split(body, "\n") {
-			canvas = append(canvas, tagged{line: ln, pane: i})
+	var canvas []canvasLine
+	for _, top := range order {
+		rowSlots := byRow[top]
+		cols := make([]string, len(rowSlots))
+		spans := make([]canvasSpan, len(rowSlots))
+		for i, s := range rowSlots {
+			cols[i] = s.p.Frame(m, s.p.View(m, s.w-2, s.inner), s.w-2)
+			spans[i] = canvasSpan{flat: s.flat, x: box.X + s.x, w: s.w}
+		}
+		block := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
+		for _, ln := range strings.Split(block, "\n") {
+			canvas = append(canvas, canvasLine{line: ln, spans: spans})
 		}
 	}
-	// Normalise: the canvas may be shorter/longer than `total` by rounding; window
-	// against its real length.
+
 	realTotal := len(canvas)
 	offset := clampOffset(g.pageScroll, realTotal, box.H)
 	g.pageScroll = offset
-
 	end := offset + box.H
 	if end > realTotal {
 		end = realTotal
 	}
-	view := canvas[offset:end]
 
-	// Record each pane's on-screen box for mouse hit-testing.
-	g.setBoxes(slots, offset, box)
+	g.setBoxes(canvas, offset, end, box)
 
-	out := make([]string, len(view))
-	for i, t := range view {
-		out[i] = t.line
+	out := make([]string, 0, box.H)
+	for _, cl := range canvas[offset:end] {
+		out = append(out, cl.line)
 	}
 	if offset > 0 {
 		out = append([]string{g.pageAffordance(m, offset+1, realTotal, true)}, out...)
@@ -264,24 +329,33 @@ func (g *Group) View(m theme.Mode, box Rect) string {
 	return strings.Join(out, "\n")
 }
 
-// setBoxes assigns each pane its on-screen rectangle given the page offset, so the
-// mouse can target it. Panes fully scrolled out get a zero box (no hits).
-func (g *Group) setBoxes(slots []slot, offset int, box Rect) {
-	for _, s := range slots {
-		screenTop := box.Y + (s.top - offset)
-		visTop := screenTop
-		visBottom := screenTop + s.h
-		if visBottom <= box.Y || visTop >= box.Y+box.H {
-			s.p.SetBox(Rect{}) // off-screen
-			continue
+// setBoxes assigns each pane its on-screen rectangle from the visible canvas rows,
+// so the mouse can target it. A pane with no visible rows gets a zero box (no hits).
+func (g *Group) setBoxes(canvas []canvasLine, offset, end int, box Rect) {
+	type ext struct{ minY, maxY, x, w int }
+	seen := map[int]*ext{}
+	for j := offset; j < end; j++ {
+		screenY := box.Y + (j - offset)
+		for _, sp := range canvas[j].spans {
+			e, ok := seen[sp.flat]
+			if !ok {
+				seen[sp.flat] = &ext{minY: screenY, maxY: screenY, x: sp.x, w: sp.w}
+				continue
+			}
+			if screenY < e.minY {
+				e.minY = screenY
+			}
+			if screenY > e.maxY {
+				e.maxY = screenY
+			}
 		}
-		if visTop < box.Y {
-			visTop = box.Y
+	}
+	for i, p := range g.flat() {
+		if e, ok := seen[i]; ok {
+			p.SetBox(Rect{X: e.x, Y: e.minY, W: e.w, H: e.maxY - e.minY + 1})
+		} else {
+			p.SetBox(Rect{})
 		}
-		if visBottom > box.Y+box.H {
-			visBottom = box.Y + box.H
-		}
-		s.p.SetBox(Rect{X: box.X, Y: visTop, W: box.W, H: visBottom - visTop})
 	}
 }
 
