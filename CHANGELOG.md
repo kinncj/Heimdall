@@ -7,12 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-07-03
+
 ### Fixed
 - **Ghostty over SSH now shows the splash image, not the ASCII fallback.** The image
   detection recognised Ghostty only by `TERM_PROGRAM=ghostty`, which SSH and tmux
   strip — so a dashboard run over SSH from Ghostty fell back to ASCII even though the
   terminal can render images. It now also treats `TERM=xterm-ghostty` (always
   forwarded) as Kitty-graphics-capable.
+
+## [2.7.0] - 2026-07-03
 
 ### Added
 - **Himinbjörg — one focus + scroll primitive for the TUI (`app/internal/tui/pane`).**
@@ -26,7 +30,7 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   scrollable at any resolution — and `Tab` steps the focus ring through each panel and
   wraps back to the whole-view stop. The mouse wheel/click targets the panel under the
   pointer (it did nothing in the top view before). The wide two-column panel grid is
-  kept. Dashboard-modal adoption is still in progress on `feature/himinbjorg-focus-scroll`.
+  kept. Migrating the remaining dashboard modals onto the primitive is tracked in issue #8.
 - **The command picker (`c`) filters by name, and its result filters by line.** `/`
   narrows the command list as you type; after a command runs, `/` in the result view
   filters the output lines (case-insensitive substring). `esc` clears either filter,
