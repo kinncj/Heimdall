@@ -1,5 +1,5 @@
 ---
-description: Version & issue tracking — every change gets a SemVer class, an issue with type:bug|type:feature label, a major/minor milestone, and a card on the configured project board (project.config.yaml)
+description: Version & issue tracking — every change gets a SemVer class, an issue with the matching type:* label, a major/minor milestone, and a card on the configured project board (project.config.yaml)
 alwaysApply: true
 ---
 
@@ -14,7 +14,7 @@ finish it):
    target minor/major; create it if missing. **Patches never get their own
    milestone** — attach them to their minor's milestone (`vX.Y.0`).
 3. **Issue — every change, patches included.** Create a GitHub issue, labelled
-   **`type:bug`** (patch / fix) or **`type:feature`** (feature / minor / major), assigned
+   the matching **`type:*`** label (`type:bug` fix · `type:feature` feature · `type:docs`/`type:refactor`/`type:chore`, per `gh-labels-milestones`), assigned
    to the target major/minor milestone.
 4. **Project board.** Add the issue to the project board — read its number from
    `github.project_number` in `project.config.yaml` (never hard-code it) — and set

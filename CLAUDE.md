@@ -79,7 +79,7 @@ a piece of work (and before you finish it):
    target minor/major; create it if missing. **Patches never get their own
    milestone** — attach them to their minor's milestone (`vX.Y.0`).
 3. **Issue — every change, patches included.** Create a GitHub issue, labelled
-   **`type:bug`** (patch / fix) or **`type:feature`** (feature / minor / major), assigned to
+   the matching **`type:*`** label (`type:bug` fix · `type:feature` feature · `type:docs`/`type:refactor`/`type:chore`, per `gh-labels-milestones`), assigned to
    the target major/minor milestone.
 4. **Project board.** Add the issue to the project board — read its number from
    `github.project_number` in `project.config.yaml` (never hard-code it) — and set
