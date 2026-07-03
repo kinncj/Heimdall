@@ -6,10 +6,9 @@
 // and adds Tab focus, a focus ring, two-level page+pane scroll, and mouse routing.
 //
 // Panes render only — they never classify or reshape metric meaning (ADR-0022).
-// A pane's Source decides what its rows are and what filter/sort mean; the pane
-// owns scrolling, selection, the "/" filter UX, the sort-key cycle, and the
-// affordances. Capabilities are opt-in interfaces so a static panel gets neither
-// filter nor sort.
+// A pane's Source decides what its rows are; the pane owns scrolling, selection,
+// the focus ring, and the "▲/▼ more" affordances. Filtering and sorting are the
+// consumer's concern (e.g. the dashboard), not the pane's.
 package pane
 
 import (
@@ -223,31 +222,14 @@ func (p *Pane) View(m theme.Mode, width, height int) string {
 	return strings.Join(p.window(m, rows, height), "\n")
 }
 
-// window slices lines to a height-row window around p.scroll and (for a focused
-// selectable pane) marks the cursor row, replacing the edge rows with themed
-// "▲/▼ more · y/total" affordances so the height stays bounded.
+// window renders lines through the shared Window (so scrolling, the selection
+// margin, and the "▲/▼ more · y/total" affordances behave identically to the
+// dashboard modals) and then marks the focused pane's cursor row. Window keeps the
+// selection clear of the affordance edges, so the cursor is never overwritten.
 func (p *Pane) window(m theme.Mode, lines []string, height int) []string {
-	total := len(lines)
-	offset := clampOffset(p.scroll, total, height)
-	// Keep the cursor visible if this is a selectable pane.
-	if p.sel >= 0 {
-		offset = clampOffset(keepVisible(offset, p.sel, height), total, height)
-	}
+	out, offset := Window(m, lines, p.scroll, p.sel, height)
 	p.scroll = offset
-
-	if total <= height {
-		return p.markCursor(m, append([]string(nil), lines...), offset)
-	}
-
-	out := append([]string(nil), lines[offset:offset+height]...)
-	out = p.markCursor(m, out, offset)
-	if offset > 0 {
-		out[0] = affordanceLine(m, offset+1, total, true)
-	}
-	if offset+height < total {
-		out[len(out)-1] = affordanceLine(m, offset+height, total, false)
-	}
-	return out
+	return p.markCursor(m, out, offset)
 }
 
 // markCursor prefixes the focused pane's cursor row with the ▸ caret (in the

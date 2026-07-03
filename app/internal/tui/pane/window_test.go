@@ -30,6 +30,39 @@ func TestWindowAffordancesOnOverflow(t *testing.T) {
 	}
 }
 
+// A viewport too short for "more" markers (1–2 rows) must still show real content,
+// never a lone affordance row. Regression for the height==1 edge-overwrite bug.
+func TestWindowShortViewportShowsContent(t *testing.T) {
+	m := testMode(t)
+	lines := makeRows(20)
+
+	// height 1, scrolled into the middle: exactly one real content row, no marker.
+	out, _ := Window(m, lines, 8, -1, 1)
+	if len(out) != 1 {
+		t.Fatalf("height 1 must return 1 row, got %d", len(out))
+	}
+	if strings.Contains(out[0], "more") {
+		t.Fatalf("height-1 viewport must show content, not a marker: %q", out[0])
+	}
+
+	// height 1 with a selection shows the selected row itself.
+	out2, off := Window(m, lines, 0, 12, 1)
+	if off != 12 || strings.Contains(out2[0], "more") {
+		t.Fatalf("height-1 with sel should show the selected content row: off=%d row=%q", off, out2[0])
+	}
+
+	// height 2 with overflow: two content rows, still no marker hiding content.
+	out3, _ := Window(m, lines, 9, -1, 2)
+	if len(out3) != 2 {
+		t.Fatalf("height 2 must return 2 rows, got %d", len(out3))
+	}
+	for _, r := range out3 {
+		if strings.Contains(r, "more") {
+			t.Fatalf("height-2 viewport must show content, not a marker: %q", r)
+		}
+	}
+}
+
 // The selection-visibility invariant that used to live in the dashboard's
 // keepSelVisible: whatever the selection, Window keeps it inside the viewport and
 // one row clear of the ▲/▼ "more" markers on scrolled edges.

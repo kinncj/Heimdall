@@ -14,7 +14,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   and the dashboard's duplicate `scrollWindow`/`keepSelVisible` are gone — one windowing
   implementation for the whole TUI, so the modals show the same `▲/▼ more · y/total`
   affordance as the top view. The pane's unused `Filterable`/`Sortable` API was dropped;
-  the dashboard keeps its own filter/sort idiom. No user-facing change (closes #8).
+  the dashboard keeps its own filter/sort idiom. The only visible difference is the
+  scroll indicator now reads `▲/▼ more · y/total` (was `↑/↓ N more`) — scroll, filter,
+  and sort behaviour are unchanged. Closes #8.
 
 ## [2.7.1] - 2026-07-03
 
