@@ -7,6 +7,15 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.7.3] - 2026-07-03
+
+### Fixed
+- **Very short scroll viewports (1–2 rows) now show content instead of only a
+  "more" marker.** After the v2.7.2 windowing unification, a body that overflowed a
+  1-row viewport could render just the `▲/▼ more` marker and no content. Viewports
+  shorter than three rows now show content (centred on the selection), and the pane
+  cursor is no longer overwritten by an edge marker at a scrolled boundary.
+
 ## [2.7.2] - 2026-07-03
 
 ### Changed
