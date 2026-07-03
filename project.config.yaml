@@ -28,11 +28,9 @@ github:
   project_number: 124
   project_node_id: "PVT_kwHOAAR2vs4BcZgS"
   status_field_id: "PVTSSF_lAHOAAR2vs4BcZgSzhXCpSM"
-  # Versioning & tracking (mandatory — see the "Version & Issue Tracking" section in
-  # CLAUDE.md / AGENTS.md). Every change = a GitHub issue, labelled bug|enhancement,
-  # on project 124 with a Status. Milestones exist only for major/minor versions
-  # (vX.Y.0); patches attach to their minor's milestone, never their own.
-  labels:
-    fix: "bug"           # patch / bugfix
-    feature: "enhancement" # minor / major
-  milestone_granularity: "minor"  # major & minor only — never per-patch
+  # Versioning & tracking (mandatory — see "Version & Issue Tracking" in CLAUDE.md /
+  # AGENTS.md). Every change gets a GitHub issue labelled per the gh-labels-milestones
+  # convention (type:bug | type:feature | type:docs | type:refactor | type:chore),
+  # assigned to a major/minor milestone (vX.Y.0 — patches attach to their minor,
+  # never get their own), and added to this board with a Status. Label taxonomy and
+  # milestone granularity live in the gh-labels-milestones skill, not here.

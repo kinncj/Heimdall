@@ -272,7 +272,7 @@ Classify the SemVer bump first: **major** (breaking) / **minor** (new backward-c
 feature) / **patch** (bug fix). Then:
 - **Milestone — major & minor only.** Ensure `vX.Y.0` exists (`gh-labels-milestones`);
   patches attach to their minor's `vX.Y.0`, never get their own.
-- **Issue — every change.** Labelled **`bug`** (patch / fix) or **`enhancement`**
+- **Issue — every change.** Labelled **`type:bug`** (patch / fix) or **`type:feature`**
   (feature), assigned to the target major/minor milestone (`gh-issues`).
 - **Project board.** Add the issue and set **Status** (`In progress` → `Done`); read the
   board number from `github.project_number` in `project.config.yaml` (`gh-projects`),

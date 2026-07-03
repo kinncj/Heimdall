@@ -18,7 +18,7 @@ Manage GitHub Projects v2 board operations: add issues as cards, update field va
 | `issue_node_id` | `gh-issues` skill output | `"I_kwDO..."` |
 | `issue_number` | `gh-issues` skill output | `42` |
 | `field_name` | project field name | `"Status"` |
-| `field_value` | target option name | `"In Progress"` |
+| `field_value` | target option name | `"In progress"` |
 
 ## Read project config
 
@@ -153,8 +153,8 @@ gh api graphql -f query='
 | Phase | Field | Value |
 |---|---|---|
 | Discover | Status | `Todo` |
-| Architect | Status | `In Progress` |
-| Implement | Status | `In Progress` |
+| Architect | Status | `In progress` |
+| Implement | Status | `In progress` |
 | Validate | Status | `In Review` |
 | Done | Status | `Done` |
 
@@ -182,6 +182,6 @@ gh project item-list "$PROJECT_NUMBER" \
 
 ```
 [gh-projects] ADD    #42  → project #{project_number}  item_id={id}
-[gh-projects] UPDATE #42  field=Status  value="In Progress"
+[gh-projects] UPDATE #42  field=Status  value="In progress"
 [gh-projects] SKIP   #42  already on board
 ```
