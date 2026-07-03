@@ -6,6 +6,8 @@ GPU/NPU, network, disk, and the top processes. Press **`esc`** to go back to the
 fleet, **`q`** to quit.
 
 > Named **Hliðskjálf** — Odin's high seat, from which he sees into all realms.
+> Its focus and scrolling are **Himinbjörg**, the one focus+scroll primitive
+> shared across the whole TUI.
 
 ## Keys
 
@@ -13,10 +15,32 @@ fleet, **`q`** to quit.
 |---|---|
 | `t` | open the top view for the focused host |
 | `p` | open the process table (this used to be `t`) |
-| `↑/↓` · `k/j` | scroll the body |
-| `pgup/pgdn` | page the body |
+| `↑/↓` · `k/j` | scroll — the **whole view** by default, or the focused panel |
+| `tab` / `shift+tab` | move the focus ring to the next / previous panel; wraps back to the whole view |
+| `pgup/pgdn` | page |
+| `home/end` | jump to the top / bottom |
+| mouse wheel | scroll the panel under the pointer (or the whole view) |
+| mouse click | focus the panel under the pointer |
 | `esc` | back to the fleet/detail |
 | `q` · `ctrl+c` | quit |
+
+## Focus and scrolling (Himinbjörg)
+
+The view is a grid of panels, and it can be taller than your terminal — especially
+over SSH on a phone. So it scrolls two ways, and you never lose your place:
+
+- **The whole view is focused first.** `↑/↓` and the mouse wheel scroll the entire
+  screen, so it is always scrollable at any resolution — nothing is stranded below
+  the fold.
+- **`tab` steps the focus ring into each panel** (CPU → MEMORY → POWER → …), then
+  wraps back around to the whole-view stop. The focused panel is drawn with a
+  **heavier border** (not just a colour, so it survives `NO_COLOR`), and a focused
+  panel scrolls its own overflow while the page keeps its active row on screen.
+- **The mouse targets the panel under the pointer** — wheel scrolls it, click focuses
+  it. (Before Himinbjörg the wheel did nothing here.)
+
+The `▲ more above` / `▼ more below` markers with a `y/total` (or `page y/total`)
+count tell you where you are.
 
 ## What it shows
 
