@@ -266,6 +266,19 @@ If failure → return to Phase 5.
 On success: Create PR via gh pr create, post completion summary.
 
 ## GitHub Issue Management
+
+### Version, milestone & project (mandatory — every change)
+Classify the SemVer bump first: **major** (breaking) / **minor** (new backward-compatible
+feature) / **patch** (bug fix). Then:
+- **Milestone — major & minor only.** Ensure `vX.Y.0` exists (`gh-labels-milestones`);
+  patches attach to their minor's `vX.Y.0`, never get their own.
+- **Issue — every change.** Labelled **`bug`** (patch / fix) or **`enhancement`**
+  (feature), assigned to the target major/minor milestone (`gh-issues`).
+- **Project board.** Add the issue and set **Status** (`In progress` → `Done`); read the
+  board number from `github.project_number` in `project.config.yaml` (`gh-projects`),
+  never hard-code it.
+- PR `Closes #N`. **No Claude/Anthropic attribution** anywhere.
+
 Every feature has a corresponding GitHub issue. Update issues at each phase transition:
 
 ```bash
