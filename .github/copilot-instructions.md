@@ -203,3 +203,16 @@ Insert design sub-pipeline before IMPLEMENT:
 | Design system | `docs/design/system/components/` |
 
 Never write design artifacts to `docs/wireframes/`, `docs/identity/`, `docs/mockups/`, or any location outside `docs/design/`.
+
+## Version & Issue Tracking (mandatory)
+
+Every change is tracked automatically. When you start a piece of work (and before you finish it):
+
+1. **Classify the SemVer bump** — major (breaking) / minor (new backward-compatible feature) / patch (bug fix, no API change).
+2. **Milestone — major & minor only.** Ensure `vX.Y.0` exists (create if missing). **Patches never get their own milestone** — attach to their minor's `vX.Y.0`.
+3. **Issue — every change, patches included.** Labelled **`bug`** (patch/fix) or **`enhancement`** (feature), assigned to the target major/minor milestone.
+4. **Project board** — add the issue and set **Status** (`In progress` → `Done`). Read the board number from `github.project_number` in `project.config.yaml` (never hard-code it).
+5. **Link & close** — the PR says `Closes #N`; on release the milestone version equals the release tag.
+6. **No Claude/Anthropic attribution** anywhere — commits, PR bodies, issues, releases.
+
+Mechanics via the maple skills: `gh-labels-milestones`, `gh-issues`, `gh-projects`.
