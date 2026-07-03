@@ -71,6 +71,10 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.modal == modalLogView && m.logSearching {
 		return m.updateLogSearch(msg.String(), msg.Runes), nil
 	}
+	// Likewise the command-picker filter input.
+	if m.modal == modalCmdList && m.cmdSearching {
+		return m.updateCmdSearch(msg.String(), msg.Runes), nil
+	}
 	// Clamp a scroll offset that may be a "pin to tail" sentinel or stale after the
 	// buffer shrank, so up/down respond immediately.
 	if m.modal == modalLogView || m.modal == modalTop || m.modal == modalCmdResult {
@@ -116,6 +120,7 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "c":
 			if ok && hasCmd(h) && m.runCmd != nil {
 				m.modal, m.cmdSel = modalCmdList, 0
+				m.cmdQuery, m.cmdSearching = "", false
 			}
 		}
 	case modalLogList:
@@ -202,12 +207,18 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalTop
 		}
 	case modalCmdList:
-		keys := cmdModalKeys()
+		keys := m.filteredCmdKeys()
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			m.cmdSearching = true
 		case "esc":
-			m.modal = modalNone
+			if m.cmdQuery != "" {
+				m.cmdQuery = "" // first esc clears an active filter
+			} else {
+				m.modal = modalNone // then closes the picker
+			}
 		case "up", "k":
 			if m.cmdSel > 0 {
 				m.cmdSel--
@@ -305,8 +316,15 @@ func (m Model) ModalView() string {
 			keys.Style().Render("esc") + muted.Style().Render(" cancel")
 	case modalCmdList:
 		title = heading.Style().Render("  COMMAND — " + dn)
+		if q := m.cmdQuery; q != "" || m.cmdSearching {
+			if m.cmdSearching {
+				q += "▏"
+			}
+			title += muted.Style().Render("   filter: ") + val.Style().Render(q)
+		}
 		body = m.cmdListBody()
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" pick  ") +
+			keys.Style().Render("/") + muted.Style().Render(" filter  ") +
 			keys.Style().Render("⏎") + muted.Style().Render(" run  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" back")
 	case modalCmdResult:

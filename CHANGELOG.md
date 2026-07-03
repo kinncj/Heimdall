@@ -20,6 +20,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   wraps back to the whole-view stop. The mouse wheel/click targets the panel under the
   pointer (it did nothing in the top view before). The wide two-column panel grid is
   kept. Dashboard-modal adoption is still in progress on `feature/himinbjorg-focus-scroll`.
+- **The command picker (`c`) filters by name.** `/` opens a filter that narrows the
+  command list as you type (case-insensitive substring), `esc` clears it, and the
+  highlighted row stays in view — the same idiom as the log-view search.
 
 ## [2.6.3] - 2026-07-02
 

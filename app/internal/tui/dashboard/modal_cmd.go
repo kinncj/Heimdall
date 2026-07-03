@@ -29,8 +29,25 @@ func cmdModalKeys() []string {
 	return out
 }
 
+// filteredCmdKeys narrows the command list by the picker's name filter
+// (case-insensitive substring). An empty query returns every command.
+func (m Model) filteredCmdKeys() []string {
+	all := cmdModalKeys()
+	q := strings.ToLower(strings.TrimSpace(m.cmdQuery))
+	if q == "" {
+		return all
+	}
+	out := make([]string, 0, len(all))
+	for _, k := range all {
+		if strings.Contains(strings.ToLower(k), q) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
 func (m Model) cmdResultName() string {
-	keys := cmdModalKeys()
+	keys := m.filteredCmdKeys()
 	if m.cmdSel < len(keys) {
 		return keys[m.cmdSel]
 	}
@@ -40,7 +57,11 @@ func (m Model) cmdResultName() string {
 func (m Model) cmdListBody() []string {
 	val, _ := m.mode.Role("value")
 	focus, _ := m.mode.Role("focus")
-	keys := cmdModalKeys()
+	muted, _ := m.mode.Role("text_muted")
+	keys := m.filteredCmdKeys()
+	if len(keys) == 0 {
+		return []string{muted.Style().Render("  no commands match the filter")}
+	}
 	out := make([]string, len(keys))
 	for i, k := range keys {
 		if i == m.cmdSel {
@@ -50,6 +71,33 @@ func (m Model) cmdListBody() []string {
 		}
 	}
 	return out
+}
+
+// updateCmdSearch handles keystrokes while the command filter input is open: type
+// to narrow by name, backspace to edit, enter to keep, esc to clear. Mirrors the
+// log-view search so the two pickers behave the same.
+func (m Model) updateCmdSearch(s string, runes []rune) Model {
+	switch s {
+	case "enter":
+		m.cmdSearching = false
+	case "esc":
+		m.cmdSearching = false
+		m.cmdQuery = ""
+	case "backspace":
+		if r := []rune(m.cmdQuery); len(r) > 0 {
+			m.cmdQuery = string(r[:len(r)-1])
+		}
+	default:
+		if len(runes) > 0 {
+			m.cmdQuery += string(runes)
+		}
+	}
+	// A narrowed list resets the cursor and scroll so the selection stays valid.
+	if m.cmdSel >= len(m.filteredCmdKeys()) {
+		m.cmdSel = 0
+	}
+	m.modalScroll = 0
+	return m
 }
 
 func (m Model) cmdResultBody(h domain.HostView, w int) []string {
