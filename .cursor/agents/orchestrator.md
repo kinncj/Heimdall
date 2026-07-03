@@ -263,9 +263,9 @@ On success: Create PR via gh pr create, post completion summary.
 
 ## GitHub Issue Management
 
-### Version, milestone & project (mandatory — every change)
+### Version & Issue Tracking (mandatory — every change)
 Classify the SemVer bump first: **major** (breaking) / **minor** (new backward-compatible
-feature) / **patch** (bug fix). Then:
+feature) / **patch** (bug fix / no API change). Then:
 - **Milestone — major & minor only.** Ensure `vX.Y.0` exists (`gh-labels-milestones`);
   patches attach to their minor's `vX.Y.0`, never get their own.
 - **Issue — every change.** Labelled **`type:bug`** (patch / fix) or **`type:feature`**
