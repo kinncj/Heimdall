@@ -34,19 +34,6 @@ type Selectable interface {
 	RowCount() int
 }
 
-// Filterable is a Source that supports the "/" full-text/name filter. What the
-// query matches is the source's business (full-text for logs, name for commands).
-type Filterable interface {
-	SetFilter(query string)
-}
-
-// Sortable is a Source that supports an in-pane sort-key cycle. SortKeys lists the
-// keys in cycle order; SetSort selects one.
-type Sortable interface {
-	SortKeys() []string
-	SetSort(key string)
-}
-
 // Rect is a pane's on-screen box, captured at render so the mouse can target it.
 type Rect struct{ X, Y, W, H int }
 
@@ -62,10 +49,6 @@ type Pane struct {
 
 	scroll int // first visible row of the source
 	sel    int // cursor row for Selectable sources; -1 otherwise
-
-	filtering bool
-	query     string
-	sortIdx   int // index into SortKeys for Sortable sources
 
 	box     Rect // set at View time; read for mouse hit-testing
 	focused bool
@@ -95,13 +78,6 @@ func (p *Pane) SetFocused(f bool) { p.focused = f }
 
 // Focused reports whether the pane currently draws the focus ring.
 func (p *Pane) Focused() bool { return p.focused }
-
-// Filtering reports whether the "/" filter input is open.
-func (p *Pane) Filtering() bool { return p.filtering }
-
-// CanFilter / CanSort report which capability affordances the footer should show.
-func (p *Pane) CanFilter() bool { _, ok := p.src.(Filterable); return ok }
-func (p *Pane) CanSort() bool   { _, ok := p.src.(Sortable); return ok }
 
 // selectable returns the source as Selectable, or nil.
 func (p *Pane) selectable() Selectable {
@@ -157,12 +133,8 @@ func keepVisible(offset, target, height int) int {
 // --- input -------------------------------------------------------------------
 
 // Update handles a key for a focused pane and reports whether it consumed the key.
-// A pane in filter mode consumes typing; esc closes the filter. Otherwise the
-// scroll/select/sort keys apply and everything else is left for the caller.
+// Scroll/select keys apply; everything else is left for the caller.
 func (p *Pane) Update(msg tea.KeyMsg, height int) (handled bool) {
-	if p.filtering {
-		return p.updateFilter(msg)
-	}
 	switch msg.String() {
 	case "up", "k":
 		p.move(-1, height)
@@ -176,83 +148,10 @@ func (p *Pane) Update(msg tea.KeyMsg, height int) (handled bool) {
 		p.moveTo(0, height)
 	case "end":
 		p.moveTo(p.rowCount()-1, height)
-	case "/":
-		if p.CanFilter() {
-			p.filtering, p.query = true, ""
-			return true
-		}
-		return false
-	case "s":
-		if p.CanSort() {
-			p.cycleSort()
-			return true
-		}
-		return false
 	default:
 		return false
 	}
 	return true
-}
-
-func (p *Pane) updateFilter(msg tea.KeyMsg) bool {
-	switch msg.String() {
-	case "esc":
-		p.filtering, p.query = false, ""
-		if f, ok := p.src.(Filterable); ok {
-			f.SetFilter("")
-		}
-		p.clampAfterChange(0)
-	case "enter":
-		p.filtering = false
-	case "backspace":
-		if r := []rune(p.query); len(r) > 0 {
-			p.query = string(r[:len(r)-1])
-			p.applyFilter()
-		}
-	default:
-		if s := msg.String(); len(s) == 1 {
-			p.query += s
-			p.applyFilter()
-		}
-	}
-	return true
-}
-
-func (p *Pane) applyFilter() {
-	if f, ok := p.src.(Filterable); ok {
-		f.SetFilter(p.query)
-	}
-	// A narrowed list resets the cursor to the top and re-clamps.
-	if p.sel >= 0 {
-		p.sel = 0
-	}
-	p.scroll = 0
-}
-
-func (p *Pane) cycleSort() {
-	s, ok := p.src.(Sortable)
-	if !ok {
-		return
-	}
-	keys := s.SortKeys()
-	if len(keys) == 0 {
-		return
-	}
-	p.sortIdx = (p.sortIdx + 1) % len(keys)
-	s.SetSort(keys[p.sortIdx])
-}
-
-// SortKey is the active sort key, or "" if the source is not Sortable.
-func (p *Pane) SortKey() string {
-	s, ok := p.src.(Sortable)
-	if !ok {
-		return ""
-	}
-	keys := s.SortKeys()
-	if len(keys) == 0 {
-		return ""
-	}
-	return keys[p.sortIdx%len(keys)]
 }
 
 // move shifts the cursor (selectable) or the scroll offset (scroll-only) by delta
@@ -282,21 +181,6 @@ func (p *Pane) moveTo(target, height int) {
 		return
 	}
 	p.scroll = clampOffset(target, n, height)
-}
-
-func (p *Pane) clampAfterChange(height int) {
-	if height < 1 {
-		height = 1
-	}
-	p.scroll = clampOffset(p.scroll, p.rowCount(), height)
-	if p.sel >= 0 {
-		if p.sel > p.rowCount()-1 {
-			p.sel = p.rowCount() - 1
-		}
-		if p.sel < 0 {
-			p.sel = 0
-		}
-	}
 }
 
 // Wheel scrolls the pane by dir (-1 up, +1 down) worth of a few rows, as the mouse
@@ -336,23 +220,7 @@ func (p *Pane) View(m theme.Mode, width, height int) string {
 	if height < 1 {
 		height = 1
 	}
-
-	// Reserve the top row for the filter input when filtering.
-	body := rows
-	var head string
-	if p.filtering {
-		head = p.filterLine(m, width)
-		height--
-		if height < 1 {
-			height = 1
-		}
-	}
-
-	windowed := p.window(m, body, height)
-	if head != "" {
-		windowed = append([]string{head}, windowed...)
-	}
-	return strings.Join(windowed, "\n")
+	return strings.Join(p.window(m, rows, height), "\n")
 }
 
 // window slices lines to a height-row window around p.scroll and (for a focused
@@ -402,18 +270,6 @@ func (p *Pane) markCursor(m theme.Mode, win []string, offset int) []string {
 	return win
 }
 
-func (p *Pane) filterLine(m theme.Mode, width int) string {
-	prompt := "/"
-	if f, ok := m.Role("focus"); ok {
-		prompt = f.Style().Render("/")
-	}
-	txt := prompt + p.query + "▏"
-	if width > 0 {
-		return lipgloss.NewStyle().MaxWidth(width).Render(txt)
-	}
-	return txt
-}
-
 // Frame wraps content in a border whose weight signals focus: a heavy border when
 // focused (the focus ring), a normal border otherwise. Colour comes from the focus
 // / border role; the weight is the non-colour signal, so focus survives NO_COLOR.
@@ -447,8 +303,8 @@ func (p *Pane) SetSelection(v int) {
 	}
 }
 
-// TransferStateFrom copies focus/scroll/selection/filter/sort from a same-shaped
-// old group, so rebuilding on a live tick does not jump the view.
+// TransferStateFrom copies focus/scroll/selection from a same-shaped old group, so
+// rebuilding on a live tick does not jump the view.
 func (g *Group) TransferStateFrom(old *Group) {
 	if old == nil {
 		return
@@ -462,9 +318,6 @@ func (g *Group) TransferStateFrom(old *Group) {
 	for i := range np {
 		np[i].scroll = op[i].scroll
 		np[i].sel = op[i].sel
-		np[i].filtering = op[i].filtering
-		np[i].query = op[i].query
-		np[i].sortIdx = op[i].sortIdx
 	}
 	g.applyFocus()
 }
