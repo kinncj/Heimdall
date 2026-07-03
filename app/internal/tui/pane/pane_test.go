@@ -29,30 +29,11 @@ type staticSrc struct{ rows []string }
 
 func (s *staticSrc) Rows() []string { return s.rows }
 
-// listSrc is a selectable, filterable, sortable source.
-type listSrc struct {
-	all      []string
-	query    string
-	sortKey  string
-	sortKeys []string
-}
+// listSrc is a selectable source.
+type listSrc struct{ all []string }
 
-func (l *listSrc) Rows() []string {
-	if l.query == "" {
-		return l.all
-	}
-	var out []string
-	for _, r := range l.all {
-		if strings.Contains(r, l.query) {
-			out = append(out, r)
-		}
-	}
-	return out
-}
-func (l *listSrc) RowCount() int      { return len(l.Rows()) }
-func (l *listSrc) SetFilter(q string) { l.query = q }
-func (l *listSrc) SortKeys() []string { return l.sortKeys }
-func (l *listSrc) SetSort(k string)   { l.sortKey = k }
+func (l *listSrc) Rows() []string { return l.all }
+func (l *listSrc) RowCount() int  { return len(l.all) }
 
 func key(s string) tea.KeyMsg {
 	switch s {
@@ -149,63 +130,6 @@ func TestScrollOnlyPaneHasNoSelection(t *testing.T) {
 	p.Update(key("down"), 5)
 	if p.Scroll() != 1 {
 		t.Fatalf("scroll=%d want 1", p.Scroll())
-	}
-}
-
-// --- filter ------------------------------------------------------------------
-
-func TestSlashFilterNarrowsAndResets(t *testing.T) {
-	src := &listSrc{all: []string{"alpha", "beta", "gamma", "gamble"}}
-	p := New("L", src)
-	p.SetFocused(true)
-	if !p.Update(key("/"), 10) || !p.Filtering() {
-		t.Fatal("slash did not open filter")
-	}
-	for _, r := range "gam" {
-		p.Update(key(string(r)), 10)
-	}
-	rows := src.Rows()
-	if len(rows) != 2 {
-		t.Fatalf("filtered rows=%d want 2 (%v)", len(rows), rows)
-	}
-	if p.Selection() != 0 {
-		t.Fatalf("selection after filter=%d want 0", p.Selection())
-	}
-	p.Update(key("esc"), 10)
-	if p.Filtering() || src.query != "" {
-		t.Fatal("esc did not clear filter")
-	}
-}
-
-func TestStaticPaneRejectsFilterAndSort(t *testing.T) {
-	p := New("S", &staticSrc{rows: makeRows(5)})
-	if p.CanFilter() || p.CanSort() {
-		t.Fatal("static pane must not advertise filter/sort")
-	}
-	if p.Update(key("/"), 10) {
-		t.Fatal("static pane consumed / (should not filter)")
-	}
-	if p.Update(key("s"), 10) {
-		t.Fatal("static pane consumed s (should not sort)")
-	}
-}
-
-// --- sort --------------------------------------------------------------------
-
-func TestSortCycles(t *testing.T) {
-	src := &listSrc{all: makeRows(3), sortKeys: []string{"cpu", "mem", "pid"}}
-	p := New("P", src)
-	if p.SortKey() != "cpu" {
-		t.Fatalf("initial sort=%q want cpu", p.SortKey())
-	}
-	p.Update(key("s"), 10)
-	if src.sortKey != "mem" || p.SortKey() != "mem" {
-		t.Fatalf("after s: src=%q pane=%q want mem", src.sortKey, p.SortKey())
-	}
-	p.Update(key("s"), 10)
-	p.Update(key("s"), 10) // wraps back to cpu
-	if p.SortKey() != "cpu" {
-		t.Fatalf("sort wrapped to %q want cpu", p.SortKey())
 	}
 }
 
