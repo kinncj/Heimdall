@@ -7,6 +7,16 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+- **Himinbjörg — one focus + scroll primitive for the TUI (`app/internal/tui/pane`).**
+  A `Pane` (scroll, selection-that-follows-the-cursor, `/` filter, sort) and a `Group`
+  (Tab/Shift-Tab focus with a focus ring, two-level page+pane scroll, pointer-targeted
+  mouse) replace the three divergent scroll implementations the TUI carried. Capability
+  interfaces (`Filterable`/`Sortable`) are opt-in, so static panels get neither. Panes
+  render only (ADR-0022). See [ADR-0023](docs/architecture/0023-tui-focus-scroll-pane-primitive.md).
+  Migration of topview and the dashboard modals onto the primitive is in progress on
+  `feature/himinbjorg-focus-scroll`.
+
 ## [2.6.3] - 2026-07-02
 
 ### Changed

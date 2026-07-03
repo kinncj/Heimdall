@@ -194,6 +194,11 @@ Feature: Unified focus and scroll for the TUI
 
 ## ADR Links
 
-<!-- populated by architect agent when adr_required: true -->
-<!-- New architectural primitive: app/internal/tui/pane (Pane + Group). -->
-<!-- Must respect ADR-0022 metric-standardization boundary: panes render only. -->
+- [ADR-0023](../../architecture/0023-tui-focus-scroll-pane-primitive.md) — the `pane`
+  primitive (`Pane` + `Group`) this story introduces.
+- [ADR-0022](../../architecture/0022-metric-standardization-boundary.md) — panes render
+  only; no bucketing or classification in the view layer.
+- [ADR-0020](../../architecture/0020-hlidskjalf-top-view-and-npu-rename.md) — the
+  full-screen top view this feature makes focus/scroll-consistent.
+- [ADR-0019](../../architecture/0019-v2-log-search-and-top-sorting.md) — the log-search
+  and top-sort behaviour folded into the pane `/` filter and sort-key cycle.

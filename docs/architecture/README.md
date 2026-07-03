@@ -58,5 +58,6 @@ docs/architecture/NNNN-short-decision-title.md
 | [0020](0020-hlidskjalf-top-view-and-npu-rename.md) | Hliðskjálf full-screen top view, NPU rename, and screen-aware TUI | accepted | 2026-06-30 |
 | [0021](0021-power-metric-standardization-and-source-layering.md) | Power metric standardization (cpu/gpu/total) and per-platform source layering | accepted | 2026-07-02 |
 | [0022](0022-metric-standardization-boundary.md) | Metric standardization boundary: adapters normalise, consumers render | accepted | 2026-07-02 |
+| [0023](0023-tui-focus-scroll-pane-primitive.md) | Himinbjörg: one focus + scroll primitive (`pane.Pane`/`pane.Group`) for the TUI | accepted | 2026-07-02 |
 
 <!-- Add a row for each ADR as you create them -->
