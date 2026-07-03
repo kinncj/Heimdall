@@ -7,6 +7,8 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-07-03
+
 ### Changed
 - **The dashboard modals and detail view now scroll through the shared `pane.Window`**,
   and the dashboard's duplicate `scrollWindow`/`keepSelVisible` are gone — one windowing
