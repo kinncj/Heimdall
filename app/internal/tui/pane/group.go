@@ -22,10 +22,11 @@ import (
 // same keepVisible rule, so the focused pane's active row is never hidden.
 type Group struct {
 	rows       [][]*Pane
-	focus      int // index into the row-major flattening
+	focus      int // index into the row-major flattening; -1 = whole-page focus
 	pageScroll int
 	box        Rect
 	lastHeight int
+	pageFocus  bool // when set, Tab includes a whole-page focus stop (focus == -1)
 }
 
 // NewGroup builds a single-column group: one pane per row, stacked vertically.
@@ -45,6 +46,18 @@ func NewGrid(rows [][]*Pane) *Group {
 	return g
 }
 
+// EnablePageFocus adds a whole-page focus stop to the Tab cycle and makes it the
+// starting focus: arrows and the wheel scroll the entire body as one, so the view
+// is always scrollable regardless of which panel — or none — is focused. Tab then
+// steps into each panel and wraps back around to the whole-page stop. Used by the
+// full-screen top view, where the panels together can exceed the terminal.
+func (g *Group) EnablePageFocus() *Group {
+	g.pageFocus = true
+	g.focus = -1
+	g.applyFocus()
+	return g
+}
+
 // flat returns the panes in reading order (row-major).
 func (g *Group) flat() []*Pane {
 	var out []*Pane
@@ -60,14 +73,18 @@ func (g *Group) Panes() []*Pane { return g.flat() }
 // Focus is the reading-order index of the focused pane.
 func (g *Group) Focus() int { return g.focus }
 
-// Focused returns the focused pane, or nil if the group is empty.
+// Focused returns the focused pane, or nil when the group is empty or the
+// whole-page stop is focused (focus == -1).
 func (g *Group) Focused() *Pane {
 	fl := g.flat()
-	if len(fl) == 0 {
+	if g.focus < 0 || g.focus >= len(fl) {
 		return nil
 	}
 	return fl[g.focus]
 }
+
+// WholePageFocused reports whether the whole-page stop is the current focus.
+func (g *Group) WholePageFocused() bool { return g.pageFocus && g.focus < 0 }
 
 // PageScroll is the current page (canvas) scroll offset in rows.
 func (g *Group) PageScroll() int { return g.pageScroll }
@@ -92,7 +109,13 @@ func (g *Group) setFocus(i int) {
 	if n == 0 {
 		return
 	}
-	g.focus = ((i % n) + n) % n // wrap both directions
+	if g.pageFocus {
+		// States run -1 (whole page), 0 … n-1, then wrap back to -1.
+		total := n + 1
+		g.focus = ((i+1)%total+total)%total - 1
+	} else {
+		g.focus = ((i % n) + n) % n // wrap both directions
+	}
 	g.applyFocus()
 	g.ensureFocusedVisible(g.lastHeight)
 }
@@ -109,6 +132,9 @@ func (g *Group) Update(msg tea.KeyMsg, height int) bool {
 		g.FocusPrev()
 		return true
 	}
+	if g.WholePageFocused() {
+		return g.pageScrollKey(msg, height)
+	}
 	fp := g.Focused()
 	if fp == nil {
 		return false
@@ -120,10 +146,69 @@ func (g *Group) Update(msg tea.KeyMsg, height int) bool {
 	return handled
 }
 
+// pageScrollKey scrolls the whole canvas when the whole-page stop is focused, so
+// arrows/pgup/pgdn/home/end move the entire body as one.
+func (g *Group) pageScrollKey(msg tea.KeyMsg, height int) bool {
+	_, total := g.layout(g.boxW(), height)
+	switch msg.String() {
+	case "up", "k":
+		g.pageScroll = clampOffset(g.pageScroll-1, total, height)
+	case "down", "j":
+		g.pageScroll = clampOffset(g.pageScroll+1, total, height)
+	case "pgup":
+		g.pageScroll = clampOffset(g.pageScroll-g.pageStep(height), total, height)
+	case "pgdown", "pgdn":
+		g.pageScroll = clampOffset(g.pageScroll+g.pageStep(height), total, height)
+	case "home":
+		g.pageScroll = 0
+	case "end":
+		g.pageScroll = clampOffset(total, total, height)
+	default:
+		return false
+	}
+	return true
+}
+
+func (g *Group) pageStep(height int) int {
+	if height > 1 {
+		return height - 1
+	}
+	return 1
+}
+
+func (g *Group) boxW() int {
+	if g.box.W > 0 {
+		return g.box.W
+	}
+	return 80
+}
+
 // Mouse routes a wheel/click by pointer position: the wheel scrolls the pane under
 // the pointer, a click focuses it. Reports whether the event was consumed.
 func (g *Group) Mouse(msg tea.MouseMsg, height int) bool {
 	g.lastHeight = height
+	// Whole-page focus: the wheel scrolls the entire body wherever the pointer is.
+	// A click still drops focus onto the panel under the pointer.
+	if g.WholePageFocused() {
+		_, total := g.layout(g.boxW(), height)
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			g.pageScroll = clampOffset(g.pageScroll-wheelStep, total, height)
+			return true
+		case tea.MouseButtonWheelDown:
+			g.pageScroll = clampOffset(g.pageScroll+wheelStep, total, height)
+			return true
+		}
+		if msg.Action == tea.MouseActionPress && msg.Button == tea.MouseButtonLeft {
+			if idx := g.paneAt(msg.X, msg.Y); idx >= 0 {
+				g.focus = idx
+				g.applyFocus()
+				g.ensureFocusedVisible(height)
+				return true
+			}
+		}
+		return false
+	}
 	idx := g.paneAt(msg.X, msg.Y)
 	if idx < 0 {
 		return false
@@ -231,8 +316,8 @@ func (g *Group) layout(width, height int) ([]slot, int) {
 // ensureFocusedVisible page-scrolls the canvas so the focused pane's active row is
 // on screen. Same keepVisible rule the panes use for their own cursors.
 func (g *Group) ensureFocusedVisible(height int) {
-	if height < 1 || len(g.flat()) == 0 {
-		return
+	if height < 1 || len(g.flat()) == 0 || g.focus < 0 {
+		return // whole-page focus drives pageScroll directly
 	}
 	w := g.box.W
 	if w < 1 {
@@ -291,7 +376,10 @@ func (g *Group) View(m theme.Mode, box Rect) string {
 		cols := make([]string, len(rowSlots))
 		spans := make([]canvasSpan, len(rowSlots))
 		for i, s := range rowSlots {
-			cols[i] = s.p.Frame(m, s.p.View(m, s.w-2, s.inner), s.w-2)
+			// Pad every pane in the row to the row's height so their boxes line up
+			// (a short panel next to a tall one keeps a clean grid, no ragged gap).
+			body := padLines(s.p.View(m, s.w-2, s.inner), s.inner)
+			cols[i] = s.p.Frame(m, body, s.w-2)
 			spans[i] = canvasSpan{flat: s.flat, x: box.X + s.x, w: s.w}
 		}
 		block := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
@@ -314,19 +402,27 @@ func (g *Group) View(m theme.Mode, box Rect) string {
 	for _, cl := range canvas[offset:end] {
 		out = append(out, cl.line)
 	}
-	if offset > 0 {
-		out = append([]string{g.pageAffordance(m, offset+1, realTotal, true)}, out...)
-		if len(out) > box.H {
-			out = out[:box.H]
+	// Replace the edge rows with page affordances (like a pane does its own edges),
+	// so the window stays exactly box.H tall without dropping the opposite edge.
+	if len(out) > 0 {
+		if offset > 0 {
+			out[0] = g.pageAffordance(m, offset+1, realTotal, true)
 		}
-	}
-	if end < realTotal {
-		out = append(out, g.pageAffordance(m, end, realTotal, false))
-		if len(out) > box.H {
-			out = out[len(out)-box.H:]
+		if end < realTotal {
+			out[len(out)-1] = g.pageAffordance(m, end, realTotal, false)
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+// padLines extends a rendered block to exactly n lines with blanks, so panes in a
+// row share a height and their boxes align.
+func padLines(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	for len(lines) < n {
+		lines = append(lines, "")
+	}
+	return strings.Join(lines, "\n")
 }
 
 // setBoxes assigns each pane its on-screen rectangle from the visible canvas rows,

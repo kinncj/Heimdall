@@ -430,7 +430,7 @@ func (p *Pane) filterLine(m theme.Mode, width int) string {
 
 // Frame wraps content in a border whose weight signals focus: a heavy border when
 // focused (the focus ring), a normal border otherwise. Colour comes from the focus
-// / border role; the weight is the non-colour signal.
+// / border role; the weight is the non-colour signal, so focus survives NO_COLOR.
 func (p *Pane) Frame(m theme.Mode, content string, width int) string {
 	border := lipgloss.NormalBorder()
 	roleName := "border"
@@ -438,20 +438,49 @@ func (p *Pane) Frame(m theme.Mode, content string, width int) string {
 		border = lipgloss.ThickBorder()
 		roleName = "focus"
 	}
-	st := lipgloss.NewStyle().Border(border)
-	if role, ok := m.Role(roleName); ok {
-		if c := role.Style().GetForeground(); c != nil {
-			st = st.BorderForeground(c)
-		}
+	st := lipgloss.NewStyle().Border(border).Padding(0, 1)
+	if role, ok := m.Role(roleName); ok && role.FG != "" {
+		st = st.BorderForeground(lipgloss.Color(role.FG))
 	}
 	if width > 0 {
-		st = st.Width(width)
+		st = st.Width(width - 2) // Padding(0,1) adds two columns
 	}
 	title := p.title
 	if h, ok := m.Role("heading"); ok {
 		title = h.Style().Render(p.title)
 	}
 	return st.Render(title + "\n" + content)
+}
+
+// SetScroll / SetSelection restore view state (used when a live refresh rebuilds
+// panes but must keep the user where they were).
+func (p *Pane) SetScroll(v int) { p.scroll = v }
+func (p *Pane) SetSelection(v int) {
+	if p.sel >= 0 {
+		p.sel = v
+	}
+}
+
+// TransferStateFrom copies focus/scroll/selection/filter/sort from a same-shaped
+// old group, so rebuilding on a live tick does not jump the view.
+func (g *Group) TransferStateFrom(old *Group) {
+	if old == nil {
+		return
+	}
+	np, op := g.flat(), old.flat()
+	if len(np) != len(op) {
+		return
+	}
+	g.focus = old.focus
+	g.pageScroll = old.pageScroll
+	for i := range np {
+		np[i].scroll = op[i].scroll
+		np[i].sel = op[i].sel
+		np[i].filtering = op[i].filtering
+		np[i].query = op[i].query
+		np[i].sortIdx = op[i].sortIdx
+	}
+	g.applyFocus()
 }
 
 // page is one page of scrolling (a near-full window, keeping one row of overlap).

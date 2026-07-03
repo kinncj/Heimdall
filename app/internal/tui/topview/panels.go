@@ -20,82 +20,47 @@ type panelSpec struct {
 	lines []string
 }
 
-// body builds the scrollable panel region for the tier as a flat list of lines.
-func (m Model) body(t tier) []string {
+// specRows builds the panel content for the tier as rows of panels. Each row is
+// laid out by pane.Group: one panel per row for narrow tiers, two side by side for
+// the wide grid. The Group draws the borders, focus ring, and scroll affordances —
+// this function only supplies each panel's title and content lines.
+func (m Model) specRows(t tier) [][]panelSpec {
 	if t == tierTiny {
-		return m.tinyBody()
-	}
-
-	var out []string
-	add := func(block string) {
-		if len(out) > 0 {
-			out = append(out, "")
-		}
-		out = append(out, strings.Split(block, "\n")...)
+		return [][]panelSpec{{{title: "TOP", lines: m.tinyBody()}}}
 	}
 
 	if t == tierWide {
-		full := m.width - 4
-		col := (m.width-2)/2 - 4
+		col := m.width/2 - 4 // per-column content width (border + padding = 4)
 		if col < 10 {
 			col = 10
 		}
-		add(m.row2(m.cpuPanel(t, col), m.memPanel(t, col), col))
-		add(m.row2(m.powerPanel(t, col), m.gpuPanel(t, col), col))
-		add(m.row2(m.netDiskPanel(t, col), m.loadUptimePanel(), col))
-		add(m.renderPanel(m.processPanel(t, m.procRows(out)), full))
-		return out
+		return [][]panelSpec{
+			{m.cpuPanel(t, col), m.memPanel(t, col)},
+			{m.powerPanel(t, col), m.gpuPanel(t, col)},
+			{m.netDiskPanel(t, col), m.loadUptimePanel()},
+			{m.processPanel(t, m.procN())},
+		}
 	}
 
 	inner := m.width - 4
 	if inner < 10 {
 		inner = 10
 	}
-	for _, p := range []panelSpec{
-		m.cpuPanel(t, inner), m.memPanel(t, inner), m.powerPanel(t, inner),
-		m.gpuPanel(t, inner), m.netDiskPanel(t, inner),
-	} {
-		add(m.renderPanel(p, inner))
+	return [][]panelSpec{
+		{m.cpuPanel(t, inner)}, {m.memPanel(t, inner)}, {m.powerPanel(t, inner)},
+		{m.gpuPanel(t, inner)}, {m.netDiskPanel(t, inner)},
+		{m.processPanel(t, m.procN())},
 	}
-	add(m.renderPanel(m.processPanel(t, m.procRows(out)), inner))
-	return out
 }
 
-// procRows is how many content lines the PROCESSES box should hold so it grows
-// to fill the height left below the other panels (btop-style), instead of
-// leaving a void. out is the body built so far; add() will insert one blank
-// separator, and the box itself costs a title row + two borders.
-func (m Model) procRows(out []string) int {
-	n := m.bodyHeight() - (len(out) + 1) - 3
-	if n < 4 {
-		n = 4
+// procN is how many process rows the PROCESSES panel should render. The panel is a
+// scrollable pane now, so it carries every process and lets the Group scroll it,
+// rather than being padded to a fixed height.
+func (m Model) procN() int {
+	if n := len(m.host.Processes); n > 0 {
+		return n
 	}
-	return n
-}
-
-// row2 renders two panels side by side and returns the joined block.
-func (m Model) row2(a, b panelSpec, col int) string {
-	left := m.renderPanel(a, col)
-	right := m.renderPanel(b, col)
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, "  ", right)
-}
-
-// renderPanel boxes a panel's title + content with a single border, fixed to the
-// given inner content width. lipgloss wraps any overlong content and guarantees
-// the box width, so no line escapes the frame.
-func (m Model) renderPanel(p panelSpec, inner int) string {
-	heading, _ := m.mode.Role("heading")
-	border, _ := m.mode.Role("border")
-	content := heading.Style().Render(p.title)
-	if len(p.lines) > 0 {
-		content += "\n" + strings.Join(p.lines, "\n")
-	}
-	return lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color(border.FG)).
-		Padding(0, 1).
-		Width(inner).
-		Render(content)
+	return 4
 }
 
 // --- panels -----------------------------------------------------------------

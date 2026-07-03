@@ -11,20 +11,27 @@ import (
 	"heimdall/app/internal/domain"
 )
 
-func TestRefreshPreservesScroll(t *testing.T) {
+func TestRefreshPreservesFocusAndScroll(t *testing.T) {
 	th := darkMode(t)
 	h := domain.HostView{Host: domain.Host{ID: "h", DisplayName: "h"},
 		State:        domain.StateOnline,
 		LastSnapshot: []domain.Metric{{Name: "cpu.util", Status: domain.StatusOK, Gauge: 50}}}
-	m := New(h, map[string][]float64{}, th, 120, 8)
-	m, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown}) // scroll to 1
-	if m.scroll == 0 {
-		t.Skip("content fit on screen; nothing to scroll")
+	// A short terminal so the panel stack overflows and Tab page-scrolls.
+	m := New(h, map[string][]float64{}, th, 120, 10)
+	for i := 0; i < 3; i++ { // Tab focus down a few panels
+		m, _ = m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	}
-	before := m.scroll
+	focus := m.group.Focus()
+	page := m.group.PageScroll()
+	if focus == 0 {
+		t.Fatal("Tab did not move focus")
+	}
 	r := m.Refresh(h, map[string][]float64{})
-	if r.scroll != before {
-		t.Errorf("Refresh dropped scroll: got %d want %d", r.scroll, before)
+	if r.group.Focus() != focus {
+		t.Errorf("Refresh dropped focus: got %d want %d", r.group.Focus(), focus)
+	}
+	if r.group.PageScroll() != page {
+		t.Errorf("Refresh dropped page scroll: got %d want %d", r.group.PageScroll(), page)
 	}
 }
 

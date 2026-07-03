@@ -118,6 +118,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.top = &t
 		}
 	case tea.MouseMsg:
+		// The top view is a full-screen takeover: it owns the mouse too, so the
+		// wheel/click targets the panel under the pointer (Himinbjörg).
+		if m.top != nil {
+			nt := m.top.Mouse(msg)
+			m.top = &nt
+			return m, nil
+		}
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
 			return m.scroll(-1), nil

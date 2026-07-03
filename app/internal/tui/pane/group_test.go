@@ -175,6 +175,61 @@ func TestGridReadingOrderAndColumns(t *testing.T) {
 	}
 }
 
+// With page focus, the whole view is the first stop: arrows scroll the whole page,
+// Tab steps into each pane, and the cycle wraps back to the whole-page stop.
+func TestPageFocusFirstStopAndWrap(t *testing.T) {
+	g := NewGrid([][]*Pane{
+		{New("a", &staticSrc{rows: makeRows(15)})},
+		{New("b", &staticSrc{rows: makeRows(15)})},
+	}).EnablePageFocus()
+
+	const h = 12
+	if !g.WholePageFocused() {
+		t.Fatal("page-focus group should start on the whole-page stop")
+	}
+	if g.Focused() != nil {
+		t.Fatal("no pane should be focused on the whole-page stop")
+	}
+	// Arrows scroll the whole page while nothing is focused.
+	g.Update(key("down"), h)
+	g.Update(key("down"), h)
+	if g.PageScroll() == 0 {
+		t.Fatal("arrows should scroll the whole page on the whole-page stop")
+	}
+	// Tab steps into pane 0, then pane 1, then wraps back to the whole-page stop.
+	g.Update(key("tab"), h)
+	if g.Focus() != 0 {
+		t.Fatalf("first Tab should focus pane 0, got %d", g.Focus())
+	}
+	g.Update(key("tab"), h)
+	if g.Focus() != 1 {
+		t.Fatalf("second Tab should focus pane 1, got %d", g.Focus())
+	}
+	g.Update(key("tab"), h) // wrap back to whole page
+	if !g.WholePageFocused() {
+		t.Fatalf("Tab should wrap back to the whole-page stop, focus=%d", g.Focus())
+	}
+	// Shift-Tab from the whole-page stop goes to the last pane.
+	g.Update(keyShiftTab(), h)
+	if g.Focus() != 1 {
+		t.Fatalf("shift+Tab from whole-page should focus the last pane, got %d", g.Focus())
+	}
+}
+
+func TestPageFocusWheelScrollsWholePage(t *testing.T) {
+	m := testMode(t)
+	g := NewGrid([][]*Pane{
+		{New("a", &staticSrc{rows: makeRows(20)})},
+		{New("b", &staticSrc{rows: makeRows(20)})},
+	}).EnablePageFocus()
+	g.View(m, Rect{X: 0, Y: 0, W: 50, H: 12})
+	before := g.PageScroll()
+	g.Mouse(wheel(tea.MouseButtonWheelDown, 5, 5), 12)
+	if g.PageScroll() <= before {
+		t.Fatal("wheel on the whole-page stop should scroll the whole page")
+	}
+}
+
 func wheel(btn tea.MouseButton, x, y int) tea.MouseMsg {
 	return tea.MouseMsg{X: x, Y: y, Button: btn, Action: tea.MouseActionPress}
 }
