@@ -68,6 +68,39 @@ func (m Model) sortedProcesses(h domain.HostView) []domain.ProcessRow {
 	return rows
 }
 
+// matchesTopRow reports whether a process satisfies the active process filter
+// (empty query matches everything), case-insensitive substring over the command.
+func (m Model) matchesTopRow(p domain.ProcessRow) bool {
+	q := strings.ToLower(strings.TrimSpace(m.topQuery))
+	if q == "" {
+		return true
+	}
+	return strings.Contains(strings.ToLower(p.Command), q)
+}
+
+// updateTopSearch handles keystrokes while the process filter input is open: type
+// to narrow by command, backspace to edit, enter to keep, esc to clear. Mirrors
+// the log-view search.
+func (m Model) updateTopSearch(s string, runes []rune) Model {
+	switch s {
+	case "enter":
+		m.topSearching = false
+	case "esc":
+		m.topSearching = false
+		m.topQuery = ""
+	case "backspace":
+		if r := []rune(m.topQuery); len(r) > 0 {
+			m.topQuery = string(r[:len(r)-1])
+		}
+	default:
+		if len(runes) > 0 {
+			m.topQuery += string(runes)
+		}
+	}
+	m.modalScroll = 0 // re-read from the top as the result set changes
+	return m
+}
+
 // matchesLogQuery reports whether a line satisfies the active log search (empty
 // query matches everything), case-insensitive substring over source + text.
 func (m Model) matchesLogQuery(l domain.LogLine) bool {

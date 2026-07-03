@@ -36,7 +36,7 @@ var keyBindings = []struct{ key, desc string }{
 	{"", "Modals"},
 	{"↑/↓ · wheel", "pick / scroll (selection stays in view)"},
 	{"⏎", "open / run"},
-	{"/", "search / filter (logs, commands, command output)"},
+	{"/", "search / filter (logs, processes, commands)"},
 	{"s", "change process sort"},
 	{"esc", "back — one level at a time"},
 	{"", "General"},

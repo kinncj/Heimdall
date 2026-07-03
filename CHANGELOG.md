@@ -24,6 +24,9 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   narrows the command list as you type; after a command runs, `/` in the result view
   filters the output lines (case-insensitive substring). `esc` clears either filter,
   the highlighted row stays in view — the same idiom as the log-view search.
+- **The process view (`p`) filters by command.** `/` narrows the process table by
+  command name; it stacks with the `s` sort, so you can filter to a process family
+  and sort it by CPU or memory. `esc` clears the filter.
 
 ## [2.6.3] - 2026-07-02
 

@@ -79,6 +79,10 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.modal == modalCmdResult && m.cmdOutSearching {
 		return m.updateCmdOutSearch(msg.String(), msg.Runes), nil
 	}
+	// …and the process-view command filter input.
+	if m.modal == modalTop && m.topSearching {
+		return m.updateTopSearch(msg.String(), msg.Runes), nil
+	}
 	// Clamp a scroll offset that may be a "pin to tail" sentinel or stale after the
 	// buffer shrank, so up/down respond immediately.
 	if m.modal == modalLogView || m.modal == modalTop || m.modal == modalCmdResult {
@@ -120,6 +124,7 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "p":
 			if ok && hasProc(h) {
 				m.modal, m.modalScroll = modalTop, 0
+				m.topQuery, m.topSearching = "", false
 			}
 		case "c":
 			if ok && hasCmd(h) && m.runCmd != nil {
@@ -173,8 +178,14 @@ func (m Model) updateDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
+		case "/":
+			m.topSearching = true
 		case "esc":
-			m.modal = modalNone
+			if m.topQuery != "" {
+				m.topQuery = "" // first esc clears an active filter
+			} else {
+				m.modal = modalNone
+			}
 		case "s":
 			m.modal, m.topSortSel = modalTopSort, m.activeTopSortIndex()
 		case "up", "k":
@@ -315,9 +326,16 @@ func (m Model) ModalView() string {
 		title = heading.Style().Render("  PROCESSES — "+dn) +
 			muted.Style().Render("   sort ") + val.Style().Render(m.activeTopSort().key) +
 			muted.Style().Render("   updated "+when)
+		if q := m.topQuery; q != "" || m.topSearching {
+			if m.topSearching {
+				q += "▏"
+			}
+			title += muted.Style().Render("   filter: ") + val.Style().Render(q)
+		}
 		body = m.topBody(h, w)
 		footer = "  " + keys.Style().Render("↑/↓") + muted.Style().Render(" scroll  ") +
 			keys.Style().Render("s") + muted.Style().Render(" sort  ") +
+			keys.Style().Render("/") + muted.Style().Render(" filter  ") +
 			keys.Style().Render("esc") + muted.Style().Render(" back")
 	case modalTopSort:
 		title = heading.Style().Render("  SORT — top processes")
@@ -421,9 +439,17 @@ func (m Model) topBody(h domain.HostView, w int) []string {
 	if len(h.Processes) == 0 {
 		return append(out, muted.Style().Render("  waiting for a process table…"))
 	}
+	matched := 0
 	for _, p := range m.sortedProcesses(h) {
+		if !m.matchesTopRow(p) {
+			continue
+		}
+		matched++
 		out = append(out, val.Style().Render(fmt.Sprintf("  %7d %7d %5.1f%% %5.1f%%  %s",
 			p.PID, p.PPID, p.CPUPct, p.MemPct, clip(p.Command, w-38))))
+	}
+	if matched == 0 {
+		out = append(out, muted.Style().Render("  no processes match the filter"))
 	}
 	return out
 }

@@ -44,6 +44,8 @@ type Model struct {
 	// v2 (ADR 0019): log search + top sorting.
 	topSort      string       // active top sort key ("" = cpu default)
 	topSortSel   int          // selection index in the sort picker
+	topQuery     string       // process-view COMMAND filter
+	topSearching bool         // true while the process filter input is open
 	logQuery     string       // log-view search query
 	logSearching bool         // true while the log search input is open
 	persistSort  func(string) // persist the chosen top sort to config (injected)

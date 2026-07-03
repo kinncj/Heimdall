@@ -72,9 +72,11 @@ A live top-style process list for the host.
 |---|---|
 | `↑/↓` · wheel | scroll |
 | `s` | change the sort column — `↑/↓` to pick (CPU%, MEM%, PID, COMMAND), `⏎` to apply |
-| `esc` | back |
+| `/` | **filter by command** (case-insensitive); `esc` clears it |
+| `esc` | clear an active filter, then back |
 
-The chosen sort is remembered as your default for next time.
+The chosen sort is remembered as your default for next time. Sort and filter stack —
+filter to `chrome`, sort by `MEM%`, and you see the heaviest Chrome processes.
 
 ## 5. Commands (`c`)
 
