@@ -82,8 +82,7 @@ finish it):
    feature) / patch (bug fix, no API change).
 2. **Milestone — major & minor only.** Ensure `vX.Y.0` exists (create if missing).
    **Patches never get their own milestone** — attach to their minor's `vX.Y.0`.
-3. **Issue — every change, patches included.** Labelled **`bug`** (patch/fix) or
-   **`enhancement`** (feature), assigned to the target major/minor milestone.
+3. **Issue — every change, patches included.** Labelled the matching **`type:*`** label (`type:bug` fix · `type:feature` feature · `type:docs`/`type:refactor`/`type:chore`, per `gh-labels-milestones`), assigned to the target major/minor milestone.
 4. **Project board** — add the issue and set **Status** (`In progress` → `Done`).
    Read the board number from `github.project_number` in `project.config.yaml`
    (never hard-code it).
