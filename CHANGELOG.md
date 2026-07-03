@@ -14,8 +14,12 @@ and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   mouse) replace the three divergent scroll implementations the TUI carried. Capability
   interfaces (`Filterable`/`Sortable`) are opt-in, so static panels get neither. Panes
   render only (ADR-0022). See [ADR-0023](docs/architecture/0023-tui-focus-scroll-pane-primitive.md).
-  Migration of topview and the dashboard modals onto the primitive is in progress on
-  `feature/himinbjorg-focus-scroll`.
+- **The full-screen top view (`t`) runs on the pane primitive.** The whole view is the
+  first focus — `↑/↓` and the mouse wheel scroll the entire screen, so it is always
+  scrollable at any resolution — and `Tab` steps the focus ring through each panel and
+  wraps back to the whole-view stop. The mouse wheel/click targets the panel under the
+  pointer (it did nothing in the top view before). The wide two-column panel grid is
+  kept. Dashboard-modal adoption is still in progress on `feature/himinbjorg-focus-scroll`.
 
 ## [2.6.3] - 2026-07-02
 
