@@ -19,7 +19,7 @@ jobs:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -115,7 +115,7 @@ jobs:
           SUMS=SHA256SUMS OUT=aur-out COMPONENTS="${{ matrix.component }}" \
             bash packaging/aur/gen-pkgbuild.sh
       - name: Publish to the AUR
-        uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
+        uses: KSXGitHub/github-actions-deploy-aur@v4.2.0
         with:
           pkgname: heimdall-${{ matrix.component }}-bin
           pkgbuild: aur-out/heimdall-${{ matrix.component }}-bin/PKGBUILD
