@@ -1,6 +1,72 @@
+# Dependency updates.
+#
+# Application dependencies use separate manifests, so each package ecosystem
+# needs an entry pointing to the directory containing its manifest.
+# GitHub Actions also needs its own repository-root entry.
+#
+# `make security-scan` (govulncheck) complements Dependabot: Dependabot reports
+# available updates, while govulncheck identifies vulnerabilities reachable
+# from the Go application.
+
 version: 2
+
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  # Go modules: app/go.mod
+  - package-ecosystem: gomod
+    directory: /app
     schedule:
-      interval: "weekly"
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(go)"
+    labels:
+      - dependencies
+      - go
+    groups:
+      charm:
+        patterns:
+          - github.com/charmbracelet/*
+      go-patch:
+        update-types:
+          - patch
+
+  # TypeScript manifest generator: tools/generate/package.json
+  - package-ecosystem: npm
+    directory: /tools/generate
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(npm)"
+    labels:
+      - dependencies
+      - typescript
+    groups:
+      npm-patch:
+        update-types:
+          - patch
+
+  # GitHub Actions workflows under .github/workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(actions)"
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      actions:
+        patterns:
+          - "*"
